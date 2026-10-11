@@ -4,7 +4,6 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,7 +22,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -71,7 +73,7 @@ fun QueueBottomSheet(
 ) {
     if (LocalInspectionMode.current) {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = modifier.fillMaxSize()
         ) {
@@ -83,7 +85,7 @@ fun QueueBottomSheet(
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
             scrimColor = Color.Black.copy(alpha = 0.5f),
             modifier = modifier.fillMaxHeight()
@@ -121,16 +123,14 @@ fun QueueBottomSheetContent(
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
+        modifier = modifier.fillMaxSize()
     ) {
         if (state.queue.isEmpty()) {
             // Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -230,19 +230,20 @@ fun QueueBottomSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(nestedScrollConnection),
-                    contentPadding = PaddingValues(bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    contentPadding = PaddingValues(top = 0.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     // Header: Action Row & Animated "Playing Queue" Title (Sticky Header)
                     stickyHeader(key = "header_actions") {
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            color = MaterialTheme.colorScheme.surface,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .onGloballyPositioned { layoutCoordinates ->
@@ -262,7 +263,7 @@ fun QueueBottomSheetContent(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(bottom = 8.dp),
+                                            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -302,7 +303,7 @@ fun QueueBottomSheetContent(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
+                                            .padding(horizontal = 16.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -452,7 +453,7 @@ fun QueueBottomSheetContent(
                         listState = lazyListState,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .padding(end = 2.dp, top = 8.dp, bottom = 8.dp)
+                            .padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
                             .zIndex(100f)
                     )
                 }
@@ -481,9 +482,9 @@ fun QueueBottomSheetContent(
                 )
             }
         }
-
-        Spacer(modifier = Modifier.navigationBarsPadding())
     }
+
+    Spacer(modifier = Modifier.navigationBarsPadding())
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -500,39 +501,184 @@ private fun QueueItemRow(
     onDragEnd: () -> Unit,
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
-    onLongClick: () -> Unit = {}
+    onLongClick: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val currentOnDragStart by rememberUpdatedState(onDragStart)
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val view = LocalView.current
 
-    val itemShape = if (isCurrent || isSelected) CircleShape else RoundedCornerShape(20.dp)
+    val itemShape = if (isCurrent || isSelected || isBeingDragged) CircleShape else RoundedCornerShape(12.dp)
 
     val containerColor by animateColorAsState(
         targetValue = when {
             isBeingDragged -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
             isSelected -> MaterialTheme.colorScheme.secondaryContainer
             isCurrent -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceContainerLowest
+            else -> Color.Transparent
         },
         label = "queue_item_bg"
     )
 
-    val contentColor = when {
-        isSelected -> MaterialTheme.colorScheme.onSecondaryContainer
-        isCurrent || isBeingDragged -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSurface
+    val rawArtist = item.mediaMetadata.artist?.toString() ?: ""
+    val rawTitle = item.mediaMetadata.title?.toString() ?: ""
+    val displayArtist = remember(rawArtist, rawTitle) {
+        val artistList = collectArtistNames(rawArtist, rawTitle)
+        if (artistList.isNotEmpty()) {
+            artistList.joinArtistsForDisplay()
+        } else {
+            rawArtist.ifBlank { "Unknown Artist" }
+        }
     }
 
-    val elevation by animateDpAsState(
-        targetValue = if (isBeingDragged) 8.dp else (if (isCurrent || isSelected) 4.dp else 1.dp),
-        label = "queue_item_elevation"
-    )
+    ListItem(
+        headlineContent = {
+            Text(
+                text = if (rawTitle.isBlank()) "Unknown Track" else rawTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (isCurrent || isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = when {
+                    isSelected -> MaterialTheme.colorScheme.onSecondaryContainer
+                    isCurrent || isBeingDragged -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        supportingContent = {
+            Text(
+                text = displayArtist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = when {
+                    isSelected -> MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                    isCurrent || isBeingDragged -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        leadingContent = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Drag Rearrange Handle on left
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .then(
+                            if (!isSelectionMode) {
+                                Modifier.pointerInput(Unit) {
+                                    detectVerticalDragGestures(
+                                        onDragStart = { currentOnDragStart() },
+                                        onDragEnd = { currentOnDragEnd() },
+                                        onDragCancel = { currentOnDragEnd() },
+                                        onVerticalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            currentOnDrag(dragAmount)
+                                        }
+                                    )
+                                }
+                            } else Modifier
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DragIndicator,
+                        contentDescription = "Drag to reorder",
+                        tint = if (isCurrent || isBeingDragged) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        },
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
 
-    Surface(
-        modifier = Modifier
+                // Artwork Thumbnail
+                Box(
+                    modifier = Modifier.size(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                    AsyncImage(
+                        model = item.mediaMetadata.artworkUri,
+                        contentDescription = null,
+                        error = musicPlaceholder,
+                        placeholder = musicPlaceholder,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    )
+
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        trailingContent = {
+            if (isSelectionMode) {
+                IconButton(
+                    onClick = onLongClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = if (isSelected) "Selected" else "Unselected",
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                FilledTonalIconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.size(28.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = if (isCurrent || isBeingDragged) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        contentColor = if (isCurrent || isBeingDragged) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Remove from Queue",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent
+        ),
+        modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp)
             .zIndex(if (isBeingDragged) 10f else 0f)
             .graphicsLayer {
                 translationY = dragOffsetY
@@ -549,6 +695,7 @@ private fun QueueItemRow(
                 } else Modifier
             )
             .clip(itemShape)
+            .background(containerColor)
             .combinedClickable(
                 enabled = !isBeingDragged,
                 onClick = {
@@ -562,147 +709,8 @@ private fun QueueItemRow(
                     view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                     onLongClick()
                 }
-            ),
-        color = containerColor,
-        contentColor = contentColor,
-        tonalElevation = elevation,
-        shadowElevation = elevation,
-        shape = itemShape
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // Drag Rearrange Handle on left
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .then(
-                        if (!isSelectionMode) {
-                            Modifier.pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onDragStart = { currentOnDragStart() },
-                                    onDragEnd = { currentOnDragEnd() },
-                                    onDragCancel = { currentOnDragEnd() },
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        currentOnDrag(dragAmount)
-                                    }
-                                )
-                            }
-                        } else Modifier
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.DragHandle,
-                    contentDescription = "Drag to reorder",
-                    tint = if (isCurrent || isBeingDragged) {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    },
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // Artwork Thumbnail
-            Box(
-                modifier = Modifier.size(52.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = item.mediaMetadata.artworkUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                )
-
-                if (isSelected) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                }
-            }
-
-            // Title & Artist
-            val rawArtist = item.mediaMetadata.artist?.toString() ?: ""
-            val rawTitle = item.mediaMetadata.title?.toString() ?: ""
-            val displayArtist = remember(rawArtist, rawTitle) {
-                val artistList = collectArtistNames(rawArtist, rawTitle)
-                if (artistList.isNotEmpty()) {
-                    artistList.joinArtistsForDisplay()
-                } else {
-                    rawArtist.ifBlank { "Unknown Artist" }
-                }
-            }
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = if (rawTitle.isBlank()) "Unknown Track" else rawTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = if (isCurrent || isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                    color = when {
-                        isSelected -> MaterialTheme.colorScheme.onSecondaryContainer
-                        isCurrent || isBeingDragged -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = displayArtist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = when {
-                        isSelected -> MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                        isCurrent || isBeingDragged -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (!isSelectionMode) {
-                // Remove from Queue Button
-                IconButton(
-                    onClick = onRemove,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Remove from Queue",
-                        tint = if (isCurrent || isBeingDragged) {
-                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        },
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-    }
+            )
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
