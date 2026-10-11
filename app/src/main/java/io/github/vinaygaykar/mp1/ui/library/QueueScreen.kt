@@ -45,6 +45,7 @@ import androidx.media3.common.MediaMetadata
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
@@ -196,200 +197,215 @@ fun QueueBottomSheetContent(
                 }
             }
 
-            LazyColumn(
-                state = lazyListState,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .nestedScroll(nestedScrollConnection),
-                contentPadding = PaddingValues(bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Header: Action Row & Animated "Playing Queue" Title (Sticky Header)
-                stickyHeader(key = "header_actions") {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onGloballyPositioned { layoutCoordinates ->
-                                stickyHeaderHeightPx = layoutCoordinates.size.height
-                            }
-                    ) {
-                        Column(
+                LazyColumn(
+                    state = lazyListState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(nestedScrollConnection),
+                    contentPadding = PaddingValues(bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header: Action Row & Animated "Playing Queue" Title (Sticky Header)
+                    stickyHeader(key = "header_actions") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                                .onGloballyPositioned { layoutCoordinates ->
+                                    stickyHeaderHeightPx = layoutCoordinates.size.height
+                                }
                         ) {
-                            AnimatedVisibility(
-                                visible = showPlayingQueueHeader,
-                                enter = expandVertically() + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                AnimatedVisibility(
+                                    visible = showPlayingQueueHeader,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
                                 ) {
                                     Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(
-                                            text = "Playing Queue",
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = MaterialTheme.colorScheme.secondaryContainer,
-                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Text(
-                                                text = "${state.queue.size}",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                text = "Playing Queue",
+                                                style = MaterialTheme.typography.titleLarge,
+                                                fontWeight = FontWeight.Bold
                                             )
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                            ) {
+                                                Text(
+                                                    text = "${state.queue.size}",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val isShuffleEnabled = state.queue.size > 1
-                                val shuffleContainerColor by animateColorAsState(
-                                    targetValue = if (state.isShuffleOn) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerLowest
-                                    },
-                                    label = "shuffle_btn_bg"
-                                )
-                                val shuffleContentColor by animateColorAsState(
-                                    targetValue = if (state.isShuffleOn) {
-                                        MaterialTheme.colorScheme.onPrimaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                                    label = "shuffle_btn_content"
-                                )
-
-                                // Shuffle Button (Left)
-                                FilledTonalButton(
-                                    onClick = { actions.onShuffleToggle() },
-                                    enabled = isShuffleEnabled,
-                                    shape = CircleShape,
-                                    colors = ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = shuffleContainerColor,
-                                        contentColor = shuffleContentColor,
-                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.5f),
-                                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Icon(
-                                        imageVector = if (state.isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
+                                    val isShuffleEnabled = state.queue.size > 1
+                                    val shuffleContainerColor by animateColorAsState(
+                                        targetValue = if (state.isShuffleOn) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceContainerLowest
+                                        },
+                                        label = "shuffle_btn_bg"
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (state.isShuffleOn) "Shuffle On" else "Shuffle Off",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.SemiBold
+                                    val shuffleContentColor by animateColorAsState(
+                                        targetValue = if (state.isShuffleOn) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                        label = "shuffle_btn_content"
                                     )
-                                }
 
-                                // Clear All Button (Right)
-                                OutlinedButton(
-                                    onClick = { actions.clearQueue() },
-                                    enabled = state.queue.size > 1,
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.ClearAll,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Clear All",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    // Clear All Button (Left)
+                                    OutlinedButton(
+                                        onClick = { actions.clearQueue() },
+                                        enabled = state.queue.size > 1,
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ClearAll,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Clear All",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+
+                                    // Shuffle Button (Right)
+                                    FilledTonalButton(
+                                        onClick = { actions.onShuffleToggle() },
+                                        enabled = isShuffleEnabled,
+                                        shape = CircleShape,
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = shuffleContainerColor,
+                                            contentColor = shuffleContentColor,
+                                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.5f),
+                                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (state.isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (state.isShuffleOn) "Shuffle On" else "Shuffle Off",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+
+                    // Queue Songs
+                    itemsIndexed(
+                        items = state.queue,
+                        key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
+                    ) { index, item ->
+                        val isCurrent = index == state.currentIndex
+                        val key = itemKeys.getOrElse(index) { "item_$index" }
+                        val isBeingDragged = draggedKey == key
+
+                        QueueItemRow(
+                            item = item,
+                            isCurrent = isCurrent,
+                            isBeingDragged = isBeingDragged,
+                            dragOffsetY = if (isBeingDragged) dragOffsetY else 0f,
+                            onSelect = { actions.onSkipToQueueItem(index) },
+                            onRemove = { actions.removeFromQueue(index) },
+                            onDragStart = {
+                                draggedKey = key
+                                dragOffsetY = 0f
+                            },
+                            onDrag = { dragAmount ->
+                                val currentKey = draggedKey ?: return@QueueItemRow
+                                dragOffsetY += dragAmount
+
+                                val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+                                val listIndex = itemKeys.indexOf(currentKey)
+                                if (listIndex == -1) return@QueueItemRow
+                                val lazyListIndex = listIndex + 1
+
+                                val draggedItemInfo = visibleItems.firstOrNull { it.index == lazyListIndex }
+                                if (draggedItemInfo != null) {
+                                    val draggedItemTop = draggedItemInfo.offset + dragOffsetY
+                                    val draggedItemCenter = draggedItemTop + draggedItemInfo.size / 2f
+
+                                    val targetItem = visibleItems.firstOrNull { itemInfo ->
+                                        itemInfo.index >= 1 &&
+                                                itemInfo.index != lazyListIndex &&
+                                                draggedItemCenter >= itemInfo.offset &&
+                                                draggedItemCenter <= (itemInfo.offset + itemInfo.size)
+                                    }
+
+                                    if (targetItem != null) {
+                                        val targetQueueIndex = targetItem.index - 1
+                                        actions.moveQueueItem(listIndex, targetQueueIndex)
+                                        dragOffsetY += (draggedItemInfo.offset - targetItem.offset)
+                                    }
+
+                                    val viewportHeight = lazyListState.layoutInfo.viewportSize.height
+                                    if (draggedItemTop < 100f) {
+                                        coroutineScope.launch { lazyListState.scrollBy(-20f) }
+                                    } else if (draggedItemTop > viewportHeight - 100f) {
+                                        coroutineScope.launch { lazyListState.scrollBy(20f) }
+                                    }
+                                }
+                            },
+                            onDragEnd = {
+                                draggedKey = null
+                                dragOffsetY = 0f
+                            }
+                        )
+                    }
                 }
 
-                // Queue Songs
-                itemsIndexed(
-                    items = state.queue,
-                    key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
-                ) { index, item ->
-                    val isCurrent = index == state.currentIndex
-                    val key = itemKeys.getOrElse(index) { "item_$index" }
-                    val isBeingDragged = draggedKey == key
-
-                    QueueItemRow(
-                        item = item,
-                        isCurrent = isCurrent,
-                        isBeingDragged = isBeingDragged,
-                        dragOffsetY = if (isBeingDragged) dragOffsetY else 0f,
-                        onSelect = { actions.onSkipToQueueItem(index) },
-                        onRemove = { actions.removeFromQueue(index) },
-                        onDragStart = {
-                            draggedKey = key
-                            dragOffsetY = 0f
-                        },
-                        onDrag = { dragAmount ->
-                            val currentKey = draggedKey ?: return@QueueItemRow
-                            dragOffsetY += dragAmount
-
-                            val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-                            val listIndex = itemKeys.indexOf(currentKey)
-                            if (listIndex == -1) return@QueueItemRow
-                            val lazyListIndex = listIndex + 1
-
-                            val draggedItemInfo = visibleItems.firstOrNull { it.index == lazyListIndex }
-                            if (draggedItemInfo != null) {
-                                val draggedItemTop = draggedItemInfo.offset + dragOffsetY
-                                val draggedItemCenter = draggedItemTop + draggedItemInfo.size / 2f
-
-                                val targetItem = visibleItems.firstOrNull { itemInfo ->
-                                    itemInfo.index >= 1 &&
-                                            itemInfo.index != lazyListIndex &&
-                                            draggedItemCenter >= itemInfo.offset &&
-                                            draggedItemCenter <= (itemInfo.offset + itemInfo.size)
-                                }
-
-                                if (targetItem != null) {
-                                    val targetQueueIndex = targetItem.index - 1
-                                    actions.moveQueueItem(listIndex, targetQueueIndex)
-                                    dragOffsetY += (draggedItemInfo.offset - targetItem.offset)
-                                }
-
-                                val viewportHeight = lazyListState.layoutInfo.viewportSize.height
-                                if (draggedItemTop < 100f) {
-                                    coroutineScope.launch { lazyListState.scrollBy(-20f) }
-                                } else if (draggedItemTop > viewportHeight - 100f) {
-                                    coroutineScope.launch { lazyListState.scrollBy(20f) }
-                                }
-                            }
-                        },
-                        onDragEnd = {
-                            draggedKey = null
-                            dragOffsetY = 0f
-                        }
+                if (state.queue.size > 50) {
+                    SimpleScrollBar(
+                        listState = lazyListState,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 2.dp, top = 8.dp, bottom = 8.dp)
+                            .zIndex(100f)
                     )
                 }
             }
@@ -497,7 +513,7 @@ private fun QueueItemRow(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(52.dp)
-                    .clip(if (isCurrent) CircleShape else RoundedCornerShape(12.dp))
+                    .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             )
 
@@ -620,5 +636,7 @@ fun QueueBottomSheetPreview() {
         )
     }
 }
+
+
 
 
