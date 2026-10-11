@@ -467,6 +467,63 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    override fun removeIndicesFromQueue(indices: Set<Int>) {
+        val player = controller ?: return
+        val totalCount = player.mediaItemCount
+        val sortedDescending = indices.filter { it in 0 until totalCount }.sortedDescending()
+        for (index in sortedDescending) {
+            player.removeMediaItem(index)
+        }
+        updateState()
+    }
+
+    override fun removeOthersFromQueue(indicesToKeep: Set<Int>) {
+        val player = controller ?: return
+        val totalCount = player.mediaItemCount
+        val indicesToRemove = (0 until totalCount).filter { it !in indicesToKeep }.sortedDescending()
+        for (index in indicesToRemove) {
+            player.removeMediaItem(index)
+        }
+        updateState()
+    }
+
+    override fun playNextInQueue(indices: Set<Int>) {
+        val player = controller ?: return
+        val totalCount = player.mediaItemCount
+        val currentIdx = player.currentMediaItemIndex
+        if (totalCount <= 1 || indices.isEmpty()) return
+
+        val validIndices = indices.filter { it in 0 until totalCount }.toSet()
+        if (validIndices.isEmpty()) return
+
+        val activeCurrentIdx = if (currentIdx in 0 until totalCount) currentIdx else 0
+        val selectedWithoutCurrent = validIndices.filter { it != activeCurrentIdx }.sorted()
+        val unselected = (0 until totalCount).filter { it !in validIndices || it == activeCurrentIdx }
+
+        val currentPosInUnselected = unselected.indexOf(activeCurrentIdx).let { if (it == -1) 0 else it }
+
+        val targetList = mutableListOf<Int>()
+        for (i in 0..currentPosInUnselected) {
+            targetList.add(unselected[i])
+        }
+        targetList.addAll(selectedWithoutCurrent)
+        for (i in (currentPosInUnselected + 1) until unselected.size) {
+            targetList.add(unselected[i])
+        }
+
+        val workingList = (0 until totalCount).toMutableList()
+        for (i in targetList.indices) {
+            val targetVal = targetList[i]
+            val fromIndex = (i until workingList.size).firstOrNull { workingList[it] == targetVal }
+            if (fromIndex != null && fromIndex != i) {
+                player.moveMediaItem(fromIndex, i)
+                val item = workingList.removeAt(fromIndex)
+                workingList.add(i, item)
+            }
+        }
+        updateState()
+    }
+
     override fun onCleared() {
         super.onCleared()
         controller?.release()

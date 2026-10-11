@@ -46,4 +46,7 @@ interface PlayerActions {
     fun moveQueueItem(fromIndex: Int, toIndex: Int)
     fun clearQueue()
     fun onLyricsSearch(query: String)
+    fun removeIndicesFromQueue(indices: Set<Int>) {}
+    fun removeOthersFromQueue(indicesToKeep: Set<Int>) {}
+    fun playNextInQueue(indices: Set<Int>) {}
 }
