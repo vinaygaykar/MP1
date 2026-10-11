@@ -1,0 +1,321 @@
+package io.github.vinaygaykar.mp1.ui.search
+
+import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import io.github.vinaygaykar.mp1.domain.models.Album
+import io.github.vinaygaykar.mp1.domain.models.Artist
+import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
+import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
+import io.github.vinaygaykar.mp1.ui.library.SongListItem
+import io.github.vinaygaykar.mp1.ui.theme.rememberArtistShape
+
+@Composable
+fun SearchScreen(
+    bottomPadding: Dp = 0.dp,
+    onBack: () -> Unit = {},
+    viewModel: SearchViewModel = hiltViewModel()
+) {
+    val query by viewModel.searchQuery.collectAsState()
+    val selectedFilters by viewModel.selectedFilters.collectAsState()
+    val results by viewModel.searchResults.collectAsState()
+    val context = LocalContext.current
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+            TextField(
+                value = query,
+                onValueChange = { viewModel.onQueryChange(it) },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Search...") },
+                singleLine = true,
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onQueryChange("") }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Clear search"
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(24.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                )
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SearchFilterType.entries.forEach { filter ->
+                val isSelected = selectedFilters.contains(filter)
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { viewModel.toggleFilter(filter) },
+                    label = { Text(filter.label) },
+                    leadingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(FilterChipDefaults.IconSize)
+                            )
+                        }
+                    } else null,
+                    shape = CircleShape
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        if (query.trim().isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = bottomPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Search for songs, albums, and artists",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else if (results.isEmpty) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = bottomPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No results found for \"$query\"",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = bottomPadding)
+            ) {
+                if (results.songs.isNotEmpty()) {
+                    item {
+                        SearchSectionHeader(title = "Songs (${results.songs.size})")
+                    }
+                    items(results.songs, key = { "song_${it.id}" }) { song ->
+                        SongListItem(
+                            song = song,
+                            onClick = { viewModel.onSongClick(song) },
+                            onSwipeRightNoArgs = { viewModel.addToQueue(song) }
+                        )
+                    }
+                }
+
+                if (results.albums.isNotEmpty()) {
+                    item {
+                        SearchSectionHeader(title = "Albums (${results.albums.size})")
+                    }
+                    items(results.albums, key = { "album_${it.id}" }) { album ->
+                        AlbumListItem(
+                            album = album,
+                            onClick = {
+                                val intent = Intent(context, AlbumDetailActivity::class.java).apply {
+                                    putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                    }
+                }
+
+                if (results.artists.isNotEmpty()) {
+                    item {
+                        SearchSectionHeader(title = "Artists (${results.artists.size})")
+                    }
+                    items(results.artists, key = { "artist_${it.id}" }) { artist ->
+                        ArtistListItem(
+                            artist = artist,
+                            onClick = {
+                                val intent = Intent(context, ArtistDetailActivity::class.java).apply {
+                                    putExtra(ArtistDetailActivity.EXTRA_ARTIST_ID, artist.id)
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SearchSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+fun AlbumListItem(
+    album: Album,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = {
+            val trackText = if (album.trackCount > 0) "${album.trackCount} ${if (album.trackCount == 1) "track" else "tracks"}" else ""
+            val subtitle = listOfNotNull(album.artist.ifBlank { null }, trackText.ifBlank { null })
+                .joinToString(" • ")
+            Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingContent = {
+            if (album.artworkUri != null) {
+                AsyncImage(
+                    model = album.artworkUri,
+                    contentDescription = album.name,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RectangleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RectangleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Album,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    )
+}
+
+@Composable
+fun ArtistListItem(
+    artist: Artist,
+    onClick: () -> Unit
+) {
+    val artistShape = rememberArtistShape(artist.id, artist.name)
+
+    ListItem(
+        headlineContent = { Text(artist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = {
+            if (artist.trackCount > 0) {
+                Text("${artist.trackCount} ${if (artist.trackCount == 1) "track" else "tracks"}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        },
+        leadingContent = {
+            if (!artist.imageUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = artist.imageUrl,
+                    contentDescription = artist.name,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(artistShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(artistShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    )
+}
