@@ -34,7 +34,7 @@ jobs:
 
       - name: Sign Release APK
         id: sign_app
-        uses: rpx/android-sign-action@v1
+        uses: r0adkll/sign-android-release@v2
         with:
           releaseDirectory: app/build/outputs/apk/release
           signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -45,7 +45,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          files: ${{ steps.sign_app.outputs.signedFile }}
           draft: false
           prerelease: false
           generate_release_notes: true
