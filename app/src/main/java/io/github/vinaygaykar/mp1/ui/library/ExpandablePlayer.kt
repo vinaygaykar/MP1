@@ -1073,6 +1073,7 @@ fun ExpandablePlayer(
                         ) {
                             LyricsView(
                                 state = state,
+                                actions = actions,
                                 onSeek = { actions.onSeek(it) },
                                 onSearch = { actions.onLyricsSearch(it) }
                             )

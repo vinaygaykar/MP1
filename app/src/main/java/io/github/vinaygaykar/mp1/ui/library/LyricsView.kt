@@ -1,7 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.library
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -13,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,18 +30,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Lyrics
+import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.utils.collectArtistNames
+import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LyricsView(
     state: PlayerUiState,
+    actions: PlayerActions,
     onSeek: (Long) -> Unit,
     onSearch: (String) -> Unit
 ) {
     val lyrics = remember(state.lyrics, state.isLyricsSynced) {
         state.lyrics?.let { LyricsParser.parse(it, state.isLyricsSynced) }
+    }
+
+    var showSearchDialog by remember { mutableStateOf(false) }
+
+    if (showSearchDialog) {
+        LyricsSearchDialog(
+            initialQuery = "${state.trackTitle} ${state.artist}",
+            onSearch = { query ->
+                onSearch(query)
+                showSearchDialog = false
+            },
+            onDismiss = { showSearchDialog = false }
+        )
     }
 
     Box(
@@ -63,11 +81,7 @@ fun LyricsView(
                 }
                 lyrics == null || (lyrics.content.isEmpty() && lyrics.lines.isEmpty()) -> {
                     LyricsEmptyState(
-                        title = state.trackTitle,
-                        artist = state.artist,
-                        onSearch = onSearch,
-                        error = state.lyricsError,
-                        modifier = Modifier.statusBarsPadding()
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
                 lyrics.isSynced -> {
@@ -87,65 +101,194 @@ fun LyricsView(
             }
         }
 
-        // Overlay Header Layer (Dynamic Container)
+        // Sticky Top Header (Dynamic surface color from seed palette, no alpha)
         Surface(
             modifier = Modifier
-                .statusBarsPadding()
-                .padding(top = 24.dp, start = 32.dp, end = 32.dp)
-                .align(Alignment.TopCenter)
-                .height(64.dp)
-                .widthIn(max = 400.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            tonalElevation = 12.dp,
-            shadowElevation = 8.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                .fillMaxWidth()
+                .align(Alignment.TopCenter),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            tonalElevation = 2.dp
         ) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .padding(start = 20.dp, end = 16.dp)
-                        .weight(1f),
-                    verticalArrangement = Arrangement.Center
+                // Top Track Metadata Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = state.trackTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier.basicMarquee()
+                    AsyncImage(
+                        model = state.artworkUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
                     )
-                    Text(
-                        text = state.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        val displayArtist = remember(state.artist, state.trackTitle) {
+                            collectArtistNames(state.artist, state.trackTitle).joinArtistsForDisplay()
+                        }
+
+                        Text(
+                            text = state.trackTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.basicMarquee()
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = displayArtist,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
-                val rotation = (state.positionMs * 0.12f) % 360f
-                AsyncImage(
-                    model = state.artworkUri,
-                    contentDescription = null,
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Actions Row (Left: Search Button, Right: Offline Badge or Save Button)
+                Row(
                     modifier = Modifier
-                        .padding(end = 4.dp)
-                        .size(56.dp)
-                        .graphicsLayer { rotationZ = rotation }
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
+                        .fillMaxWidth()
+                        .padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Left: Search Button
+                    AssistChip(
+                        onClick = { showSearchDialog = true },
+                        label = { Text("Search") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search lyrics",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        shape = CircleShape
+                    )
+
+                    // Right: Offline Badge or Save Button
+                    Box {
+                        if (!state.lyrics.isNullOrBlank()) {
+                            if (state.isLyricsLocal) {
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text("Offline") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.CloudDone,
+                                            contentDescription = "Offline lyrics",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        leadingIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ),
+                                    border = null,
+                                    shape = CircleShape
+                                )
+                            } else {
+                                AssistChip(
+                                    onClick = { actions.onSaveLyrics() },
+                                    label = { Text("Save") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Download,
+                                            contentDescription = "Save lyrics",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    border = null,
+                                    shape = CircleShape
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+fun LyricsSearchDialog(
+    initialQuery: String,
+    onSearch: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf(initialQuery) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Search Lyrics") },
+        text = {
+            Column {
+                Text(
+                    text = "Search LRCLIB for lyrics",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search query") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = CircleShape,
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            if (searchQuery.isNotBlank()) {
+                                onSearch(searchQuery)
+                            }
+                        }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (searchQuery.isNotBlank()) {
+                        onSearch(searchQuery)
+                    }
+                }
+            ) {
+                Text("Search")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -177,7 +320,7 @@ fun SyncedLyrics(
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 120.dp, bottom = 100.dp, start = 24.dp, end = 24.dp),
+        contentPadding = PaddingValues(top = 180.dp, bottom = 100.dp, start = 24.dp, end = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         itemsIndexed(lyrics.lines) { index, line ->
@@ -222,7 +365,7 @@ fun StaticLyrics(content: String, modifier: Modifier = Modifier) {
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(120.dp))
+        Spacer(modifier = Modifier.height(180.dp))
         Text(
             text = content,
             style = MaterialTheme.typography.bodyLarge.copy(
@@ -240,59 +383,20 @@ fun StaticLyrics(content: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun LyricsEmptyState(
-    title: String,
-    artist: String,
-    onSearch: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    error: String? = null
+    modifier: Modifier = Modifier
 ) {
-    var searchQuery by remember { mutableStateOf("$title $artist") }
-    
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text = if (error != null) "Error loading lyrics" else "Lyrics not found",
-            style = MaterialTheme.typography.headlineMedium,
+            text = "No lyrics found",
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = if (error != null) error else "We couldn't find lyrics for \"$title\" by $artist.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Search lyrics") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = CircleShape,
-            singleLine = true,
-            trailingIcon = {
-                IconButton(onClick = { if (searchQuery.isNotBlank()) onSearch(searchQuery) }) {
-                    Icon(Icons.Default.Search, contentDescription = "Search")
-                }
-            }
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(
-            onClick = { if (searchQuery.isNotBlank()) onSearch(searchQuery) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = CircleShape
-        ) {
-            Text("Search on LRCLIB")
-        }
     }
 }

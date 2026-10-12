@@ -24,6 +24,7 @@ data class PlayerUiState(
     val hasPrevious: Boolean = false,
     val lyrics: String? = null,
     val isLyricsSynced: Boolean = false,
+    val isLyricsLocal: Boolean = false,
     val lyricsLoading: Boolean = false,
     val lyricsError: String? = null,
     val queue: ImmutableList<MediaItem> = persistentListOf(),
@@ -46,6 +47,7 @@ interface PlayerActions {
     fun moveQueueItem(fromIndex: Int, toIndex: Int)
     fun clearQueue()
     fun onLyricsSearch(query: String)
+    fun onSaveLyrics() {}
     fun removeIndicesFromQueue(indices: Set<Int>) {}
     fun removeOthersFromQueue(indicesToKeep: Set<Int>) {}
     fun playNextInQueue(indices: Set<Int>) {}

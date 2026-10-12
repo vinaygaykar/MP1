@@ -1,6 +1,5 @@
 package io.github.vinaygaykar.mp1.data.repo
 
-import io.github.vinaygaykar.mp1.data.local.dao.SongDao
 import io.github.vinaygaykar.mp1.data.network.LrcLibService
 import io.github.vinaygaykar.mp1.domain.models.Lyrics
 import io.github.vinaygaykar.mp1.domain.models.Song
@@ -9,7 +8,6 @@ import io.github.vinaygaykar.mp1.ui.library.LyricsParser
 import javax.inject.Inject
 
 class LyricsRepositoryImpl @Inject constructor(
-    private val songDao: SongDao,
     private val lrcLibService: LrcLibService
 ) : LyricsRepository {
 
@@ -35,12 +33,9 @@ class LyricsRepositoryImpl @Inject constructor(
                     val content = body.syncedLyrics ?: body.plainLyrics
                     if (content != null) {
                         val isSynced = body.syncedLyrics != null
-                        // Save to DB for future use
-                        songDao.updateLyrics(song.id, content, isSynced)
                         Result.success(LyricsParser.parse(content, isSynced))
                     } else if (body.instrumental == true) {
                         val instrumentalText = "[Instrumental]"
-                        songDao.updateLyrics(song.id, instrumentalText, false)
                         Result.success(Lyrics(content = instrumentalText, isSynced = false))
                     } else {
                         Result.failure(Exception("Lyrics not found"))
@@ -66,11 +61,9 @@ class LyricsRepositoryImpl @Inject constructor(
                     val content = body.syncedLyrics ?: body.plainLyrics
                     if (content != null) {
                         val isSynced = body.syncedLyrics != null
-                        songDao.updateLyrics(songId, content, isSynced)
                         Result.success(LyricsParser.parse(content, isSynced))
                     } else if (body.instrumental == true) {
                         val instrumentalText = "[Instrumental]"
-                        songDao.updateLyrics(songId, instrumentalText, false)
                         Result.success(Lyrics(content = instrumentalText, isSynced = false))
                     } else {
                         Result.failure(Exception("Lyrics not found in first result"))
