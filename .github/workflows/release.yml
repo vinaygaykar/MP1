@@ -33,20 +33,38 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Sign Release APK
-        id: sign_app
-        uses: r0adkll/sign-android-release@v1.0.4
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-          buildToolsVersion: "34.0.0"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # 1. Decode keystore from secret
+          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+
+          # 2. Find apksigner in official Android SDK pre-installed on runner
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -n 1)
+
+          # 3. Find built APK
+          UNSIGNED_APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          SIGNED_APK="app/build/outputs/apk/release/app-release-signed.apk"
+
+          # 4. Sign APK
+          $BUILD_TOOLS_DIR/apksigner sign \
+            --ks release.keystore \
+            --ks-pass pass:"$KEYSTORE_PASSWORD" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass pass:"$KEY_PASSWORD" \
+            --out "$SIGNED_APK" \
+            "$UNSIGNED_APK"
+
+          # 5. Clean up keystore
+          rm -f release.keystore
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.sign_app.outputs.signedFile }}
+          files: app/build/outputs/apk/release/app-release-signed.apk
           draft: false
           prerelease: false
           generate_release_notes: true
