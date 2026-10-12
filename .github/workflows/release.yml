@@ -47,7 +47,7 @@ jobs:
 
           # 3. Find built APK
           UNSIGNED_APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
-          SIGNED_APK="app/build/outputs/apk/release/app-release-signed.apk"
+          SIGNED_APK="app/build/outputs/apk/release/MP1.apk"
 
           # 4. Sign APK
           $BUILD_TOOLS_DIR/apksigner sign \
@@ -64,7 +64,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/app-release-signed.apk
+          files: app/build/outputs/apk/release/MP1.apk
           draft: false
           prerelease: false
           generate_release_notes: true
