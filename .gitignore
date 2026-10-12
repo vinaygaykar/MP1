@@ -10,7 +10,9 @@
 .cxx
 local.properties
 
-*.md
-!README.md
-
 *Repo
+todos/
+*.keystore
+*.jks
+keystore_base64.txt
+
