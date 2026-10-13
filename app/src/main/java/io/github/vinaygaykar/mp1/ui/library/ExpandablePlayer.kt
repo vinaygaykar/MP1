@@ -595,7 +595,7 @@ fun ExpandablePlayer(
                                 MiniPlayer(
                                     state = state,
                                     actions = actions,
-                                    showRecord = false,
+                                    showRecord = true,
                                     rotation = visualRotation,
                                     textAlpha = ((effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f),
                                     onClick = {
@@ -764,6 +764,7 @@ fun ExpandablePlayer(
                                     )
                                 }
                                 .scale(scale.value * 0.85f)
+                                .alpha(if (progress < 0.05f) 0f else progress)
                                 .onGloballyPositioned { coords ->
                                     onMiniPlayerPositioned?.invoke(coords.positionInRoot())
                                 }
