@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LyricsView(
+fun LyricsScreen(
     state: PlayerUiState,
     actions: PlayerActions,
     onSeek: (Long) -> Unit,
@@ -320,7 +320,7 @@ fun SyncedLyrics(
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 180.dp, bottom = 100.dp, start = 24.dp, end = 24.dp),
+        contentPadding = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         itemsIndexed(lyrics.lines) { index, line ->
@@ -361,7 +361,7 @@ fun StaticLyrics(content: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 36.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

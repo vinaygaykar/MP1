@@ -1071,7 +1071,7 @@ fun ExpandablePlayer(
                             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
                         ) {
-                            LyricsView(
+                            LyricsScreen(
                                 state = state,
                                 actions = actions,
                                 onSeek = { actions.onSeek(it) },
