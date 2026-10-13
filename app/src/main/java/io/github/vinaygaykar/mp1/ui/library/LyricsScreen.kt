@@ -1,6 +1,12 @@
 package io.github.vinaygaykar.mp1.ui.library
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -14,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -300,7 +307,7 @@ fun SyncedLyrics(
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    
+
     val activeIndex = remember(currentPositionMs, lyrics.lines) {
         val index = lyrics.lines.indexOfLast { it.timestampMs <= currentPositionMs }
         if (index == -1) 0 else index
@@ -325,29 +332,100 @@ fun SyncedLyrics(
     ) {
         itemsIndexed(lyrics.lines) { index, line ->
             val isActive = index == activeIndex
+
+            if (line.isInstrumental()) {
+                BouncingMusicalNotes(
+                    isActive = isActive,
+                    onClick = { onSeek(line.timestampMs) }
+                )
+            } else {
+                val alpha by animateFloatAsState(
+                    targetValue = if (isActive) 1f else 0.4f,
+                    label = "lyric_alpha"
+                )
+                val scale by animateFloatAsState(
+                    targetValue = if (isActive) 1.08f else 1f,
+                    label = "lyric_scale"
+                )
+
+                Text(
+                    text = line.text,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
+                        fontSize = if (isActive) 28.sp else 20.sp,
+                        lineHeight = if (isActive) 36.sp else 28.sp
+                    ),
+                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSeek(line.timestampMs) }
+                        .padding(vertical = 12.dp)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun BouncingMusicalNotes(
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "bouncing_notes_transition")
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val noteCount = 3
+        for (i in 0 until noteCount) {
+            val offsetY by if (isActive) {
+                infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = -12f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(
+                            durationMillis = 500,
+                            easing = FastOutSlowInEasing,
+                            delayMillis = i * 150
+                        ),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "note_bounce_$i"
+                )
+            } else {
+                remember { mutableFloatStateOf(0f) }
+            }
+
             val alpha by animateFloatAsState(
                 targetValue = if (isActive) 1f else 0.4f,
-                label = "lyric_alpha"
-            )
-            val scale by animateFloatAsState(
-                targetValue = if (isActive) 1.08f else 1f,
-                label = "lyric_scale"
+                label = "note_alpha_$i"
             )
 
-            Text(
-                text = line.text,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                    fontSize = if (isActive) 28.sp else 20.sp,
-                    lineHeight = if (isActive) 36.sp else 28.sp
-                ),
-                color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-                textAlign = TextAlign.Center,
+            val scale by animateFloatAsState(
+                targetValue = if (isActive) 1.15f else 1f,
+                label = "note_scale_$i"
+            )
+
+            Icon(
+                imageVector = Icons.Default.MusicNote,
+                contentDescription = "Instrumental break",
+                tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSeek(line.timestampMs) }
-                    .padding(vertical = 12.dp)
+                    .padding(horizontal = 6.dp)
+                    .size(if (isActive) 28.dp else 22.dp)
                     .graphicsLayer {
+                        translationY = offsetY
                         scaleX = scale
                         scaleY = scale
                     }
