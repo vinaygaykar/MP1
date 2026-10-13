@@ -2,6 +2,7 @@ package io.github.vinaygaykar.mp1.ui.library
 
 import android.view.HapticFeedbackConstants
 import android.view.View
+import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -329,6 +330,7 @@ fun ExpandablePlayer(
     var draggedPosition by remember { mutableLongStateOf(0L) }
     var lastAngle by remember { mutableFloatStateOf(0f) }
     var hapticAccumulator by remember { mutableFloatStateOf(0f) }
+    var invalidHapticAccumulator by remember { mutableFloatStateOf(0f) }
 
     val context = LocalContext.current
 
@@ -788,6 +790,7 @@ fun ExpandablePlayer(
                                                         wasPlayingOnDragStart = currentState.isPlaying
                                                         draggedPosition = currentState.positionMs
                                                         hapticAccumulator = 0f
+                                                        invalidHapticAccumulator = 0f
                                                         lastAngle = calculateAngle(offset, localCenter)
                                                         if (wasPlayingOnDragStart) currentActions.pause()
                                                     }
@@ -803,20 +806,47 @@ fun ExpandablePlayer(
                                                     if (delta > 180f) delta -= 360f
                                                     if (delta < -180f) delta += 360f
 
-                                                    visualRotation += delta
                                                     val positionDelta = (delta / 360f) * 60000f
-                                                    draggedPosition =
-                                                        (draggedPosition + positionDelta.toLong()).coerceIn(
-                                                            0L,
-                                                            currentState.durationMs
-                                                        )
-                                                    hapticAccumulator += abs(delta)
-                                                    if (hapticAccumulator >= 10f) {
-                                                        view.performHapticFeedback(
-                                                            HapticFeedbackConstants.CLOCK_TICK
-                                                        )
-                                                        hapticAccumulator = 0f
+                                                    val unconstrainedPosition = draggedPosition + positionDelta.toLong()
+                                                    val minPos = 0L
+                                                    val maxPos = currentState.durationMs
+
+                                                    if (unconstrainedPosition in minPos..maxPos) {
+                                                        visualRotation += delta
+                                                        draggedPosition = unconstrainedPosition
+                                                        invalidHapticAccumulator = 0f
+
+                                                        hapticAccumulator += abs(delta)
+                                                        if (hapticAccumulator >= 10f) {
+                                                            view.performHapticFeedback(
+                                                                HapticFeedbackConstants.CLOCK_TICK
+                                                            )
+                                                            hapticAccumulator = 0f
+                                                        }
+                                                    } else {
+                                                        val boundaryPos = if (unconstrainedPosition < minPos) minPos else maxPos
+                                                        val posDeltaToBoundary = (boundaryPos - draggedPosition).toFloat()
+                                                        val validFraction = if (positionDelta != 0f) {
+                                                            (posDeltaToBoundary / positionDelta).coerceIn(0f, 1f)
+                                                        } else {
+                                                            0f
+                                                        }
+
+                                                        val validDelta = delta * validFraction
+                                                        val invalidDelta = delta - validDelta
+
+                                                        visualRotation += validDelta
+                                                        draggedPosition = boundaryPos
+
+                                                        val invalidDegrees = abs(invalidDelta)
+                                                        if (invalidHapticAccumulator == 0f || invalidHapticAccumulator + invalidDegrees >= 12f) {
+                                                            view.performHapticFeedback(HapticFeedbackConstantsCompat.REJECT)
+                                                            invalidHapticAccumulator = if (invalidHapticAccumulator == 0f) 0.001f else ((invalidHapticAccumulator + invalidDegrees) % 12f)
+                                                        } else {
+                                                            invalidHapticAccumulator += invalidDegrees
+                                                        }
                                                     }
+
                                                     lastAngle = currentAngle
                                                     isDraggingScrub = true
                                                     change.consume()
