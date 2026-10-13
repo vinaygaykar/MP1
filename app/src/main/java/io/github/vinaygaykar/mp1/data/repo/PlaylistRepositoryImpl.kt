@@ -65,9 +65,7 @@ class PlaylistRepositoryImpl @Inject constructor(
                     year = entity.year,
                     artworkUri = parseArtworkUri(entity.artworkCachePath),
                     fileName = entity.fileName,
-                    lastModified = entity.lastModified,
-                    lyrics = entity.lyrics,
-                    isLyricsSynced = entity.isLyricsSynced
+                    lastModified = entity.lastModified
                 )
             }
         }

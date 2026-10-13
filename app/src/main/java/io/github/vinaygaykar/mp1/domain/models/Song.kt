@@ -22,8 +22,6 @@ data class Song(
     val artworkUri: Uri?,
     val fileName: String,
     val lastModified: Long,
-    val lyrics: String? = null,
-    val isLyricsSynced: Boolean = false,
     val artistsDisplayString: String = ""
 )
 
@@ -49,8 +47,6 @@ fun Song.getArtists(
 
 fun Song.toMediaItem(): MediaItem {
     val extras = Bundle().apply {
-        putString("lyrics", lyrics)
-        putBoolean("is_lyrics_synced", isLyricsSynced)
         if (albumId != null) {
             putString("album_id", albumId)
         }

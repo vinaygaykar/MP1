@@ -195,8 +195,6 @@ class LocalMusicSource @Inject constructor(
         artworkUri = parseArtworkUri(artworkCachePath),
         fileName = fileName,
         lastModified = lastModified,
-        lyrics = lyrics,
-        isLyricsSynced = isLyricsSynced,
         artistsDisplayString = artistsDisplayString
     )
 

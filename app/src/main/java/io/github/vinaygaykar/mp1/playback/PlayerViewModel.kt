@@ -121,8 +121,6 @@ class PlayerViewModel @Inject constructor(
 
         val mediaId = currentItem.mediaId
         val extras = currentItem.mediaMetadata.extras
-        val localLyrics = extras?.getString("lyrics")
-        val localIsSynced = extras?.getBoolean("is_lyrics_synced") ?: false
         val albumIdFromExtras = extras?.getString("album_id")
 
         val isNewMediaItem = mediaId != activeMediaId
@@ -153,29 +151,18 @@ class PlayerViewModel @Inject constructor(
         val lyricsLoadingToUse: Boolean
         val lyricsErrorToUse: String?
 
-        val songUriStr = currentItem.requestMetadata.mediaUri?.toString() ?: ""
-        val fileNameStr = currentItem.mediaMetadata.title?.toString() ?: ""
-
         if (isNewMediaItem) {
-            lyricsToUse = localLyrics
-            isSyncedToUse = localIsSynced
-            isLocalToUse = isLocalOrEmbeddedLyrics(context, songUriStr, fileNameStr, localLyrics)
+            lyricsToUse = null
+            isSyncedToUse = false
+            isLocalToUse = false
             lyricsLoadingToUse = false
             lyricsErrorToUse = null
         } else {
-            lyricsToUse = _uiState.value.lyrics ?: localLyrics
-            isSyncedToUse =
-                if (_uiState.value.lyrics != null) _uiState.value.isLyricsSynced else localIsSynced
-            isLocalToUse =
-                if (_uiState.value.lyrics != null) {
-                    _uiState.value.isLyricsLocal
-                } else {
-                    isLocalOrEmbeddedLyrics(context, songUriStr, fileNameStr, localLyrics)
-                }
-            lyricsLoadingToUse =
-                if (_uiState.value.lyrics != null) false else _uiState.value.lyricsLoading
-            lyricsErrorToUse =
-                if (_uiState.value.lyrics != null) null else _uiState.value.lyricsError
+            lyricsToUse = _uiState.value.lyrics
+            isSyncedToUse = _uiState.value.isLyricsSynced
+            isLocalToUse = _uiState.value.isLyricsLocal
+            lyricsLoadingToUse = _uiState.value.lyricsLoading
+            lyricsErrorToUse = _uiState.value.lyricsError
         }
 
         val currentWindowIndex = player.currentMediaItemIndex
@@ -229,7 +216,7 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
-        if (lyricsToUse == null && !lyricsLoadingToUse && lyricsErrorToUse == null && localLyrics == null) {
+        if (lyricsToUse == null && !lyricsLoadingToUse && lyricsErrorToUse == null) {
             fetchLyrics(mediaId)
         }
     }

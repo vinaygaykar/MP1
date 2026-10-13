@@ -60,7 +60,4 @@ interface SongDao {
     """
     )
     fun searchSongs(ftsQuery: String, rawQuery: String): Flow<List<SongEntity>>
-
-    @Query("UPDATE songs SET lyrics = :lyrics, isLyricsSynced = :isSynced WHERE id = :songId")
-    suspend fun updateLyrics(songId: String, lyrics: String?, isSynced: Boolean)
 }

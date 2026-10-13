@@ -1177,21 +1177,6 @@ private val samplePlayerState = PlayerUiState(
     hasPrevious = true
 )
 
-@Preview(showBackground = true, name = "Expandable Player - Expanded", device = "id:pixel_7")
-@Composable
-fun ExpandablePlayerExpandedPreview() {
-    MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            ExpandablePlayer(
-                state = samplePlayerState,
-                actions = samplePlayerActions,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
-
 @Preview(showBackground = true, name = "Expandable Player - Medium Title", device = "id:pixel_7")
 @Composable
 fun ExpandablePlayerMediumTitlePreview() {

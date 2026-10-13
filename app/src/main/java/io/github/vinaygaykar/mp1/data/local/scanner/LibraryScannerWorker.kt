@@ -734,9 +734,7 @@ class LibraryScannerWorker @AssistedInject constructor(
                     fileSize = fileSize,
                     artworkCachePath = artworkPath,
                     mimeType = mimeType,
-                    artistsDisplayString = extractedArtists.joinArtistsForDisplay(),
-                    lyrics = lyrics,
-                    isLyricsSynced = isLyricsSynced
+                    artistsDisplayString = extractedArtists.joinArtistsForDisplay()
                 )
 
                 MetadataResult(song, album, artistEntitiesList, genre)

@@ -71,7 +71,7 @@ fun LyricsView(
         // Content Layer
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface
+            color = MaterialTheme.colorScheme.surfaceContainer
         ) {
             when {
                 state.lyricsLoading -> {
@@ -106,7 +106,7 @@ fun LyricsView(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter),
-            color = MaterialTheme.colorScheme.surfaceContainer,
+            color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp
         ) {
             Column(
@@ -392,10 +392,10 @@ fun LyricsEmptyState(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "No lyrics found",
+            text = "Lyrics not found",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
     }

@@ -41,7 +41,7 @@ import io.github.vinaygaykar.mp1.data.local.entities.SongFtsEntity
 )
 abstract class MusicDatabase : RoomDatabase() {
     companion object {
-        const val VERSION = 9
+        const val VERSION = 10
     }
 
     abstract fun songDao(): SongDao

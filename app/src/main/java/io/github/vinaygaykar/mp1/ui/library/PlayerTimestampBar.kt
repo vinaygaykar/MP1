@@ -12,9 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 @Composable
 fun PlayerTimestampBar(
@@ -62,6 +64,23 @@ fun PlayerTimestampBar(
                 fontFeatureSettings = "tnum"
             ),
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PlayerTimestampBarPreview() {
+    MusicPlayerTheme {
+        PlayerTimestampBar(
+            displayPositionMs = 75000L,
+            durationMs = 210000L,
+            isPlaying = true,
+            scrubFactor = 0f,
+            rowWidthFraction = 1f,
+            recordY = 80.dp,
+            progress = 1f,
+            modifier = Modifier.padding(16.dp)
         )
     }
 }

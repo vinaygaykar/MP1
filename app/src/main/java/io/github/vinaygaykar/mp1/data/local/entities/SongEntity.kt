@@ -45,7 +45,5 @@ data class SongEntity(
     val fileSize: Long,
     val artworkCachePath: String?,
     val mimeType: String,
-    val artistsDisplayString: String = "",
-    val lyrics: String? = null,
-    val isLyricsSynced: Boolean = false
+    val artistsDisplayString: String = ""
 )

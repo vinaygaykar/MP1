@@ -12,12 +12,6 @@ class LyricsRepositoryImpl @Inject constructor(
 ) : LyricsRepository {
 
     override suspend fun getLyrics(song: Song): Result<Lyrics> {
-        // 1. Check local cache (passed via Song model)
-        if (!song.lyrics.isNullOrBlank()) {
-            return Result.success(LyricsParser.parse(song.lyrics, song.isLyricsSynced))
-        }
-
-        // 2. Fetch from LRCLIB
         return try {
             val duration = if (song.durationMs > 0) (song.durationMs / 1000).toInt() else null
             val response = lrcLibService.getLyrics(
