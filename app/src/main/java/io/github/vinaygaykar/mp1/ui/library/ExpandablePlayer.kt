@@ -15,6 +15,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -128,6 +130,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 private data class ColorStep(
@@ -294,7 +297,32 @@ fun ExpandablePlayer(
     )
 
     val scale = remember { Animatable(1f) }
-    val recordOffsetX = remember { Animatable(0f) }
+    val pagerState = rememberPagerState(
+        initialPage = 1,
+        pageCount = { 3 }
+    )
+
+    LaunchedEffect(state.currentIndex, state.trackTitle) {
+        if (pagerState.currentPage != 1) {
+            pagerState.scrollToPage(1)
+        }
+    }
+
+    LaunchedEffect(pagerState.settledPage) {
+        if (pagerState.settledPage == 0) {
+            if (state.hasPrevious) {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                actions.onPrevious()
+            }
+            pagerState.scrollToPage(1)
+        } else if (pagerState.settledPage == 2) {
+            if (state.hasNext) {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                actions.onNext()
+            }
+            pagerState.scrollToPage(1)
+        }
+    }
 
     var isDraggingScrub by remember { mutableStateOf(false) }
     var isDraggingArtwork by remember { mutableStateOf(false) }
@@ -470,7 +498,7 @@ fun ExpandablePlayer(
                         .drawBehind {
                             val localRecordX = recordX - startPadding
                             val center = Offset(
-                                x = (localRecordX + recordSize / 2).toPx() + recordOffsetX.value,
+                                x = (localRecordX + recordSize / 2).toPx(),
                                 y = (recordY + recordSize / 2).toPx()
                             )
                             val pColor =
@@ -538,40 +566,7 @@ fun ExpandablePlayer(
                             vinylFace.Render(
                                 state = state,
                                 actions = actions,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(
-                                        progress,
-                                        state.hasNext,
-                                        state.hasPrevious,
-                                        nextArtworkUri,
-                                        prevArtworkUri
-                                    ) {
-                                        if (progress > 0.9f) {
-                                            detectHorizontalDragGestures(
-                                                onHorizontalDrag = { change, dragAmount ->
-                                                    scope.launch {
-                                                        recordOffsetX.snapTo(recordOffsetX.value + dragAmount)
-                                                    }
-                                                    change.consume()
-                                                },
-                                                onDragEnd = {
-                                                    scope.launch {
-                                                        performTrackSwipe(
-                                                            recordOffsetX,
-                                                            screenWidthPx,
-                                                            state,
-                                                            actions,
-                                                            view
-                                                        )
-                                                    }
-                                                },
-                                                onDragCancel = {
-                                                    scope.launch { recordOffsetX.animateTo(0f) }
-                                                }
-                                            )
-                                        }
-                                    },
+                                modifier = Modifier.fillMaxSize(),
                                 showRecord = false,
                                 onArtistClick = {
                                     showArtistsDialog = true
@@ -755,314 +750,141 @@ fun ExpandablePlayer(
                         // The Record Element(s)
                         Box(
                             modifier = Modifier
-                                .size(containerSize)
+                                .fillMaxWidth()
+                                .height(containerSize)
                                 .offset {
                                     val localRecordX = recordX - startPadding - sizeDiff
                                     IntOffset(
-                                        x = (with(density) { localRecordX.toPx() } + recordOffsetX.value).roundToInt(),
+                                        x = with(density) { (localRecordX.toPx() * (1f - progress)).roundToInt() },
                                         y = with(density) { (recordY - sizeDiff).toPx() }.roundToInt()
                                     )
                                 }
-                                .scale(scale.value * 0.85f)
                                 .alpha(if (progress < 0.05f) 0f else progress)
                                 .onGloballyPositioned { coords ->
                                     onMiniPlayerPositioned?.invoke(coords.positionInRoot())
                                 }
-                                /*
-                                 * Previous unified gesture handler for track swiping and scrubbing
-                                 * on the entire record surface (both album art and outer circle).
-                                 *
-                                .pointerInput(
-                                    Unit,
-                                    state.hasNext,
-                                    state.hasPrevious,
-                                    nextArtworkUri,
-                                    prevArtworkUri
-                                ) {
-                                    var dragStarted = false
-                                    var dragMode =
-                                        0 // 0: undecided, 1: horizontal (skip), 2: circular (scrub)
-                                    var wasPlayingOnDragStart = false
-
-                                    detectDragGestures(
-                                        onDragStart = { offset ->
-                                            if (currentProgress > 0.9f) {
-                                                dragStarted = true
-                                                dragMode = 0
-                                                wasPlayingOnDragStart = currentState.isPlaying
-                                                draggedPosition = currentState.positionMs
-                                                hapticAccumulator = 0f
-                                                val localCenter =
-                                                    Offset(size.width / 2f, size.height / 2f)
-                                                lastAngle = calculateAngle(offset, localCenter)
-                                            }
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            if (dragStarted) {
-                                                val localCenter =
-                                                    Offset(size.width / 2f, size.height / 2f)
-                                                val currentAngle =
-                                                    calculateAngle(change.position, localCenter)
-                                                var delta = currentAngle - lastAngle
-                                                if (delta > 180f) delta -= 360f
-                                                if (delta < -180f) delta += 360f
-
-                                                if (dragMode == 0) {
-                                                    val absX = abs(dragAmount.x)
-                                                    val absY = abs(dragAmount.y)
-                                                    if (dragAmount.y > absX * 2f && abs(delta) < 1.0f) {
-                                                        dragStarted = false
-                                                    } else if (absX > absY * 2.5f && abs(delta) < 1.5f) {
-                                                        dragMode = 1
-                                                        if (wasPlayingOnDragStart) currentActions.pause()
-                                                    } else if (abs(delta) > 1.0f || (absX > 4f && absY > 4f)) {
-                                                        dragMode = 2
-                                                        isDraggingScrub = true
-                                                        if (wasPlayingOnDragStart) currentActions.pause()
-                                                    }
-                                                }
-
-                                                if (dragMode == 1) {
-                                                    scope.launch {
-                                                        recordOffsetX.snapTo(recordOffsetX.value + dragAmount.x)
-                                                    }
-                                                } else if (dragMode == 2) {
-                                                    visualRotation += delta
-                                                    val positionDelta = (delta / 360f) * 60000f
-                                                    draggedPosition =
-                                                        (draggedPosition + positionDelta.toLong()).coerceIn(
-                                                            0L,
-                                                            currentState.durationMs
-                                                        )
-                                                    hapticAccumulator += abs(delta)
-                                                    if (hapticAccumulator >= 10f) {
-                                                        view.performHapticFeedback(
-                                                            HapticFeedbackConstants.CLOCK_TICK
-                                                        )
-                                                        hapticAccumulator = 0f
-                                                    }
-                                                    lastAngle = currentAngle
-                                                }
-                                                change.consume()
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            if (dragStarted) {
-                                                if (dragMode == 1) {
-                                                    scope.launch {
-                                                        performTrackSwipe(
-                                                            recordOffsetX,
-                                                            screenWidthPx,
-                                                            state,
-                                                            actions,
-                                                            view
-                                                        )
-                                                        if (wasPlayingOnDragStart) currentActions.play()
-                                                    }
-                                                } else if (dragMode == 2) {
-                                                    isDraggingScrub = false
-                                                    currentActions.onSeek(draggedPosition)
-                                                    if (wasPlayingOnDragStart) currentActions.play()
-                                                }
-                                            }
-                                            dragStarted = false
-                                        },
-                                        onDragCancel = {
-                                            if (dragStarted) {
-                                                scope.launch { recordOffsetX.animateTo(0f) }
-                                                isDraggingScrub = false
-                                            }
-                                            dragStarted = false
-                                        }
-                                    )
-                                }
-                                */
-                                .pointerInput(
-                                    Unit,
-                                    state.hasNext,
-                                    state.hasPrevious,
-                                    nextArtworkUri,
-                                    prevArtworkUri,
-                                    artworkSize
-                                ) {
-                                    var dragStarted = false
-                                    var isTouchOnAlbumArt = false
-                                    var dragMode =
-                                        0 // 0: undecided, 1: horizontal track swipe (album art), 2: circular scrub (outer circle)
-                                    var wasPlayingOnDragStart = false
-
-                                    detectDragGestures(
-                                        onDragStart = { offset ->
-                                            if (currentProgress > 0.9f) {
-                                                val localCenter =
-                                                    Offset(size.width / 2f, size.height / 2f)
-                                                val distFromCenter =
-                                                    (offset - localCenter).getDistance()
-                                                val artworkRadiusPx =
-                                                    with(density) { (artworkSize / 2).toPx() }
-
-                                                dragStarted = true
-                                                isTouchOnAlbumArt =
-                                                    distFromCenter <= artworkRadiusPx
-                                                dragMode = 0
-                                                wasPlayingOnDragStart = currentState.isPlaying
-                                                draggedPosition = currentState.positionMs
-                                                hapticAccumulator = 0f
-                                                lastAngle = calculateAngle(offset, localCenter)
-                                            }
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            if (dragStarted) {
-                                                val localCenter =
-                                                    Offset(size.width / 2f, size.height / 2f)
-                                                val currentAngle =
-                                                    calculateAngle(change.position, localCenter)
-                                                var delta = currentAngle - lastAngle
-                                                if (delta > 180f) delta -= 360f
-                                                if (delta < -180f) delta += 360f
-
-                                                if (dragMode == 0) {
-                                                    val absX = abs(dragAmount.x)
-                                                    val absY = abs(dragAmount.y)
-
-                                                    if (isTouchOnAlbumArt) {
-                                                        // Album art object: ONLY left/right track swipe is allowed. Scrubbing is disabled.
-                                                        if (absY > absX * 2f && abs(delta) < 1.0f) {
-                                                            dragStarted = false
-                                                        } else if (absX > absY * 2.5f && abs(delta) < 1.5f) {
-                                                            dragMode = 1
-                                                            isDraggingArtwork = true
-                                                            if (wasPlayingOnDragStart) currentActions.pause()
-                                                        }
-                                                    } else {
-                                                        // Outer circle: ONLY scrubbing gesture is allowed. Track swiping is disabled.
-                                                        if (abs(delta) > 1.0f || (absX > 4f && absY > 4f)) {
-                                                            dragMode = 2
-                                                            isDraggingScrub = true
-                                                            if (wasPlayingOnDragStart) currentActions.pause()
-                                                        }
-                                                    }
-                                                }
-
-                                                if (dragMode == 1) {
-                                                    // Track swiping (activated only on album art object)
-                                                    scope.launch {
-                                                        recordOffsetX.snapTo(recordOffsetX.value + dragAmount.x)
-                                                    }
-                                                } else if (dragMode == 2) {
-                                                    // Scrubbing (activated only on outer circle)
-                                                    visualRotation += delta
-                                                    val positionDelta = (delta / 360f) * 60000f
-                                                    draggedPosition =
-                                                        (draggedPosition + positionDelta.toLong()).coerceIn(
-                                                            0L,
-                                                            currentState.durationMs
-                                                        )
-                                                    hapticAccumulator += abs(delta)
-                                                    if (hapticAccumulator >= 10f) {
-                                                        view.performHapticFeedback(
-                                                            HapticFeedbackConstants.CLOCK_TICK
-                                                        )
-                                                        hapticAccumulator = 0f
-                                                    }
-                                                    lastAngle = currentAngle
-                                                }
-                                                change.consume()
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            if (dragStarted) {
-                                                if (dragMode == 1) {
-                                                    isDraggingArtwork = false
-                                                    scope.launch {
-                                                        performTrackSwipe(
-                                                            recordOffsetX,
-                                                            screenWidthPx,
-                                                            state,
-                                                            actions,
-                                                            view
-                                                        )
-                                                        if (wasPlayingOnDragStart) currentActions.play()
-                                                    }
-                                                } else if (dragMode == 2) {
-                                                    isDraggingScrub = false
-                                                    currentActions.onSeek(draggedPosition)
-                                                    if (wasPlayingOnDragStart) currentActions.play()
-                                                }
-                                            }
-                                            dragStarted = false
-                                            isDraggingArtwork = false
-                                        },
-                                        onDragCancel = {
-                                            if (dragStarted) {
-                                                if (dragMode == 1) {
-                                                    isDraggingArtwork = false
-                                                    scope.launch { recordOffsetX.animateTo(0f) }
-                                                } else if (dragMode == 2) {
-                                                    isDraggingScrub = false
-                                                }
-                                            }
-                                            dragStarted = false
-                                            isDraggingArtwork = false
-                                        }
-                                    )
-                                }
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onPress = {
-                                            if (currentProgress > 0.9f) {
-                                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                                scale.animateTo(0.96f, animationSpec = tween(100))
-                                                try {
-                                                    awaitRelease()
-                                                    currentActions.onPlayPause()
-                                                } finally {
-                                                    scale.animateTo(
-                                                        1.0f,
-                                                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)
-                                                    )
-                                                }
-                                            } else if (currentProgress <= 0.9f) {
-                                                currentActions.onPlayPause()
-                                            }
-                                        }
-                                    )
-                                }
                         ) {
-                            RecordSurface(
-                                artworkUri = state.artworkUri,
-                                recordSize = recordSize,
-                                artworkSize = artworkSize,
-                                rotation = visualRotation,
-                                overlayAlpha = overlayAlpha,
-                                modifier = Modifier.fillMaxSize(),
-                                isScrubbing = isDraggingScrub,
-                                isDraggingArtwork = isDraggingArtwork
-                            )
+                            HorizontalPager(
+                                state = pagerState,
+                                userScrollEnabled = currentProgress > 0.9f && !showQueue && !showLyrics && !showArtistsDialog,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        var dragStarted = false
+                                        var wasPlayingOnDragStart = false
 
-                            if (recordOffsetX.value < 0 && state.hasNext) {
-                                RecordSurface(
-                                    artworkUri = nextArtworkUri,
-                                    recordSize = recordSize,
-                                    artworkSize = artworkSize,
-                                    rotation = 0f,
-                                    overlayAlpha = 0f,
+                                        detectDragGestures(
+                                            onDragStart = { offset ->
+                                                if (currentProgress > 0.9f) {
+                                                    val localCenter =
+                                                        Offset(size.width / 2f, size.height / 2f)
+                                                    val distFromCenter =
+                                                        (offset - localCenter).getDistance()
+                                                    val artworkRadiusPx =
+                                                        with(density) { (artworkSize / 2).toPx() }
+
+                                                    if (distFromCenter > artworkRadiusPx) {
+                                                        dragStarted = true
+                                                        wasPlayingOnDragStart = currentState.isPlaying
+                                                        draggedPosition = currentState.positionMs
+                                                        hapticAccumulator = 0f
+                                                        lastAngle = calculateAngle(offset, localCenter)
+                                                        if (wasPlayingOnDragStart) currentActions.pause()
+                                                    }
+                                                }
+                                            },
+                                            onDrag = { change, _ ->
+                                                if (dragStarted) {
+                                                    val localCenter =
+                                                        Offset(size.width / 2f, size.height / 2f)
+                                                    val currentAngle =
+                                                        calculateAngle(change.position, localCenter)
+                                                    var delta = currentAngle - lastAngle
+                                                    if (delta > 180f) delta -= 360f
+                                                    if (delta < -180f) delta += 360f
+
+                                                    visualRotation += delta
+                                                    val positionDelta = (delta / 360f) * 60000f
+                                                    draggedPosition =
+                                                        (draggedPosition + positionDelta.toLong()).coerceIn(
+                                                            0L,
+                                                            currentState.durationMs
+                                                        )
+                                                    hapticAccumulator += abs(delta)
+                                                    if (hapticAccumulator >= 10f) {
+                                                        view.performHapticFeedback(
+                                                            HapticFeedbackConstants.CLOCK_TICK
+                                                        )
+                                                        hapticAccumulator = 0f
+                                                    }
+                                                    lastAngle = currentAngle
+                                                    isDraggingScrub = true
+                                                    change.consume()
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                if (dragStarted) {
+                                                    isDraggingScrub = false
+                                                    currentActions.onSeek(draggedPosition)
+                                                    if (wasPlayingOnDragStart) currentActions.play()
+                                                }
+                                                dragStarted = false
+                                            },
+                                            onDragCancel = {
+                                                if (dragStarted) {
+                                                    isDraggingScrub = false
+                                                }
+                                                dragStarted = false
+                                            }
+                                        )
+                                    }
+                            ) { page ->
+                                val pageArtworkUri = when (page) {
+                                    0 -> if (state.hasPrevious) prevArtworkUri else null
+                                    1 -> state.artworkUri
+                                    2 -> if (state.hasNext) nextArtworkUri else null
+                                    else -> null
+                                }
+
+                                Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .offset(x = screenWidth)
-                                )
-                            }
-                            if (recordOffsetX.value > 0 && state.hasPrevious) {
-                                RecordSurface(
-                                    artworkUri = prevArtworkUri,
-                                    recordSize = recordSize,
-                                    artworkSize = artworkSize,
-                                    rotation = 0f,
-                                    overlayAlpha = 0f,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .offset(x = -screenWidth)
-                                )
+                                        .pointerInput(Unit) {
+                                            detectTapGestures(
+                                                onPress = {
+                                                    if (currentProgress > 0.9f) {
+                                                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                                        scale.animateTo(0.96f, animationSpec = tween(100))
+                                                        try {
+                                                            awaitRelease()
+                                                            currentActions.onPlayPause()
+                                                        } finally {
+                                                            scale.animateTo(
+                                                                1.0f,
+                                                                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)
+                                                            )
+                                                        }
+                                                    } else if (currentProgress <= 0.9f) {
+                                                        currentActions.onPlayPause()
+                                                    }
+                                                }
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    RecordSurface(
+                                        artworkUri = pageArtworkUri,
+                                        recordSize = recordSize,
+                                        artworkSize = artworkSize,
+                                        rotation = if (page == 1) visualRotation else 0f,
+                                        overlayAlpha = if (page == 1) overlayAlpha else 0f,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .scale(scale.value * 0.85f),
+                                        isScrubbing = page == 1 && isDraggingScrub,
+                                        isDraggingArtwork = page == 1 && isDraggingArtwork
+                                    )
+                                }
                             }
                         }
 
@@ -1117,37 +939,7 @@ fun ExpandablePlayer(
     }
 }
 
-private suspend fun performTrackSwipe(
-    recordOffsetX: Animatable<Float, *>,
-    screenWidthPx: Float,
-    state: PlayerUiState,
-    actions: PlayerActions,
-    view: View
-) {
-    if (recordOffsetX.value > screenWidthPx / 4) {
-        if (state.hasPrevious) {
-            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            recordOffsetX.animateTo(screenWidthPx, tween(300))
-            actions.onPrevious()
-            recordOffsetX.snapTo(0f)
-        } else {
-            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            recordOffsetX.animateTo(0f, spring())
-        }
-    } else if (recordOffsetX.value < -screenWidthPx / 4) {
-        if (state.hasNext) {
-            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            recordOffsetX.animateTo(-screenWidthPx, tween(300))
-            actions.onNext()
-            recordOffsetX.snapTo(0f)
-        } else {
-            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            recordOffsetX.animateTo(0f, spring())
-        }
-    } else {
-        recordOffsetX.animateTo(0f, spring())
-    }
-}
+
 
 private val samplePlayerActions = object : PlayerActions {
     override fun onPlayPause() {}

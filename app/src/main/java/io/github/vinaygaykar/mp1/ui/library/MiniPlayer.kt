@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -318,17 +319,14 @@ private fun MiniPlayerItemContent(
     modifier: Modifier = Modifier,
     onPositioned: ((Offset) -> Unit)? = null
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(start = 28.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.CenterStart
     ) {
         Column(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxHeight()
-                .padding(end = 16.dp)
+                .padding(start = 28.dp, end = 72.dp)
                 .graphicsLayer { alpha = textAlpha },
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start
@@ -356,9 +354,11 @@ private fun MiniPlayerItemContent(
             )
         }
 
-        // Vinyl Record on the right side
+        // Vinyl Record on the right side (constant 56.dp x 56.dp size)
         Box(
             modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp)
                 .size(56.dp)
                 .alpha(if (showRecord) 1f else 0f)
                 .graphicsLayer { rotationZ = rotation % 360f }
