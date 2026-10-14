@@ -23,7 +23,7 @@ object NetworkModule {
         return OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .header("User-Agent", "MP1MusicPlayer/1.0 (https://github.com/vinaygaykar/mp1)")
+                    .header("User-Agent", "MP.1MusicPlayer/1.0 (https://github.com/vinaygaykar/mp1)")
                     .build()
                 chain.proceed(request)
             }

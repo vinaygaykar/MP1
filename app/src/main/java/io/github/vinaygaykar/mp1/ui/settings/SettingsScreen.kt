@@ -21,7 +21,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import io.github.vinaygaykar.mp1.R
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -103,7 +105,7 @@ fun SettingsScreen(
         )
         ListItem(
             headlineContent = { Text("About") },
-            supportingContent = { Text("MP v1.0") },
+            supportingContent = { Text("${stringResource(R.string.app_name)} v1.0") },
         )
     }
 }

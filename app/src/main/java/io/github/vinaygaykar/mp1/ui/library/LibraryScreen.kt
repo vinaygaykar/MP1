@@ -56,7 +56,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -108,6 +107,8 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import io.github.vinaygaykar.mp1.R
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -380,7 +381,7 @@ fun LibraryContent(
                     collapsibleHeaderHeightPx = coordinates.size.height.toFloat()
                 }
         ) {
-            // Title Row with "MP 1" + Search & Settings
+            // Title Row with App Name + Search & Settings
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -389,7 +390,7 @@ fun LibraryContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "MP 1",
+                    text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium
                 )
 
@@ -397,15 +398,6 @@ fun LibraryContent(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = {
-                        (context as? Activity)?.moveTaskToBack(true)
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Home,
-                            contentDescription = "Home Screen",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
                     IconButton(onClick = onSearchClick) {
                         Icon(
                             imageVector = Icons.Default.Search,
