@@ -763,10 +763,10 @@ class LibraryScannerWorker @AssistedInject constructor(
     }
 
     private fun extractAndCacheArtwork(retriever: MediaMetadataRetriever, albumId: String): String? {
-        val cacheDir = File(appContext.cacheDir, "artwork")
-        if (!cacheDir.exists()) cacheDir.mkdirs()
+        val artworkDir = File(appContext.filesDir, "artwork")
+        if (!artworkDir.exists()) artworkDir.mkdirs()
 
-        val artworkFile = File(cacheDir, "$albumId.jpg")
+        val artworkFile = File(artworkDir, "$albumId.jpg")
         if (artworkFile.exists() && artworkFile.length() > 0) {
             return artworkFile.absolutePath
         }
@@ -784,10 +784,10 @@ class LibraryScannerWorker @AssistedInject constructor(
 
     private fun tryExtractMediaStoreThumbnail(mediaStoreUri: Uri, albumId: String): String? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
-        val cacheDir = File(appContext.cacheDir, "artwork")
-        if (!cacheDir.exists()) cacheDir.mkdirs()
+        val artworkDir = File(appContext.filesDir, "artwork")
+        if (!artworkDir.exists()) artworkDir.mkdirs()
 
-        val artworkFile = File(cacheDir, "$albumId.jpg")
+        val artworkFile = File(artworkDir, "$albumId.jpg")
         if (artworkFile.exists() && artworkFile.length() > 0) {
             return artworkFile.absolutePath
         }
@@ -817,6 +817,9 @@ class LibraryScannerWorker @AssistedInject constructor(
         }
         val path = if (artworkCachePath.startsWith("file://")) artworkCachePath.substring(7) else artworkCachePath
         val file = File(path)
+        if (path.startsWith(appContext.cacheDir.absolutePath)) {
+            return false
+        }
         return file.exists() && file.length() > 0
     }
 
