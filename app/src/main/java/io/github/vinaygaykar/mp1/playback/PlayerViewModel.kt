@@ -378,6 +378,13 @@ class PlayerViewModel @Inject constructor(
         controller?.pause()
     }
 
+    override fun stop() {
+        controller?.let { player ->
+            player.stop()
+            player.clearMediaItems()
+        }
+    }
+
     override fun onNext() {
         controller?.seekToNextMediaItem()
     }

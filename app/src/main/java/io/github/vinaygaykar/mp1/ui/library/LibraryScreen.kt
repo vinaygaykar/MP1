@@ -42,6 +42,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import android.app.Activity
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -395,6 +397,15 @@ fun LibraryContent(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(onClick = {
+                        (context as? Activity)?.moveTaskToBack(true)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Home,
+                            contentDescription = "Home Screen",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     IconButton(onClick = onSearchClick) {
                         Icon(
                             imageVector = Icons.Default.Search,

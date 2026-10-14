@@ -36,6 +36,7 @@ interface PlayerActions {
     fun onPlayPause()
     fun play()
     fun pause()
+    fun stop() {}
     fun onNext()
     fun onPrevious()
     fun onSeek(positionMs: Long)
