@@ -1,7 +1,6 @@
 package io.github.vinaygaykar.mp1.playback
 
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.annotation.OptIn
@@ -13,13 +12,10 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
-import androidx.media3.session.DefaultMediaNotificationProvider
-import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
-import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,6 +40,9 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var isRestoringState = true
+
+    private val shuffleCommand = SessionCommand("ACTION_TOGGLE_SHUFFLE", Bundle.EMPTY)
+    private val repeatCommand = SessionCommand("ACTION_TOGGLE_REPEAT", Bundle.EMPTY)
 
     @Inject
     lateinit var playbackStateDao: PlaybackStateDao
@@ -90,16 +89,19 @@ class PlaybackService : MediaSessionService() {
                 }
 
                 isRestoringState = false
+                mediaSession?.setMediaButtonPreferences(buildMediaButtonPreferences(player))
             }
         }
 
         player.addListener(object : Player.Listener {
             override fun onRepeatModeChanged(repeatMode: Int) {
                 if (!isRestoringState) savePlaybackState(player)
+                mediaSession?.setMediaButtonPreferences(buildMediaButtonPreferences(player))
             }
 
             override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
                 if (!isRestoringState) savePlaybackState(player)
+                mediaSession?.setMediaButtonPreferences(buildMediaButtonPreferences(player))
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -125,13 +127,6 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopCommand = SessionCommand("ACTION_STOP_PLAYBACK", Bundle.EMPTY)
-        val stopButton = CommandButton.Builder()
-            .setDisplayName("Stop")
-            .setIconResId(R.drawable.ic_close)
-            .setSessionCommand(stopCommand)
-            .build()
-
         val callback = object : MediaSession.Callback {
             override fun onConnect(
                 session: MediaSession,
@@ -139,7 +134,8 @@ class PlaybackService : MediaSessionService() {
             ): MediaSession.ConnectionResult {
                 val connectionResult = super.onConnect(session, controller)
                 val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
-                    .add(stopCommand)
+                    .add(shuffleCommand)
+                    .add(repeatCommand)
                     .build()
                 return MediaSession.ConnectionResult.accept(
                     availableSessionCommands,
@@ -153,11 +149,15 @@ class PlaybackService : MediaSessionService() {
                 customCommand: SessionCommand,
                 args: Bundle
             ): ListenableFuture<SessionResult> {
-                if (customCommand.customAction == "ACTION_STOP_PLAYBACK") {
-                    session.player.stop()
-                    session.player.clearMediaItems()
-                    stopSelf()
-                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                when (customCommand.customAction) {
+                    "ACTION_TOGGLE_SHUFFLE" -> {
+                        session.player.shuffleModeEnabled = !session.player.shuffleModeEnabled
+                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    }
+                    "ACTION_TOGGLE_REPEAT" -> {
+                        session.player.repeatMode = (session.player.repeatMode + 1) % 3
+                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    }
                 }
                 return super.onCustomCommand(session, controller, customCommand, args)
             }
@@ -166,10 +166,34 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
             .setCallback(callback)
-            .setCustomLayout(listOf(stopButton))
+            .build().also { session ->
+                session.setMediaButtonPreferences(buildMediaButtonPreferences(player))
+            }
+    }
+
+    private fun buildMediaButtonPreferences(player: Player): List<CommandButton> {
+        val shuffleOn = player.shuffleModeEnabled
+        val shuffleIconRes = if (shuffleOn) R.drawable.ic_shuffle_on else R.drawable.ic_shuffle_off
+        val shuffleButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(shuffleIconRes)
+            .setDisplayName("Shuffle")
+            .setSessionCommand(shuffleCommand)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
             .build()
 
-        setMediaNotificationProvider(RightAlignedStopNotificationProvider(this))
+        val repeatIconRes = when (player.repeatMode) {
+            Player.REPEAT_MODE_ONE -> R.drawable.ic_repeat_one
+            Player.REPEAT_MODE_ALL -> R.drawable.ic_repeat_all
+            else -> R.drawable.ic_repeat_off
+        }
+        val repeatButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(repeatIconRes)
+            .setDisplayName("Repeat")
+            .setSessionCommand(repeatCommand)
+            .setSlots(CommandButton.SLOT_OVERFLOW)
+            .build()
+
+        return listOf(shuffleButton, repeatButton)
     }
 
     private fun saveQueueAndPlaybackState(player: Player) {
@@ -271,46 +295,5 @@ class PlaybackService : MediaSessionService() {
             mediaSession = null
         }
         super.onDestroy()
-    }
-
-    @OptIn(UnstableApi::class)
-    private class RightAlignedStopNotificationProvider(
-        context: Context
-    ) : MediaNotification.Provider {
-        private val delegate = DefaultMediaNotificationProvider.Builder(context).build()
-
-        override fun createNotification(
-            mediaSession: MediaSession,
-            customLayout: ImmutableList<CommandButton>,
-            actionFactory: MediaNotification.ActionFactory,
-            callback: MediaNotification.Provider.Callback
-        ): MediaNotification {
-            val mediaNotification = delegate.createNotification(
-                mediaSession,
-                customLayout,
-                actionFactory,
-                callback
-            )
-            val actions = mediaNotification.notification.actions
-            if (actions != null && actions.size > 1) {
-                val stopIndex = actions.indexOfFirst {
-                    val title = it.title?.toString()
-                    title.equals("Stop", ignoreCase = true) || title.equals("Close", ignoreCase = true)
-                }
-                if (stopIndex != -1 && stopIndex != actions.size - 1) {
-                    val actionList = actions.toMutableList()
-                    val stopAction = actionList.removeAt(stopIndex)
-                    actionList.add(stopAction)
-                    mediaNotification.notification.actions = actionList.toTypedArray()
-                }
-            }
-            return mediaNotification
-        }
-
-        override fun handleCustomCommand(
-            session: MediaSession,
-            action: String,
-            extras: Bundle
-        ): Boolean = delegate.handleCustomCommand(session, action, extras)
     }
 }

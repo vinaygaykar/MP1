@@ -29,7 +29,8 @@ data class PlayerUiState(
     val lyricsError: String? = null,
     val queue: ImmutableList<MediaItem> = persistentListOf(),
     val currentIndex: Int = -1,
-    val isScanInProgress: Boolean = false
+    val isScanInProgress: Boolean = false,
+    val audioEnergyCurve: FloatArray? = null
 )
 
 interface PlayerActions {
@@ -52,4 +53,5 @@ interface PlayerActions {
     fun removeIndicesFromQueue(indices: Set<Int>) {}
     fun removeOthersFromQueue(indicesToKeep: Set<Int>) {}
     fun playNextInQueue(indices: Set<Int>) {}
+    fun ensureAudioEnergyCalculated(songId: String, uri: Uri) {}
 }

@@ -32,6 +32,7 @@ fun PlayerTimestampBar(
     recordY: Dp,
     progress: Float,
     modifier: Modifier = Modifier,
+    energy: Float = 0.5f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     minBarWidth: Dp = 140.dp
 ) {
@@ -79,6 +80,7 @@ fun PlayerTimestampBar(
                 isPlaying = isPlaying,
                 progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                 scrubFactor = scrubFactor,
+                energy = energy,
                 waveCycles = waveCycles,
                 aspectRatio = selectedAspectRatio,
                 activeColor = MaterialTheme.colorScheme.primary,

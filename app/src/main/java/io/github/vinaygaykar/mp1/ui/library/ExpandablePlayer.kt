@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.min
 import androidx.media3.common.MediaItem
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -111,6 +112,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -118,6 +120,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
@@ -125,6 +130,7 @@ import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.faces.VinylFace
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
+import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.toArtistId
 import kotlinx.coroutines.delay
@@ -195,6 +201,19 @@ fun ExpandablePlayer(
 
     val currentActions by rememberUpdatedState(actions)
     val currentState by rememberUpdatedState(state)
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isScreenActive by remember { mutableStateOf(true) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            isScreenActive = event == Lifecycle.Event.ON_RESUME
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val isDark = isSystemInDarkTheme()
     val playerColorScheme: ColorScheme? = remember(state.seedColor, isDark) {
@@ -441,6 +460,21 @@ fun ExpandablePlayer(
 
         LaunchedEffect(progress) {
             onProgressUpdate(progress)
+        }
+
+        val isPlayerVisible = progress > 0.1f && isScreenActive
+        val activeSongId = remember(state.queue, state.currentIndex, currentTrackKey) {
+            if (state.currentIndex in state.queue.indices) {
+                state.queue[state.currentIndex].mediaId
+            } else {
+                currentTrackKey
+            }
+        }
+
+        LaunchedEffect(activeSongId, isPlayerVisible) {
+            if (isPlayerVisible && activeSongId.isNotEmpty()) {
+                currentActions.ensureAudioEnergyCalculated(activeSongId, Uri.EMPTY)
+            }
         }
 
         val vinylFace = remember { VinylFace() }
@@ -734,6 +768,16 @@ fun ExpandablePlayer(
                         if (progress > 0f) {
                             val displayPosition =
                                 if (isDraggingScrub) draggedPosition else state.positionMs
+                            val currentEnergy = remember(state.audioEnergyCurve, displayPosition) {
+                                val curve = state.audioEnergyCurve
+                                if (curve != null && curve.isNotEmpty()) {
+                                    val bucketIndex = (displayPosition / AudioEnergyExtractor.ENERGY_INTERVAL_MS)
+                                        .toInt().coerceIn(0, curve.lastIndex)
+                                    curve[bucketIndex]
+                                } else {
+                                    0.5f
+                                }
+                            }
                             PlayerTimestampBar(
                                 displayPositionMs = displayPosition,
                                 durationMs = state.durationMs,
@@ -742,6 +786,7 @@ fun ExpandablePlayer(
                                 rowWidthFraction = rowWidthFraction,
                                 recordY = recordY,
                                 progress = progress,
+                                energy = currentEnergy,
                                 modifier = Modifier.align(Alignment.TopCenter)
                             )
                         }

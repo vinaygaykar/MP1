@@ -20,6 +20,7 @@ import io.github.vinaygaykar.mp1.data.local.scanner.ScannerRepository
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
+import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -50,6 +51,7 @@ class PlayerViewModel @Inject constructor(
 
     private var positionUpdateJob: Job? = null
     private var currentArtworkJob: Job? = null
+    private var energyExtractionJob: Job? = null
     private var queueUpdateJob: Job? = null
     private var activeArtworkUri: Uri? = null
     private var activeMediaId: String? = null
@@ -151,18 +153,23 @@ class PlayerViewModel @Inject constructor(
         val lyricsLoadingToUse: Boolean
         val lyricsErrorToUse: String?
 
+        val audioEnergyToUse: FloatArray?
         if (isNewMediaItem) {
+            energyExtractionJob?.cancel()
+            AudioEnergyExtractor.clearCache()
             lyricsToUse = null
             isSyncedToUse = false
             isLocalToUse = false
             lyricsLoadingToUse = false
             lyricsErrorToUse = null
+            audioEnergyToUse = AudioEnergyExtractor.getCachedEnergy(mediaId)
         } else {
             lyricsToUse = _uiState.value.lyrics
             isSyncedToUse = _uiState.value.isLyricsSynced
             isLocalToUse = _uiState.value.isLyricsLocal
             lyricsLoadingToUse = _uiState.value.lyricsLoading
             lyricsErrorToUse = _uiState.value.lyricsError
+            audioEnergyToUse = _uiState.value.audioEnergyCurve
         }
 
         val currentWindowIndex = player.currentMediaItemIndex
@@ -195,7 +202,8 @@ class PlayerViewModel @Inject constructor(
                 lyricsLoading = lyricsLoadingToUse,
                 lyricsError = lyricsErrorToUse,
                 queue = _uiState.value.queue,
-                currentIndex = uiCurrentIndex
+                currentIndex = uiCurrentIndex,
+                audioEnergyCurve = audioEnergyToUse
             )
         }
 
@@ -717,6 +725,31 @@ class PlayerViewModel @Inject constructor(
             }
         }
         updateState()
+    }
+
+    override fun ensureAudioEnergyCalculated(songId: String, uri: Uri) {
+        val activeItem = controller?.currentMediaItem
+        val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: songId
+        if (activeId.isEmpty()) return
+
+        if (_uiState.value.audioEnergyCurve != null) return
+        val cached = AudioEnergyExtractor.getCachedEnergy(activeId)
+        if (cached != null) {
+            _uiState.update { it.copy(audioEnergyCurve = cached) }
+            return
+        }
+
+        energyExtractionJob?.cancel()
+        energyExtractionJob = viewModelScope.launch(Dispatchers.IO) {
+            val song = musicRepository.getSongById(activeId)
+            val songUri = song?.uri ?: uri.takeIf { it != Uri.EMPTY } ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
+            if (songUri != Uri.EMPTY) {
+                val result = AudioEnergyExtractor.extractEnergy(context, activeId, songUri)
+                result.onSuccess { energyCurve ->
+                    _uiState.update { it.copy(audioEnergyCurve = energyCurve) }
+                }
+            }
+        }
     }
 
     override fun onCleared() {
