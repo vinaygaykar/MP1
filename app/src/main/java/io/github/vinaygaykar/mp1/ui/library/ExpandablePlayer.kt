@@ -346,7 +346,7 @@ fun ExpandablePlayer(
     )
 
     val rowWidthFraction by animateFloatAsState(
-        targetValue = if (isDraggingScrub) 0.9f else 0.4f,
+        targetValue = 0.9f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessLow

@@ -3,6 +3,7 @@ package io.github.vinaygaykar.mp1.ui.library
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,16 +17,28 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
 
+const val DEFAULT_WAVE_CYCLES = 1f
+
 @Composable
 fun PlaybackWaveform(
     isPlaying: Boolean,
     progress: Float,
     scrubFactor: Float,
     modifier: Modifier = Modifier,
+    waveCycles: Float = DEFAULT_WAVE_CYCLES,
+    aspectRatio: Float = 1.5f,
     activeColor: Color = MaterialTheme.colorScheme.primary,
     inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
     thumbColor: Color = activeColor
 ) {
+    val canvasHeight = 24.dp
+    val waveHeight = canvasHeight * (2f / 3f) // Peak-to-peak amplitude height (16dp)
+    val strokePadding = 4.dp // Padding for end stroke caps
+
+    val safeCycles = waveCycles.coerceAtLeast(0.1f)
+    val wavelength = waveHeight * aspectRatio.coerceIn(1.0f, 1.5f)
+    val targetWaveWidth = wavelength * safeCycles + strokePadding
+
     val infiniteTransition = rememberInfiniteTransition(label = "waveform")
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -43,7 +56,11 @@ fun PlaybackWaveform(
         label = "amplitude"
     )
 
-    Canvas(modifier = modifier.height(24.dp)) {
+    Canvas(
+        modifier = modifier
+            .height(canvasHeight)
+            .widthIn(min = targetWaveWidth, max = targetWaveWidth)
+    ) {
         val width = size.width
         val height = size.height
         val centerY = height / 2
@@ -65,7 +82,7 @@ fun PlaybackWaveform(
         for (i in 0..steps) {
             val rel = i.toFloat() / steps
             val x = startX + rel * trackWidth
-            val angle = rel.toDouble() * 2.0 * PI - phase.toDouble()
+            val angle = rel.toDouble() * waveCycles * 2.0 * PI - phase.toDouble()
             val sine = sin(angle).toFloat()
             val y = centerY + sine * currentAmplitude
             if (i == 0) fullPath.moveTo(x, y) else fullPath.lineTo(x, y)
@@ -87,14 +104,14 @@ fun PlaybackWaveform(
             for (i in 0..activeSteps) {
                 val rel = (i.toFloat() / steps).coerceAtMost(coercedProgress)
                 val x = startX + rel * trackWidth
-                val angle = rel.toDouble() * 2.0 * PI - phase.toDouble()
+                val angle = rel.toDouble() * waveCycles * 2.0 * PI - phase.toDouble()
                 val sine = sin(angle).toFloat()
                 val y = centerY + sine * currentAmplitude
                 if (i == 0) activePath.moveTo(x, y) else activePath.lineTo(x, y)
             }
 
             // Ensure active path reaches the exact progress point
-            val endAngle = coercedProgress.toDouble() * 2.0 * PI - phase.toDouble()
+            val endAngle = coercedProgress.toDouble() * waveCycles * 2.0 * PI - phase.toDouble()
             val endY = centerY + sin(endAngle).toFloat() * currentAmplitude
             activePath.lineTo(activeEndX, endY)
 
