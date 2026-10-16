@@ -43,6 +43,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -200,17 +201,20 @@ fun QueueBottomSheetContent(
 
             val showPlayingQueueHeader = isPlayingQueueHeaderVisible || isAtTop
 
-            // Scroll to current playing song when sheet opens or current index changes
-            LaunchedEffect(state.currentIndex) {
-                if (state.currentIndex in state.queue.indices) {
-                    if (state.currentIndex == 0) {
-                        lazyListState.scrollToItem(0, 0)
-                    } else {
-                        val scrollOffset = if (stickyHeaderHeightPx > 0) -stickyHeaderHeightPx else -150
+            var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
+            val density = LocalDensity.current
+            val extraOffsetPx = remember(density) { with(density) { 12.dp.roundToPx() } }
+
+            // Scroll to current playing song ONCE when sheet opens
+            LaunchedEffect(stickyHeaderHeightPx, state.currentIndex, state.queue.size) {
+                if (!hasScrolledToInitialPosition && state.currentIndex in state.queue.indices) {
+                    if (stickyHeaderHeightPx > 0) {
+                        val scrollOffset = -(stickyHeaderHeightPx + extraOffsetPx)
                         lazyListState.scrollToItem(
                             index = state.currentIndex + 1,
                             scrollOffset = scrollOffset
                         )
+                        hasScrolledToInitialPosition = true
                     }
                 }
             }
