@@ -575,34 +575,44 @@ fun LibraryContent(
                         contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
                     )
 
-                    1 -> SongList(
-                        songs = songs,
-                        onSongClick = { song ->
-                            if (isSelectionMode) {
-                                toggleSongSelection(song)
+                    1 -> {
+                        val headerHeightDp = remember(collapsibleHeaderHeightPx, density) {
+                            if (collapsibleHeaderHeightPx > 0f) {
+                                with(density) { collapsibleHeaderHeightPx.toDp() }
                             } else {
-                                onPlaySong(song, songs)
+                                104.dp
                             }
-                        },
-                        onSongLongClick = { song ->
-                            toggleSongSelection(song)
-                        },
-                        selectedSongIds = selectedSongIds,
-                        isSelectionMode = isSelectionMode,
-                        onSwipeRight = { song, offset, size ->
-                            onAddToQueue(song)
-                            if (isPlayerActive) {
-                                flyingArtworks.add(
-                                    FlyingArtworkItem(
-                                        artworkUri = song.artworkUri,
-                                        startOffset = offset,
-                                        startSize = size
+                        }
+                        SongList(
+                            songs = songs,
+                            onSongClick = { song ->
+                                if (isSelectionMode) {
+                                    toggleSongSelection(song)
+                                } else {
+                                    onPlaySong(song, songs)
+                                }
+                            },
+                            onSongLongClick = { song ->
+                                toggleSongSelection(song)
+                            },
+                            selectedSongIds = selectedSongIds,
+                            isSelectionMode = isSelectionMode,
+                            onSwipeRight = { song, offset, size ->
+                                onAddToQueue(song)
+                                if (isPlayerActive) {
+                                    flyingArtworks.add(
+                                        FlyingArtworkItem(
+                                            artworkUri = song.artworkUri,
+                                            startOffset = offset,
+                                            startSize = size
+                                        )
                                     )
-                                )
-                            }
-                        },
-                        contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
-                    )
+                                }
+                            },
+                            contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
+                            headerHeight = headerHeightDp
+                        )
+                    }
 
                     2 -> {
                         if (useCleanAlbumGrid) {
@@ -972,16 +982,29 @@ fun SongList(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     selectedSongIds: Set<String> = emptySet(),
     isSelectionMode: Boolean = false,
-    onSongLongClick: (Song) -> Unit = {}
+    onSongLongClick: (Song) -> Unit = {},
+    headerHeight: Dp = 104.dp
 ) {
     if (songs.isEmpty()) {
+        val topPadding = contentPadding.calculateTopPadding()
+        val bottomPadding = contentPadding.calculateBottomPadding()
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(contentPadding),
+                .padding(
+                    top = topPadding,
+                    bottom = bottomPadding + headerHeight + topPadding,
+                    start = 32.dp,
+                    end = 32.dp
+                ),
             contentAlignment = Alignment.Center
         ) {
-            Text("No songs found. Try scanning a folder in Settings.")
+            Text(
+                text = "No songs found. Try scanning a folder in Settings.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     } else {
         val listState = rememberLazyListState()

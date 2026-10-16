@@ -8,11 +8,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -46,16 +50,17 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MiniPlayer(
     state: PlayerUiState,
@@ -114,98 +119,147 @@ fun MiniPlayer(
     val prevArtworkUri = remember(prevItem) { prevItem?.mediaMetadata?.artworkUri }
 
     var containerWidthPx by remember { mutableFloatStateOf(0f) }
-    var rawDragOffset by remember { mutableFloatStateOf(0f) }
-    val animatableOffset = remember { Animatable(0f) }
 
-    LaunchedEffect(state.trackTitle, state.currentIndex) {
-        animatableOffset.snapTo(0f)
-        rawDragOffset = 0f
+    val currentTrackPageIndex = if (state.hasPrevious) 1 else 0
+    val totalPageCount = 1 + (if (state.hasPrevious) 1 else 0) + (if (state.hasNext) 1 else 0)
+
+    val pagerState = rememberPagerState(
+        initialPage = currentTrackPageIndex,
+        pageCount = { totalPageCount }
+    )
+
+    val boundaryOffsetAnimatable = remember { Animatable(0f) }
+
+    LaunchedEffect(state.currentIndex, state.trackTitle, state.hasPrevious, state.hasNext) {
+        if (pagerState.currentPage != currentTrackPageIndex) {
+            pagerState.scrollToPage(currentTrackPageIndex)
+        }
+    }
+
+    LaunchedEffect(pagerState.settledPage, currentTrackPageIndex) {
+        if (pagerState.settledPage < currentTrackPageIndex) {
+            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            actions.onPrevious()
+        } else if (pagerState.settledPage > currentTrackPageIndex) {
+            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            actions.onNext()
+        }
+    }
+
+    LaunchedEffect(pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress && boundaryOffsetAnimatable.value != 0f) {
+            boundaryOffsetAnimatable.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    stiffness = Spring.StiffnessMediumLow,
+                    dampingRatio = Spring.DampingRatioMediumBouncy
+                )
+            )
+        }
+    }
+
+    val boundaryNestedScrollConnection = remember(state.hasPrevious, state.hasNext, totalPageCount, currentTrackPageIndex) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val currentOffset = boundaryOffsetAnimatable.value
+                if (currentOffset == 0f) return Offset.Zero
+
+                val deltaX = available.x
+                if ((currentOffset > 0f && deltaX < 0f) || (currentOffset < 0f && deltaX > 0f)) {
+                    val newOffset = if (currentOffset > 0f) {
+                        (currentOffset + deltaX).coerceAtLeast(0f)
+                    } else {
+                        (currentOffset + deltaX).coerceAtMost(0f)
+                    }
+                    val consumedX = newOffset - currentOffset
+                    coroutineScope.launch {
+                        boundaryOffsetAnimatable.snapTo(newOffset)
+                    }
+                    return Offset(consumedX, 0f)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                val deltaX = available.x
+                if (deltaX == 0f) return Offset.Zero
+
+                val isAtPrevBoundary = !state.hasPrevious && deltaX > 0f && pagerState.currentPage == 0
+                val isAtNextBoundary = !state.hasNext && deltaX < 0f && pagerState.currentPage == totalPageCount - 1
+
+                if (isAtPrevBoundary || isAtNextBoundary) {
+                    val currentOffset = boundaryOffsetAnimatable.value
+                    val newOffset = currentOffset + deltaX
+                    coroutineScope.launch {
+                        boundaryOffsetAnimatable.snapTo(newOffset)
+                    }
+                    if (abs(currentOffset) < 15f && abs(newOffset) >= 15f) {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    }
+                    return Offset(deltaX, 0f)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (boundaryOffsetAnimatable.value != 0f) {
+                    boundaryOffsetAnimatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessMediumLow,
+                            dampingRatio = Spring.DampingRatioMediumBouncy
+                        )
+                    )
+                }
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (boundaryOffsetAnimatable.value != 0f) {
+                    boundaryOffsetAnimatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessMediumLow,
+                            dampingRatio = Spring.DampingRatioMediumBouncy
+                        )
+                    )
+                }
+                return Velocity.Zero
+            }
+        }
+    }
+
+    val rawBoundaryOffset = boundaryOffsetAnimatable.value
+    val width = if (containerWidthPx > 0f) containerWidthPx else 400f
+    val effectiveBoundaryOffset = calculateEffectiveOffset(
+        rawOffset = rawBoundaryOffset,
+        width = width,
+        hasPrevious = state.hasPrevious,
+        hasNext = state.hasNext
+    )
+
+    val isStretchingNext = effectiveBoundaryOffset < 0f && !state.hasNext
+    val isStretchingPrev = effectiveBoundaryOffset > 0f && !state.hasPrevious
+
+    val stretchFactor = if (isStretchingNext || isStretchingPrev) {
+        (abs(effectiveBoundaryOffset) / width).coerceIn(0f, 0.4f)
+    } else 0f
+
+    val currentScaleX = 1f + stretchFactor * 0.6f
+    val currentTransformOrigin = when {
+        isStretchingNext -> TransformOrigin(1f, 0.5f)
+        isStretchingPrev -> TransformOrigin(0f, 0.5f)
+        else -> TransformOrigin.Center
     }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .draggable(
-                state = rememberDraggableState { delta ->
-                    rawDragOffset += delta
-                    val effective = calculateEffectiveOffset(
-                        rawOffset = rawDragOffset,
-                        width = containerWidthPx,
-                        hasPrevious = state.hasPrevious,
-                        hasNext = state.hasNext
-                    )
-                    coroutineScope.launch {
-                        animatableOffset.snapTo(effective)
-                    }
-                },
-                orientation = Orientation.Horizontal,
-                onDragStarted = {
-                    rawDragOffset = animatableOffset.value
-                },
-                onDragStopped = { velocity ->
-                    coroutineScope.launch {
-                        val currentOffset = animatableOffset.value
-                        val width = if (containerWidthPx > 0f) containerWidthPx else 400f
-                        val threshold = width * 0.25f
-                        val velocityThreshold = 500f
-
-                        if (currentOffset < 0f) { // Swiping left (Next)
-                            if (state.hasNext && (abs(currentOffset) > threshold || velocity < -velocityThreshold)) {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                animatableOffset.animateTo(
-                                    targetValue = -width,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
-                                actions.onNext()
-                                delay(500)
-                                if (animatableOffset.value != 0f) {
-                                    animatableOffset.snapTo(0f)
-                                    rawDragOffset = 0f
-                                }
-                            } else {
-                                if (!state.hasNext && abs(currentOffset) > 15f) {
-                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                }
-                                animatableOffset.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        stiffness = Spring.StiffnessMediumLow,
-                                        dampingRatio = Spring.DampingRatioMediumBouncy
-                                    )
-                                )
-                                rawDragOffset = 0f
-                            }
-                        } else if (currentOffset > 0f) { // Swiping right (Prev)
-                            if (state.hasPrevious && (currentOffset > threshold || velocity > velocityThreshold)) {
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                animatableOffset.animateTo(
-                                    targetValue = width,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                )
-                                actions.onPrevious()
-                                delay(500)
-                                if (animatableOffset.value != 0f) {
-                                    animatableOffset.snapTo(0f)
-                                    rawDragOffset = 0f
-                                }
-                            } else {
-                                if (!state.hasPrevious && currentOffset > 15f) {
-                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                }
-                                animatableOffset.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        stiffness = Spring.StiffnessMediumLow,
-                                        dampingRatio = Spring.DampingRatioMediumBouncy
-                                    )
-                                )
-                                rawDragOffset = 0f
-                            }
-                        }
-                    }
-                }
-            )
             .then(
                 if (onClick != null) {
                     Modifier.clickable(
@@ -224,69 +278,36 @@ fun MiniPlayer(
                 .onSizeChanged { containerWidthPx = it.width.toFloat() }
                 .clipToBounds()
         ) {
-            val offset = animatableOffset.value
-            val width = containerWidthPx
-
-            // Calculate scale and transform origin for stretch effect when no prev/next item
-            val isStretchingNext = offset < 0f && !state.hasNext
-            val isStretchingPrev = offset > 0f && !state.hasPrevious
-
-            val stretchFactor = if (isStretchingNext || isStretchingPrev) {
-                if (width > 0f) (abs(offset) / width).coerceIn(0f, 0.4f) else 0f
-            } else 0f
-
-            val currentScaleX = 1f + stretchFactor * 0.6f
-            val currentTransformOrigin = when {
-                isStretchingNext -> TransformOrigin(1f, 0.5f) // Anchor right edge, stretch left
-                isStretchingPrev -> TransformOrigin(0f, 0.5f) // Anchor left edge, stretch right
-                else -> TransformOrigin.Center
-            }
-
-            // Previous Song Item Content (entering from left when swiping right)
-            if (offset > 0f && (state.hasPrevious || prevItem != null)) {
-                MiniPlayerItemContent(
-                    title = prevTitle,
-                    artist = prevArtist,
-                    artworkUri = prevArtworkUri,
-                    showRecord = showRecord,
-                    rotation = internalRotation,
-                    textAlpha = textAlpha,
-                    modifier = Modifier.graphicsLayer {
-                        translationX = -width + offset
+            @Suppress("DEPRECATION")
+            CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(boundaryNestedScrollConnection)
+                        .graphicsLayer {
+                            translationX = effectiveBoundaryOffset
+                            scaleX = currentScaleX
+                            transformOrigin = currentTransformOrigin
+                        }
+                ) { page ->
+                    val (title, artist, artworkUri) = when {
+                        page == currentTrackPageIndex -> Triple(state.trackTitle, state.artist, state.artworkUri)
+                        page < currentTrackPageIndex -> Triple(prevTitle, prevArtist, prevArtworkUri)
+                        else -> Triple(nextTitle, nextArtist, nextArtworkUri)
                     }
-                )
-            }
 
-            // Next Song Item Content (entering from right when swiping left)
-            if (offset < 0f && (state.hasNext || nextItem != null)) {
-                MiniPlayerItemContent(
-                    title = nextTitle,
-                    artist = nextArtist,
-                    artworkUri = nextArtworkUri,
-                    showRecord = showRecord,
-                    rotation = internalRotation,
-                    textAlpha = textAlpha,
-                    modifier = Modifier.graphicsLayer {
-                        translationX = width + offset
-                    }
-                )
-            }
-
-            // Current Song Content
-            MiniPlayerItemContent(
-                title = state.trackTitle,
-                artist = state.artist,
-                artworkUri = state.artworkUri,
-                showRecord = showRecord,
-                rotation = internalRotation,
-                textAlpha = textAlpha,
-                onPositioned = onPositioned,
-                modifier = Modifier.graphicsLayer {
-                    translationX = offset
-                    scaleX = currentScaleX
-                    transformOrigin = currentTransformOrigin
+                    MiniPlayerItemContent(
+                        title = title,
+                        artist = artist,
+                        artworkUri = artworkUri,
+                        showRecord = showRecord,
+                        rotation = internalRotation,
+                        textAlpha = textAlpha,
+                        onPositioned = if (page == currentTrackPageIndex) onPositioned else null
+                    )
                 }
-            )
+            }
 
             // Bottom Progress Bar (Stationary)
             val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
