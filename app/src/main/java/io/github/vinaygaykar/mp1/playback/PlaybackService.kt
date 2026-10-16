@@ -41,7 +41,6 @@ class PlaybackService : MediaSessionService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var isRestoringState = true
 
-    private val shuffleCommand = SessionCommand("ACTION_TOGGLE_SHUFFLE", Bundle.EMPTY)
     private val repeatCommand = SessionCommand("ACTION_TOGGLE_REPEAT", Bundle.EMPTY)
 
     @Inject
@@ -134,7 +133,6 @@ class PlaybackService : MediaSessionService() {
             ): MediaSession.ConnectionResult {
                 val connectionResult = super.onConnect(session, controller)
                 val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
-                    .add(shuffleCommand)
                     .add(repeatCommand)
                     .build()
                 return MediaSession.ConnectionResult.accept(
@@ -149,15 +147,9 @@ class PlaybackService : MediaSessionService() {
                 customCommand: SessionCommand,
                 args: Bundle
             ): ListenableFuture<SessionResult> {
-                when (customCommand.customAction) {
-                    "ACTION_TOGGLE_SHUFFLE" -> {
-                        session.player.shuffleModeEnabled = !session.player.shuffleModeEnabled
-                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-                    }
-                    "ACTION_TOGGLE_REPEAT" -> {
-                        session.player.repeatMode = (session.player.repeatMode + 1) % 3
-                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
-                    }
+                if (customCommand.customAction == "ACTION_TOGGLE_REPEAT") {
+                    session.player.repeatMode = (session.player.repeatMode + 1) % 3
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
                 return super.onCustomCommand(session, controller, customCommand, args)
             }
@@ -172,15 +164,6 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun buildMediaButtonPreferences(player: Player): List<CommandButton> {
-        val shuffleOn = player.shuffleModeEnabled
-        val shuffleIconRes = if (shuffleOn) R.drawable.ic_shuffle_on else R.drawable.ic_shuffle_off
-        val shuffleButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
-            .setCustomIconResId(shuffleIconRes)
-            .setDisplayName("Shuffle")
-            .setSessionCommand(shuffleCommand)
-            .setSlots(CommandButton.SLOT_OVERFLOW)
-            .build()
-
         val repeatIconRes = when (player.repeatMode) {
             Player.REPEAT_MODE_ONE -> R.drawable.ic_repeat_one
             Player.REPEAT_MODE_ALL -> R.drawable.ic_repeat_all
@@ -193,7 +176,7 @@ class PlaybackService : MediaSessionService() {
             .setSlots(CommandButton.SLOT_OVERFLOW)
             .build()
 
-        return listOf(shuffleButton, repeatButton)
+        return listOf(repeatButton)
     }
 
     private fun saveQueueAndPlaybackState(player: Player) {
