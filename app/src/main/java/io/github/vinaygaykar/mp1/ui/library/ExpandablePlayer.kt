@@ -317,30 +317,27 @@ fun ExpandablePlayer(
     )
 
     val scale = remember { Animatable(1f) }
+    val currentTrackPageIndex = if (state.hasPrevious) 1 else 0
+    val totalPageCount = 1 + (if (state.hasPrevious) 1 else 0) + (if (state.hasNext) 1 else 0)
+
     val pagerState = rememberPagerState(
-        initialPage = 1,
-        pageCount = { 3 }
+        initialPage = currentTrackPageIndex,
+        pageCount = { totalPageCount }
     )
 
-    LaunchedEffect(state.currentIndex, state.trackTitle) {
-        if (pagerState.currentPage != 1) {
-            pagerState.scrollToPage(1)
+    LaunchedEffect(state.currentIndex, state.trackTitle, state.hasPrevious, state.hasNext) {
+        if (pagerState.currentPage != currentTrackPageIndex) {
+            pagerState.scrollToPage(currentTrackPageIndex)
         }
     }
 
-    LaunchedEffect(pagerState.settledPage) {
-        if (pagerState.settledPage == 0) {
-            if (state.hasPrevious) {
-                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                actions.onPrevious()
-            }
-            pagerState.scrollToPage(1)
-        } else if (pagerState.settledPage == 2) {
-            if (state.hasNext) {
-                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                actions.onNext()
-            }
-            pagerState.scrollToPage(1)
+    LaunchedEffect(pagerState.settledPage, currentTrackPageIndex) {
+        if (pagerState.settledPage < currentTrackPageIndex) {
+            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            actions.onPrevious()
+        } else if (pagerState.settledPage > currentTrackPageIndex) {
+            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            actions.onNext()
         }
     }
 
@@ -914,10 +911,10 @@ fun ExpandablePlayer(
                                         )
                                     }
                             ) { page ->
-                                val pageArtworkUri = when (page) {
-                                    0 -> if (state.hasPrevious) prevArtworkUri else null
-                                    1 -> state.artworkUri
-                                    2 -> if (state.hasNext) nextArtworkUri else null
+                                val pageArtworkUri = when {
+                                    page == currentTrackPageIndex -> state.artworkUri
+                                    state.hasPrevious && page == currentTrackPageIndex - 1 -> prevArtworkUri
+                                    state.hasNext && page == currentTrackPageIndex + 1 -> nextArtworkUri
                                     else -> null
                                 }
 
@@ -951,13 +948,13 @@ fun ExpandablePlayer(
                                         artworkUri = pageArtworkUri,
                                         recordSize = recordSize,
                                         artworkSize = artworkSize,
-                                        rotation = if (page == 1) visualRotation else 0f,
-                                        overlayAlpha = if (page == 1) overlayAlpha else 0f,
+                                        rotation = if (page == currentTrackPageIndex) visualRotation else 0f,
+                                        overlayAlpha = if (page == currentTrackPageIndex) overlayAlpha else 0f,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .scale(scale.value * 0.85f),
-                                        isScrubbing = page == 1 && isDraggingScrub,
-                                        isDraggingArtwork = page == 1 && isDraggingArtwork
+                                        isScrubbing = page == currentTrackPageIndex && isDraggingScrub,
+                                        isDraggingArtwork = page == currentTrackPageIndex && isDraggingArtwork
                                     )
                                 }
                             }
