@@ -1,5 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.faces
 
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import io.github.vinaygaykar.mp1.playback.PlayerActions
@@ -23,6 +24,24 @@ interface PlayerFace {
         state: PlayerUiState,
         actions: PlayerActions,
         modifier: Modifier,
+        showRecord: Boolean,
+        pagerState: PagerState?,
+        onArtistClick: (() -> Unit)?
+    ) {
+        Render(
+            state = state,
+            actions = actions,
+            modifier = modifier,
+            showRecord = showRecord,
+            onArtistClick = onArtistClick
+        )
+    }
+
+    @Composable
+    fun Render(
+        state: PlayerUiState,
+        actions: PlayerActions,
+        modifier: Modifier,
         showRecord: Boolean
     ) {
         Render(
@@ -30,6 +49,7 @@ interface PlayerFace {
             actions = actions,
             modifier = modifier,
             showRecord = showRecord,
+            pagerState = null,
             onArtistClick = null
         )
     }

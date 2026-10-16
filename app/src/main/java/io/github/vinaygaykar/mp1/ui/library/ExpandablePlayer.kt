@@ -695,6 +695,7 @@ fun ExpandablePlayer(
                                 actions = actions,
                                 modifier = Modifier.fillMaxSize(),
                                 showRecord = false,
+                                pagerState = pagerState,
                                 onArtistClick = {
                                     showArtistsDialog = true
                                 }
