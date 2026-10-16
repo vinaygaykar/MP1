@@ -19,6 +19,13 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollFactory
+import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.WindowInsets
@@ -325,6 +332,9 @@ fun ExpandablePlayer(
         pageCount = { totalPageCount }
     )
 
+    val maxSlidePx = with(density) { 24.dp.toPx() }
+    val boundaryOffsetAnimatable = remember { Animatable(0f) }
+
     LaunchedEffect(state.currentIndex, state.trackTitle, state.hasPrevious, state.hasNext) {
         if (pagerState.currentPage != currentTrackPageIndex) {
             pagerState.scrollToPage(currentTrackPageIndex)
@@ -338,6 +348,90 @@ fun ExpandablePlayer(
         } else if (pagerState.settledPage > currentTrackPageIndex) {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             actions.onNext()
+        }
+    }
+
+    LaunchedEffect(pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress && boundaryOffsetAnimatable.value != 0f) {
+            boundaryOffsetAnimatable.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+        }
+    }
+
+    val boundaryNestedScrollConnection = remember(state.hasPrevious, state.hasNext, totalPageCount, currentTrackPageIndex) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val currentOffset = boundaryOffsetAnimatable.value
+                if (currentOffset == 0f) return Offset.Zero
+
+                val deltaX = available.x
+                if ((currentOffset > 0f && deltaX < 0f) || (currentOffset < 0f && deltaX > 0f)) {
+                    val newOffset = if (currentOffset > 0f) {
+                        (currentOffset + deltaX).coerceAtLeast(0f)
+                    } else {
+                        (currentOffset + deltaX).coerceAtMost(0f)
+                    }
+                    val consumedX = newOffset - currentOffset
+                    scope.launch {
+                        boundaryOffsetAnimatable.snapTo(newOffset)
+                    }
+                    return Offset(consumedX, 0f)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                val deltaX = available.x
+                if (deltaX == 0f) return Offset.Zero
+
+                val isAtPrevBoundary = !state.hasPrevious && deltaX > 0f && pagerState.currentPage == 0
+                val isAtNextBoundary = !state.hasNext && deltaX < 0f && pagerState.currentPage == totalPageCount - 1
+
+                if (isAtPrevBoundary || isAtNextBoundary) {
+                    val currentOffset = boundaryOffsetAnimatable.value
+                    val newOffset = currentOffset + deltaX
+                    scope.launch {
+                        boundaryOffsetAnimatable.snapTo(newOffset)
+                    }
+                    return Offset(deltaX, 0f)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (boundaryOffsetAnimatable.value != 0f) {
+                    boundaryOffsetAnimatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                }
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (boundaryOffsetAnimatable.value != 0f) {
+                    boundaryOffsetAnimatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                }
+                return Velocity.Zero
+            }
         }
     }
 
@@ -808,11 +902,14 @@ fun ExpandablePlayer(
                                     onMiniPlayerPositioned?.invoke(coords.positionInRoot())
                                 }
                         ) {
-                            HorizontalPager(
+                            @Suppress("DEPRECATION")
+                            CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+                                HorizontalPager(
                                 state = pagerState,
                                 userScrollEnabled = currentProgress > 0.9f && !showQueue && !showLyrics && !showArtistsDialog,
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .nestedScroll(boundaryNestedScrollConnection)
                                     .pointerInput(Unit) {
                                         var dragStarted = false
                                         var wasPlayingOnDragStart = false
@@ -918,6 +1015,11 @@ fun ExpandablePlayer(
                                     else -> null
                                 }
 
+                                val rawOffset = boundaryOffsetAnimatable.value
+                                val slideTranslationX = rawOffset.coerceIn(-maxSlidePx, maxSlidePx)
+                                val excessPx = (abs(rawOffset) - maxSlidePx).coerceAtLeast(0f)
+                                val stretchScaleX = 1f + (excessPx / 3200f).coerceAtMost(0.05f)
+
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -952,6 +1054,12 @@ fun ExpandablePlayer(
                                         overlayAlpha = if (page == currentTrackPageIndex) overlayAlpha else 0f,
                                         modifier = Modifier
                                             .fillMaxSize()
+                                            .graphicsLayer {
+                                                if (page == currentTrackPageIndex && rawOffset != 0f) {
+                                                    translationX = slideTranslationX
+                                                    scaleX = stretchScaleX
+                                                }
+                                            }
                                             .scale(scale.value * 0.85f),
                                         isScrubbing = page == currentTrackPageIndex && isDraggingScrub,
                                         isDraggingArtwork = page == currentTrackPageIndex && isDraggingArtwork
@@ -959,6 +1067,7 @@ fun ExpandablePlayer(
                                 }
                             }
                         }
+                    }
 
                         // Lyrics Overlay
                         AnimatedVisibility(
