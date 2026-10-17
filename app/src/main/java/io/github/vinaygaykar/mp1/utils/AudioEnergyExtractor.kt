@@ -19,8 +19,8 @@ object AudioEnergyExtractor {
     private const val ENCODING_PCM_16BIT = 2
     private const val ENCODING_PCM_FLOAT = 4
     
-    // Window set to 1000ms (1 second) for ultra-smooth energy progression
-    const val ENERGY_INTERVAL_MS = 1000
+    // Window set to 250ms (0.25 seconds)
+    const val ENERGY_INTERVAL_MS = 250
 
     @Volatile
     private var activeSongId: String? = null

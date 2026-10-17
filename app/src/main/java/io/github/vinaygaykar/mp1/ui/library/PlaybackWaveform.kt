@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
 
-const val DEFAULT_WAVE_CYCLES = 1f
+const val DEFAULT_WAVE_CYCLES = 3f
 
 @Composable
 fun PlaybackWaveform(
@@ -26,6 +26,7 @@ fun PlaybackWaveform(
     scrubFactor: Float,
     modifier: Modifier = Modifier,
     energy: Float = 0.5f,
+    energyDelta: Float = 0f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     amplitudeScale: Float? = null,
     aspectRatio: Float = 1.5f,
@@ -38,11 +39,12 @@ fun PlaybackWaveform(
     val strokePadding = 4.dp // Padding for end stroke caps
 
     val coercedEnergy = energy.coerceIn(0f, 1f)
+    val coercedEnergyDelta = (energyDelta * 2.5f).coerceIn(0f, 1f)
 
     val targetCycles = if (waveCycles != DEFAULT_WAVE_CYCLES) {
         waveCycles
     } else {
-        1.0f + coercedEnergy * 3.0f
+        1.0f + (coercedEnergyDelta * 2.0f)
     }
 
     val animatedCycles by animateFloatAsState(
@@ -54,8 +56,8 @@ fun PlaybackWaveform(
         label = "animatedCycles"
     )
 
-    // Dynamic wave amplitude scale: 0.12f (whisper quiet) -> 1.25f (peak energy burst >100%)
-    val targetAmpScale = amplitudeScale ?: (0.12f + coercedEnergy * 1.13f)
+    // Wave amplitude scale reduced by 50% (0.5x) of full base size
+    val targetAmpScale = (amplitudeScale ?: 1.0f) * 0.5f
     val animatedAmplitudeScale by animateFloatAsState(
         targetValue = targetAmpScale,
         animationSpec = spring(
@@ -65,7 +67,13 @@ fun PlaybackWaveform(
         label = "animatedAmplitudeScale"
     )
 
-    val speedMillis = (2000 - (coercedEnergy * 1200)).toInt().coerceIn(800, 2000)
+    // Oscillation speed driven dramatically by energy:
+    // Low energy (0.0): ~12,000ms per phase cycle (almost stopped)
+    // High energy (1.0): ~500ms per phase cycle (fast dramatic oscillation)
+    val minFreq = 1.0f / 12000f
+    val maxFreq = 1.0f / 500f
+    val currentFreq = minFreq + ((maxFreq - minFreq) * coercedEnergy)
+    val speedMillis = (1.0f / currentFreq).toInt().coerceIn(500, 12000)
 
     val safeCycles = animatedCycles.coerceAtLeast(0.1f)
     val wavelength = waveHeight * aspectRatio.coerceIn(1.0f, 1.5f)
