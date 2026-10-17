@@ -78,34 +78,23 @@ fun PlayerTimestampBar(
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
-            if (playbackWave.equals("Energy", ignoreCase = true)) {
-                PlaybackWaveform(
-                    isPlaying = isPlaying,
-                    progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                    scrubFactor = scrubFactor,
-                    energy = energy,
-                    waveCycles = waveCycles,
-                    aspectRatio = selectedAspectRatio,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 12.dp)
-                )
-            } else {
-                if (frequencyFrame != null) {
-                    DualPeakFrequencyWaveform(
+            when {
+                playbackWave.equals("Energy", ignoreCase = true) -> {
+                    PlaybackWaveform(
                         isPlaying = isPlaying,
                         progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                         scrubFactor = scrubFactor,
-                        frequencyFrame = frequencyFrame,
+                        energy = energy,
+                        waveCycles = waveCycles,
+                        aspectRatio = selectedAspectRatio,
                         activeColor = MaterialTheme.colorScheme.primary,
                         inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 12.dp)
                     )
-                } else {
+                }
+                playbackWave.equals("Simplicity", ignoreCase = true) -> {
                     PlaybackWaveform(
                         isPlaying = isPlaying,
                         progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
@@ -120,6 +109,36 @@ fun PlayerTimestampBar(
                             .weight(1f)
                             .padding(horizontal = 12.dp)
                     )
+                }
+                else -> { // Frequency
+                    if (frequencyFrame != null) {
+                        DualPeakFrequencyWaveform(
+                            isPlaying = isPlaying,
+                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                            scrubFactor = scrubFactor,
+                            frequencyFrame = frequencyFrame,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                        )
+                    } else {
+                        PlaybackWaveform(
+                            isPlaying = isPlaying,
+                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                            scrubFactor = scrubFactor,
+                            energy = 0f,
+                            waveCycles = 1f,
+                            amplitudeScale = 0.4f,
+                            aspectRatio = selectedAspectRatio,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                        )
+                    }
                 }
             }
             Text(

@@ -112,7 +112,7 @@ fun SettingsScreen(
             modifier = Modifier.clickable { viewModel.setUseCleanAlbumGrid(!useCleanAlbumGrid) },
         )
         var playbackWaveExpanded by remember { mutableStateOf(false) }
-        val playbackWaveOptions = listOf("Frequency", "Energy")
+        val playbackWaveOptions = listOf("Frequency", "Energy", "Simplicity")
 
         Box {
             ListItem(
