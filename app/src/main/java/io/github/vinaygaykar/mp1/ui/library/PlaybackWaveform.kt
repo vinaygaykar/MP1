@@ -17,8 +17,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** Amplitude scale factor relative to base max height (0.4 = 40% height). */
-private const val AMPLITUDE_SCALE = 0.4f
+/** Center-to-crest amplitude (6dp produces 12dp crest-to-trough peak-to-peak height). */
+private val MAX_AMPLITUDE = 6.dp
 
 /** Aspect ratio multiplier determining wavelength relative to wave height. */
 private const val ASPECT_RATIO = 1.5f
@@ -88,9 +88,7 @@ fun PlaybackWaveform(
         val strokeWidthPx = DEFAULT_STROKE_WIDTH.toPx() + SCRUB_STROKE_EXPANSION.toPx() * scrubFactor
         val halfStroke = strokeWidthPx / 2f
 
-        val baseMaxAmplitude = (height / 2f - halfStroke - 1.dp.toPx()).coerceAtLeast(2.dp.toPx())
-        val maxAmplitude = baseMaxAmplitude * AMPLITUDE_SCALE
-        val currentAmplitude = maxAmplitude * amplitudeMultiplier * (1f - scrubFactor)
+        val currentAmplitude = MAX_AMPLITUDE.toPx() * amplitudeMultiplier * (1f - scrubFactor)
 
         val startX = halfStroke
         val endX = (width - halfStroke).coerceAtLeast(startX)
