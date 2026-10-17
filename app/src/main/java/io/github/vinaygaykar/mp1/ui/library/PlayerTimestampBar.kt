@@ -112,7 +112,7 @@ fun PlayerTimestampBar(
                 }
                 PlaybackWave.FREQUENCY -> {
                     if (frequencyFrame != null) {
-                        DualPeakFrequencyWaveform(
+                        FrequencyWaveform(
                             isPlaying = isPlaying,
                             progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                             scrubFactor = scrubFactor,

@@ -15,8 +15,20 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 
+/** Fixed total height of the waveform canvas container. */
+private val CANVAS_HEIGHT = 88.dp
+
+/** Default stroke width (thickness) of the waveform path. */
+private val DEFAULT_STROKE_WIDTH = 4.dp
+
+/** Extra stroke width expansion added during scrubbing. */
+private val SCRUB_STROKE_EXPANSION = 2.dp
+
+/**
+ * Frequency-reactive waveform used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWave.FREQUENCY].
+ */
 @Composable
-fun DualPeakFrequencyWaveform(
+fun FrequencyWaveform(
     isPlaying: Boolean,
     progress: Float,
     scrubFactor: Float,
@@ -26,8 +38,6 @@ fun DualPeakFrequencyWaveform(
     inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
     thumbColor: Color = activeColor
 ) {
-    val canvasHeight = 88.dp
-
     val targetLow = if (isPlaying) (frequencyFrame.low * 1.2f).coerceIn(0f, 1f) else 0f
     val targetMid = if (isPlaying) (frequencyFrame.mid * 1.2f).coerceIn(0f, 1f) else 0f
     val targetHigh = if (isPlaying) (frequencyFrame.high * 1.2f).coerceIn(0f, 1f) else 0f
@@ -42,14 +52,14 @@ fun DualPeakFrequencyWaveform(
     val animatedHigh by animateFloatAsState(targetValue = targetHigh, animationSpec = animSpec, label = "animatedHigh")
 
     Canvas(
-        modifier = modifier.height(canvasHeight)
+        modifier = modifier.height(CANVAS_HEIGHT)
     ) {
         val width = size.width
         val height = size.height
         val centerY = height / 2f
 
         // Stroke width expands from 4dp to 6dp when scrubbing
-        val strokeWidthPx = 4.dp.toPx() + 2.dp.toPx() * scrubFactor
+        val strokeWidthPx = DEFAULT_STROKE_WIDTH.toPx() + SCRUB_STROKE_EXPANSION.toPx() * scrubFactor
         val halfStroke = strokeWidthPx / 2f
 
         val startX = halfStroke

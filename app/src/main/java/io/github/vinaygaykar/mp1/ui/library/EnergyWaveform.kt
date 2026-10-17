@@ -19,6 +19,15 @@ import kotlin.math.sin
 
 const val DEFAULT_WAVE_CYCLES = 3f
 
+/** Fixed total height of the waveform canvas container. */
+private val CANVAS_HEIGHT = 88.dp
+
+/** Default stroke width (thickness) of the waveform path. */
+private val DEFAULT_STROKE_WIDTH = 4.dp
+
+/** Extra stroke width expansion added during scrubbing. */
+private val SCRUB_STROKE_EXPANSION = 2.dp
+
 /**
  * Dynamic energy-reactive waveform used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWave.ENERGY].
  */
@@ -37,7 +46,6 @@ fun EnergyWaveform(
     inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
     thumbColor: Color = activeColor
 ) {
-    val canvasHeight = 36.dp
     val waveHeight = 24.dp
     val strokePadding = 4.dp
 
@@ -59,7 +67,7 @@ fun EnergyWaveform(
         label = "animatedCycles"
     )
 
-    val targetAmpScale = (amplitudeScale ?: 1.0f) * 0.5f
+    val targetAmpScale = amplitudeScale ?: 1.0f
     val animatedAmplitudeScale by animateFloatAsState(
         targetValue = targetAmpScale,
         animationSpec = spring(
@@ -97,16 +105,17 @@ fun EnergyWaveform(
 
     Canvas(
         modifier = modifier
-            .height(canvasHeight)
+            .height(CANVAS_HEIGHT)
             .widthIn(min = targetWaveWidth, max = targetWaveWidth)
     ) {
         val width = size.width
         val height = size.height
         val centerY = height / 2
-        val strokeWidthPx = 4.dp.toPx() + 2.dp.toPx() * scrubFactor
+        val strokeWidthPx = DEFAULT_STROKE_WIDTH.toPx() + SCRUB_STROKE_EXPANSION.toPx() * scrubFactor
         val halfStroke = strokeWidthPx / 2f
 
-        val baseMaxAmplitude = (height / 2f - halfStroke - 1.dp.toPx()).coerceAtLeast(2.dp.toPx())
+        // 6dp center-to-crest amplitude produces a 12dp crest-to-trough peak-to-peak height
+        val baseMaxAmplitude = 6.dp.toPx()
         val maxAmplitude = baseMaxAmplitude * animatedAmplitudeScale
 
         val currentAmplitude = maxAmplitude * amplitudeMultiplier * (1f - scrubFactor)

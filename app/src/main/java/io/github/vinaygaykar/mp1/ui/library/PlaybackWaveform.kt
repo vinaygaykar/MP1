@@ -33,7 +33,13 @@ private const val WAVE_CYCLES = 1f
 private const val SPEED_MILLIS = 2000
 
 /** Fixed total height of the waveform canvas container. */
-private val CANVAS_HEIGHT = 36.dp
+private val CANVAS_HEIGHT = 88.dp
+
+/** Default stroke width (thickness) of the waveform path. */
+private val DEFAULT_STROKE_WIDTH = 4.dp
+
+/** Extra stroke width expansion added during scrubbing. */
+private val SCRUB_STROKE_EXPANSION = 2.dp
 
 /** Peak-to-peak base height used for wavelength calculations. */
 private val WAVE_HEIGHT = 24.dp
@@ -79,7 +85,7 @@ fun PlaybackWaveform(
         val width = size.width
         val height = size.height
         val centerY = height / 2
-        val strokeWidthPx = 4.dp.toPx() + 2.dp.toPx() * scrubFactor
+        val strokeWidthPx = DEFAULT_STROKE_WIDTH.toPx() + SCRUB_STROKE_EXPANSION.toPx() * scrubFactor
         val halfStroke = strokeWidthPx / 2f
 
         val baseMaxAmplitude = (height / 2f - halfStroke - 1.dp.toPx()).coerceAtLeast(2.dp.toPx())
