@@ -17,74 +17,49 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
 
-const val DEFAULT_WAVE_CYCLES = 3f
+/** Amplitude scale factor relative to base max height (0.4 = 40% height). */
+private const val AMPLITUDE_SCALE = 0.4f
 
+/** Aspect ratio multiplier determining wavelength relative to wave height. */
+private const val ASPECT_RATIO = 1.5f
+
+/** Extra padding in dp added to canvas width for end stroke caps. */
+private val STROKE_PADDING = 4.dp
+
+/** Fixed number of sine wave cycles rendered for simplicity mode. */
+private const val WAVE_CYCLES = 1f
+
+/** Duration in milliseconds for one full 2π phase oscillation cycle. */
+private const val SPEED_MILLIS = 2000
+
+/** Fixed total height of the waveform canvas container. */
+private val CANVAS_HEIGHT = 36.dp
+
+/** Peak-to-peak base height used for wavelength calculations. */
+private val WAVE_HEIGHT = 24.dp
+
+/**
+ * Simplified 1-cycle sine wave progress bar used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWave.SIMPLICITY].
+ */
 @Composable
 fun PlaybackWaveform(
     isPlaying: Boolean,
     progress: Float,
     scrubFactor: Float,
     modifier: Modifier = Modifier,
-    energy: Float = 0.5f,
-    energyDelta: Float = 0f,
-    waveCycles: Float = DEFAULT_WAVE_CYCLES,
-    amplitudeScale: Float? = null,
-    aspectRatio: Float = 1.5f,
     activeColor: Color = MaterialTheme.colorScheme.primary,
     inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
     thumbColor: Color = activeColor
 ) {
-    val canvasHeight = 36.dp
-    val waveHeight = 24.dp // Peak-to-peak base amplitude height
-    val strokePadding = 4.dp // Padding for end stroke caps
+    val wavelength = WAVE_HEIGHT * ASPECT_RATIO
+    val targetWaveWidth = wavelength * WAVE_CYCLES + STROKE_PADDING
 
-    val coercedEnergy = energy.coerceIn(0f, 1f)
-    val coercedEnergyDelta = (energyDelta * 2.5f).coerceIn(0f, 1f)
-
-    val targetCycles = if (waveCycles != DEFAULT_WAVE_CYCLES) {
-        waveCycles
-    } else {
-        1.0f + (coercedEnergyDelta * 2.0f)
-    }
-
-    val animatedCycles by animateFloatAsState(
-        targetValue = targetCycles,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "animatedCycles"
-    )
-
-    // Wave amplitude scale reduced by 50% (0.5x) of full base size
-    val targetAmpScale = (amplitudeScale ?: 1.0f) * 0.5f
-    val animatedAmplitudeScale by animateFloatAsState(
-        targetValue = targetAmpScale,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "animatedAmplitudeScale"
-    )
-
-    // Oscillation speed driven dramatically by energy:
-    // Low energy (0.0): ~12,000ms per phase cycle (almost stopped)
-    // High energy (1.0): ~500ms per phase cycle (fast dramatic oscillation)
-    val minFreq = 1.0f / 12000f
-    val maxFreq = 1.0f / 500f
-    val currentFreq = minFreq + ((maxFreq - minFreq) * coercedEnergy)
-    val speedMillis = (1.0f / currentFreq).toInt().coerceIn(500, 12000)
-
-    val safeCycles = animatedCycles.coerceAtLeast(0.1f)
-    val wavelength = waveHeight * aspectRatio.coerceIn(1.0f, 1.5f)
-    val targetWaveWidth = wavelength * safeCycles + strokePadding
-
-    val infiniteTransition = rememberInfiniteTransition(label = "waveform")
+    val infiniteTransition = rememberInfiniteTransition(label = "waveform_simplicity")
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 2f * PI.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(speedMillis, easing = LinearEasing),
+            animation = tween(SPEED_MILLIS, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "phase"
@@ -98,18 +73,17 @@ fun PlaybackWaveform(
 
     Canvas(
         modifier = modifier
-            .height(canvasHeight)
+            .height(CANVAS_HEIGHT)
             .widthIn(min = targetWaveWidth, max = targetWaveWidth)
     ) {
         val width = size.width
         val height = size.height
         val centerY = height / 2
-        val strokeWidthPx = 4.dp.toPx() + 2.dp.toPx() * scrubFactor // 4dp wave -> 6dp M3 flat progress bar
+        val strokeWidthPx = 4.dp.toPx() + 2.dp.toPx() * scrubFactor
         val halfStroke = strokeWidthPx / 2f
 
         val baseMaxAmplitude = (height / 2f - halfStroke - 1.dp.toPx()).coerceAtLeast(2.dp.toPx())
-        val maxAmplitude = baseMaxAmplitude * animatedAmplitudeScale
-
+        val maxAmplitude = baseMaxAmplitude * AMPLITUDE_SCALE
         val currentAmplitude = maxAmplitude * amplitudeMultiplier * (1f - scrubFactor)
 
         val startX = halfStroke
@@ -118,26 +92,25 @@ fun PlaybackWaveform(
 
         val coercedProgress = progress.coerceIn(0f, 1f)
 
-        // Generate full background path
+        // Draw full background path
         val fullPath = Path()
         val steps = trackWidth.toInt().coerceAtLeast(1)
         for (i in 0..steps) {
             val rel = i.toFloat() / steps
             val x = startX + rel * trackWidth
-            val angle = rel.toDouble() * animatedCycles * 2.0 * PI - phase.toDouble()
+            val angle = rel.toDouble() * WAVE_CYCLES * 2.0 * PI - phase.toDouble()
             val sine = sin(angle).toFloat()
             val y = centerY + sine * currentAmplitude
             if (i == 0) fullPath.moveTo(x, y) else fullPath.lineTo(x, y)
         }
 
-        // Draw background track
         drawPath(
             path = fullPath,
             color = inactiveColor,
             style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
         )
 
-        // Generate and draw active progress path
+        // Draw active progress path
         if (coercedProgress > 0f) {
             val activePath = Path()
             val activeEndX = startX + trackWidth * coercedProgress
@@ -146,14 +119,13 @@ fun PlaybackWaveform(
             for (i in 0..activeSteps) {
                 val rel = (i.toFloat() / steps).coerceAtMost(coercedProgress)
                 val x = startX + rel * trackWidth
-                val angle = rel.toDouble() * animatedCycles * 2.0 * PI - phase.toDouble()
+                val angle = rel.toDouble() * WAVE_CYCLES * 2.0 * PI - phase.toDouble()
                 val sine = sin(angle).toFloat()
                 val y = centerY + sine * currentAmplitude
                 if (i == 0) activePath.moveTo(x, y) else activePath.lineTo(x, y)
             }
 
-            // Ensure active path reaches the exact progress point
-            val endAngle = coercedProgress.toDouble() * animatedCycles * 2.0 * PI - phase.toDouble()
+            val endAngle = coercedProgress.toDouble() * WAVE_CYCLES * 2.0 * PI - phase.toDouble()
             val endY = centerY + sin(endAngle).toFloat() * currentAmplitude
             activePath.lineTo(activeEndX, endY)
 
@@ -164,7 +136,7 @@ fun PlaybackWaveform(
             )
         }
 
-        // Circular Seek Head (appears only when scrubbing)
+        // Circular Seek Head
         if (scrubFactor > 0f) {
             val thumbRadiusPx = 8.dp.toPx() * scrubFactor
             val thumbX = startX + trackWidth * coercedProgress

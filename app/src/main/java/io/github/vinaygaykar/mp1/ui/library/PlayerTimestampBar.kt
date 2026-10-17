@@ -83,7 +83,7 @@ fun PlayerTimestampBar(
             )
             when (playbackWave) {
                 PlaybackWave.ENERGY -> {
-                    PlaybackWaveform(
+                    EnergyWaveform(
                         isPlaying = isPlaying,
                         progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                         scrubFactor = scrubFactor,
@@ -103,10 +103,6 @@ fun PlayerTimestampBar(
                         isPlaying = isPlaying,
                         progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                         scrubFactor = scrubFactor,
-                        energy = 0f,
-                        waveCycles = 1f,
-                        amplitudeScale = 0.4f,
-                        aspectRatio = selectedAspectRatio,
                         activeColor = MaterialTheme.colorScheme.primary,
                         inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
                         modifier = Modifier
@@ -132,10 +128,6 @@ fun PlayerTimestampBar(
                             isPlaying = isPlaying,
                             progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                             scrubFactor = scrubFactor,
-                            energy = 0f,
-                            waveCycles = 1f,
-                            amplitudeScale = 0.4f,
-                            aspectRatio = selectedAspectRatio,
                             activeColor = MaterialTheme.colorScheme.primary,
                             inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
                             modifier = Modifier
