@@ -556,7 +556,7 @@ fun ExpandablePlayer(
             onProgressUpdate(progress)
         }
 
-        val isPlayerVisible = progress > 0.1f && isScreenActive
+        val isPlayerVisible = progress > 0.8f && isScreenActive
         val activeSongId = remember(state.queue, state.currentIndex, currentTrackKey) {
             if (state.currentIndex in state.queue.indices) {
                 state.queue[state.currentIndex].mediaId
@@ -570,8 +570,10 @@ fun ExpandablePlayer(
                 when (state.playbackWave) {
                     PlaybackWave.ENERGY -> currentActions.ensureAudioEnergyCalculated(activeSongId, Uri.EMPTY)
                     PlaybackWave.FREQUENCY -> currentActions.ensureAudioFrequencyCalculated(activeSongId, Uri.EMPTY)
-                    PlaybackWave.SIMPLICITY -> { /* No audio extraction required */ }
+                    PlaybackWave.SIMPLICITY -> currentActions.cancelAudioExtractions()
                 }
+            } else {
+                currentActions.cancelAudioExtractions()
             }
         }
 

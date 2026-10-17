@@ -743,12 +743,20 @@ class PlayerViewModel @Inject constructor(
         updateState()
     }
 
+    override fun cancelAudioExtractions() {
+        energyExtractionJob?.cancel()
+        frequencyExtractionJob?.cancel()
+        energyExtractionJob = null
+        frequencyExtractionJob = null
+    }
+
     override fun ensureAudioEnergyCalculated(songId: String, uri: Uri) {
         val activeItem = controller?.currentMediaItem
         val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: songId
         if (activeId.isEmpty()) return
 
-        ensureAudioFrequencyCalculated(activeId, uri)
+        frequencyExtractionJob?.cancel()
+        frequencyExtractionJob = null
 
         if (_uiState.value.audioEnergyCurve != null) return
         val cached = AudioEnergyExtractor.getCachedEnergy(activeId)
@@ -774,6 +782,9 @@ class PlayerViewModel @Inject constructor(
         val activeItem = controller?.currentMediaItem
         val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: songId
         if (activeId.isEmpty()) return
+
+        energyExtractionJob?.cancel()
+        energyExtractionJob = null
 
         if (_uiState.value.audioFrequencyCurve != null) return
         val cached = AudioFrequencyExtractor.getCachedFrequency(activeId)

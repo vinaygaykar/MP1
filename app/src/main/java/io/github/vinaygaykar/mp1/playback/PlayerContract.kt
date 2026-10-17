@@ -59,4 +59,5 @@ interface PlayerActions {
     fun playNextInQueue(indices: Set<Int>) {}
     fun ensureAudioEnergyCalculated(songId: String, uri: Uri) {}
     fun ensureAudioFrequencyCalculated(songId: String, uri: Uri) {}
+    fun cancelAudioExtractions() {}
 }
