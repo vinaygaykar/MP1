@@ -26,7 +26,7 @@ fun DualPeakFrequencyWaveform(
     inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
     thumbColor: Color = activeColor
 ) {
-    val canvasHeight = 44.dp
+    val canvasHeight = 88.dp
 
     val targetLow = if (isPlaying) (frequencyFrame.low * 1.2f).coerceIn(0f, 1f) else 0f
     val targetMid = if (isPlaying) (frequencyFrame.mid * 1.2f).coerceIn(0f, 1f) else 0f
