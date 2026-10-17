@@ -30,7 +30,8 @@ data class PlayerUiState(
     val queue: ImmutableList<MediaItem> = persistentListOf(),
     val currentIndex: Int = -1,
     val isScanInProgress: Boolean = false,
-    val audioEnergyCurve: FloatArray? = null
+    val audioEnergyCurve: FloatArray? = null,
+    val audioFrequencyCurve: Array<io.github.vinaygaykar.mp1.utils.FrequencyFrame>? = null
 )
 
 interface PlayerActions {
@@ -54,4 +55,5 @@ interface PlayerActions {
     fun removeOthersFromQueue(indicesToKeep: Set<Int>) {}
     fun playNextInQueue(indices: Set<Int>) {}
     fun ensureAudioEnergyCalculated(songId: String, uri: Uri) {}
+    fun ensureAudioFrequencyCalculated(songId: String, uri: Uri) {}
 }

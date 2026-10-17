@@ -34,7 +34,8 @@ fun PlayerTimestampBar(
     modifier: Modifier = Modifier,
     energy: Float = 0.5f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
-    minBarWidth: Dp = 140.dp
+    minBarWidth: Dp = 140.dp,
+    frequencyFrame: io.github.vinaygaykar.mp1.utils.FrequencyFrame? = null
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -76,19 +77,34 @@ fun PlayerTimestampBar(
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
-            PlaybackWaveform(
-                isPlaying = isPlaying,
-                progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                scrubFactor = scrubFactor,
-                energy = energy,
-                waveCycles = waveCycles,
-                aspectRatio = selectedAspectRatio,
-                activeColor = MaterialTheme.colorScheme.primary,
-                inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
-            )
+            if (frequencyFrame != null) {
+                DualPeakFrequencyWaveform(
+                    isPlaying = isPlaying,
+                    progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                    scrubFactor = scrubFactor,
+                    frequencyFrame = frequencyFrame,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                )
+            } else {
+                PlaybackWaveform(
+                    isPlaying = isPlaying,
+                    progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                    scrubFactor = scrubFactor,
+                    energy = 0f,
+                    waveCycles = 1f,
+                    amplitudeScale = 0.8f,
+                    aspectRatio = selectedAspectRatio,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                )
+            }
             Text(
                 text = formatTime(durationMs),
                 style = MaterialTheme.typography.labelSmall.copy(

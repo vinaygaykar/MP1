@@ -138,6 +138,8 @@ import io.github.vinaygaykar.mp1.ui.faces.VinylFace
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
+import io.github.vinaygaykar.mp1.utils.AudioFrequencyExtractor
+import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.toArtistId
 import kotlinx.coroutines.delay
@@ -565,6 +567,7 @@ fun ExpandablePlayer(
         LaunchedEffect(activeSongId, isPlayerVisible) {
             if (isPlayerVisible && activeSongId.isNotEmpty()) {
                 currentActions.ensureAudioEnergyCalculated(activeSongId, Uri.EMPTY)
+                currentActions.ensureAudioFrequencyCalculated(activeSongId, Uri.EMPTY)
             }
         }
 
@@ -870,6 +873,16 @@ fun ExpandablePlayer(
                                     0.5f
                                 }
                             }
+                            val currentFrequencyFrame = remember(state.audioFrequencyCurve, displayPosition) {
+                                val curve = state.audioFrequencyCurve
+                                if (curve != null && curve.isNotEmpty()) {
+                                    val bucketIndex = (displayPosition / AudioFrequencyExtractor.FREQUENCY_INTERVAL_MS)
+                                        .toInt().coerceIn(0, curve.lastIndex)
+                                    curve[bucketIndex]
+                                } else {
+                                    null
+                                }
+                            }
                             PlayerTimestampBar(
                                 displayPositionMs = displayPosition,
                                 durationMs = state.durationMs,
@@ -879,6 +892,7 @@ fun ExpandablePlayer(
                                 recordY = recordY,
                                 progress = progress,
                                 energy = currentEnergy,
+                                frequencyFrame = currentFrequencyFrame,
                                 modifier = Modifier.align(Alignment.TopCenter)
                             )
                         }

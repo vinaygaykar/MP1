@@ -21,6 +21,8 @@ import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
+import io.github.vinaygaykar.mp1.utils.AudioFrequencyExtractor
+import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -52,6 +54,7 @@ class PlayerViewModel @Inject constructor(
     private var positionUpdateJob: Job? = null
     private var currentArtworkJob: Job? = null
     private var energyExtractionJob: Job? = null
+    private var frequencyExtractionJob: Job? = null
     private var queueUpdateJob: Job? = null
     private var activeArtworkUri: Uri? = null
     private var activeMediaId: String? = null
@@ -154,15 +157,19 @@ class PlayerViewModel @Inject constructor(
         val lyricsErrorToUse: String?
 
         val audioEnergyToUse: FloatArray?
+        val audioFrequencyToUse: Array<FrequencyFrame>?
         if (isNewMediaItem) {
             energyExtractionJob?.cancel()
+            frequencyExtractionJob?.cancel()
             AudioEnergyExtractor.clearCache()
+            AudioFrequencyExtractor.clearCache()
             lyricsToUse = null
             isSyncedToUse = false
             isLocalToUse = false
             lyricsLoadingToUse = false
             lyricsErrorToUse = null
             audioEnergyToUse = AudioEnergyExtractor.getCachedEnergy(mediaId)
+            audioFrequencyToUse = AudioFrequencyExtractor.getCachedFrequency(mediaId)
         } else {
             lyricsToUse = _uiState.value.lyrics
             isSyncedToUse = _uiState.value.isLyricsSynced
@@ -170,6 +177,7 @@ class PlayerViewModel @Inject constructor(
             lyricsLoadingToUse = _uiState.value.lyricsLoading
             lyricsErrorToUse = _uiState.value.lyricsError
             audioEnergyToUse = _uiState.value.audioEnergyCurve
+            audioFrequencyToUse = _uiState.value.audioFrequencyCurve
         }
 
         val currentWindowIndex = player.currentMediaItemIndex
@@ -203,7 +211,8 @@ class PlayerViewModel @Inject constructor(
                 lyricsError = lyricsErrorToUse,
                 queue = _uiState.value.queue,
                 currentIndex = uiCurrentIndex,
-                audioEnergyCurve = audioEnergyToUse
+                audioEnergyCurve = audioEnergyToUse,
+                audioFrequencyCurve = audioFrequencyToUse
             )
         }
 
@@ -732,6 +741,8 @@ class PlayerViewModel @Inject constructor(
         val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: songId
         if (activeId.isEmpty()) return
 
+        ensureAudioFrequencyCalculated(activeId, uri)
+
         if (_uiState.value.audioEnergyCurve != null) return
         val cached = AudioEnergyExtractor.getCachedEnergy(activeId)
         if (cached != null) {
@@ -747,6 +758,31 @@ class PlayerViewModel @Inject constructor(
                 val result = AudioEnergyExtractor.extractEnergy(context, activeId, songUri)
                 result.onSuccess { energyCurve ->
                     _uiState.update { it.copy(audioEnergyCurve = energyCurve) }
+                }
+            }
+        }
+    }
+
+    override fun ensureAudioFrequencyCalculated(songId: String, uri: Uri) {
+        val activeItem = controller?.currentMediaItem
+        val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: songId
+        if (activeId.isEmpty()) return
+
+        if (_uiState.value.audioFrequencyCurve != null) return
+        val cached = AudioFrequencyExtractor.getCachedFrequency(activeId)
+        if (cached != null) {
+            _uiState.update { it.copy(audioFrequencyCurve = cached) }
+            return
+        }
+
+        frequencyExtractionJob?.cancel()
+        frequencyExtractionJob = viewModelScope.launch(Dispatchers.IO) {
+            val song = musicRepository.getSongById(activeId)
+            val songUri = song?.uri ?: uri.takeIf { it != Uri.EMPTY } ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
+            if (songUri != Uri.EMPTY) {
+                val result = AudioFrequencyExtractor.extractFrequency(context, activeId, songUri)
+                result.onSuccess { frequencyCurve ->
+                    _uiState.update { it.copy(audioFrequencyCurve = frequencyCurve) }
                 }
             }
         }
