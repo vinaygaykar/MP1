@@ -109,6 +109,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import io.github.vinaygaykar.mp1.R
+import io.github.vinaygaykar.mp1.ui.components.NoticeBanner
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -295,7 +296,14 @@ fun LibraryContent(
 
     // Measure top header height dynamically
     var collapsibleHeaderHeightPx by remember { mutableFloatStateOf(0f) }
+    var noticeBannerHeightPx by remember { mutableFloatStateOf(0f) }
     var selectionRowHeightPx by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isScanning) {
+        if (!isScanning) {
+            noticeBannerHeightPx = 0f
+        }
+    }
 
     LaunchedEffect(isSelectionMode, pagerState.currentPage) {
         if (!(isSelectionMode && pagerState.currentPage == 1)) {
@@ -515,7 +523,14 @@ fun LibraryContent(
             }
         }
 
-        // Layer 1.5: Sticky Selection Action Row (positioned below tabs when uncollapsed, sticky at top when collapsed)
+        // Layer 1.2: Scan in Progress Banner (positioned below tabs on list area, always visible at top when collapsed)
+        val displayFolder = remember(currentFolder) {
+            currentFolder
+                ?.removePrefix("primary:")
+                ?.removePrefix("primary")
+                ?.trim()
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -523,7 +538,50 @@ fun LibraryContent(
                 .graphicsLayer {
                     translationY = (collapsibleHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f)
                 }
-                .zIndex(1f)
+                .zIndex(2f)
+                .onGloballyPositioned { coordinates ->
+                    noticeBannerHeightPx = if (isScanning) coordinates.size.height.toFloat() else 0f
+                }
+        ) {
+            AnimatedVisibility(
+                visible = isScanning,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                NoticeBanner(
+                    title = "Library scan in progress...",
+                    subtitle = if (!displayFolder.isNullOrBlank()) "Scanning $displayFolder" else null,
+                    onClick = onOpenScanLocations,
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Open Scan Directories",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                )
+            }
+        }
+
+        // Layer 1.5: Sticky Selection Action Row (positioned below tabs and banner)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .graphicsLayer {
+                    translationY = (collapsibleHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f) +
+                            (if (isScanning) noticeBannerHeightPx else 0f)
+                }
+                .zIndex(1.5f)
         ) {
             AnimatedVisibility(
                 visible = isSelectionMode && pagerState.currentPage == 1,
@@ -559,7 +617,9 @@ fun LibraryContent(
                 .fillMaxSize()
                 .graphicsLayer {
                     translationY =
-                        (collapsibleHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f) + selectionRowHeightPx
+                        (collapsibleHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f) +
+                                (if (isScanning) noticeBannerHeightPx else 0f) +
+                                selectionRowHeightPx
                 },
             color = MaterialTheme.colorScheme.surface
         ) {
@@ -576,9 +636,10 @@ fun LibraryContent(
                     )
 
                     1 -> {
-                        val headerHeightDp = remember(collapsibleHeaderHeightPx, density) {
-                            if (collapsibleHeaderHeightPx > 0f) {
-                                with(density) { collapsibleHeaderHeightPx.toDp() }
+                        val effectiveHeaderPx = collapsibleHeaderHeightPx + (if (isScanning) noticeBannerHeightPx else 0f)
+                        val headerHeightDp = remember(effectiveHeaderPx, density) {
+                            if (effectiveHeaderPx > 0f) {
+                                with(density) { effectiveHeaderPx.toDp() }
                             } else {
                                 104.dp
                             }
@@ -688,11 +749,16 @@ fun LibraryContent(
 
         // Layer 2: Floating Category Dropdown & Action Buttons
         if (isFloatingVisible) {
+            val noticeBannerHeightDp = with(density) {
+                if (isScanning) noticeBannerHeightPx.toDp() else 0.dp
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .align(Alignment.TopCenter),
+                    .offset(y = noticeBannerHeightDp)
+                    .align(Alignment.TopCenter)
+                    .zIndex(3f),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -815,71 +881,6 @@ fun LibraryContent(
                 }
             )
         }
-
-        // Scan in Progress Banner (Bottom)
-        val displayFolder = remember(currentFolder) {
-            currentFolder
-                ?.removePrefix("primary:")
-                ?.removePrefix("primary")
-                ?.trim()
-        }
-
-        AnimatedVisibility(
-            visible = isScanning,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = bottomPadding + 8.dp)
-                .padding(horizontal = 16.dp)
-                .zIndex(10f)
-        ) {
-            Surface(
-                onClick = onOpenScanLocations,
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Library scan in progress...",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        if (!displayFolder.isNullOrBlank()) {
-                            Text(
-                                text = "Scanning $displayFolder",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Open Scan Directories",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -955,6 +956,22 @@ fun LibraryScreenExpandedPreview() {
             albums = previewAlbums,
             artists = previewArtists,
             genres = previewGenres,
+            initialScrolledDown = false
+        )
+    }
+}
+
+@Preview(name = "Scanning Banner Active", showBackground = true)
+@Composable
+fun LibraryScreenWithBannerPreview() {
+    MusicPlayerTheme {
+        LibraryContent(
+            songs = previewSongs,
+            albums = previewAlbums,
+            artists = previewArtists,
+            genres = previewGenres,
+            isScanning = true,
+            currentFolder = "/storage/emulated/0/Music",
             initialScrolledDown = false
         )
     }
