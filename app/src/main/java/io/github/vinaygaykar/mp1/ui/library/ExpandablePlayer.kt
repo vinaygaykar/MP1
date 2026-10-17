@@ -893,6 +893,7 @@ fun ExpandablePlayer(
                                 progress = progress,
                                 energy = currentEnergy,
                                 frequencyFrame = currentFrequencyFrame,
+                                playbackWave = state.playbackWave,
                                 modifier = Modifier.align(Alignment.TopCenter)
                             )
                         }

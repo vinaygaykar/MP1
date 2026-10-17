@@ -27,7 +27,18 @@ class SettingsRepository @Inject constructor(
         _useCleanAlbumGrid.value = enabled
     }
 
+    private val _playbackWave = MutableStateFlow(
+        prefs.getString(KEY_PLAYBACK_WAVE, "Energy") ?: "Energy",
+    )
+    val playbackWave: StateFlow<String> = _playbackWave.asStateFlow()
+
+    fun setPlaybackWave(value: String) {
+        prefs.edit { putString(KEY_PLAYBACK_WAVE, value) }
+        _playbackWave.value = value
+    }
+
     companion object {
         private const val KEY_USE_CLEAN_ALBUM_GRID = "use_clean_album_grid"
+        private const val KEY_PLAYBACK_WAVE = "playback_wave"
     }
 }

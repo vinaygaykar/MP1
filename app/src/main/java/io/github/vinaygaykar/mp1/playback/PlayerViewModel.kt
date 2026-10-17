@@ -17,6 +17,7 @@ import androidx.media3.session.SessionToken
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.vinaygaykar.mp1.data.local.scanner.ScannerRepository
+import io.github.vinaygaykar.mp1.data.repo.SettingsRepository
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
@@ -44,7 +45,8 @@ class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val lyricsRepository: LyricsRepository,
     private val musicRepository: MusicRepository,
-    private val scannerRepository: ScannerRepository
+    private val scannerRepository: ScannerRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel(), PlayerActions {
 
     private var controller: MediaController? = null
@@ -66,6 +68,11 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             scannerRepository.isScanning.collect { isScanning ->
                 _uiState.update { it.copy(isScanInProgress = isScanning) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.playbackWave.collect { wave ->
+                _uiState.update { it.copy(playbackWave = wave) }
             }
         }
 
@@ -120,7 +127,7 @@ class PlayerViewModel @Inject constructor(
             activeArtworkUri = null
             activeMediaId = null
             currentArtworkJob?.cancel()
-            _uiState.update { PlayerUiState(isScanInProgress = it.isScanInProgress) }
+            _uiState.update { PlayerUiState(isScanInProgress = it.isScanInProgress, playbackWave = it.playbackWave) }
             return
         }
 

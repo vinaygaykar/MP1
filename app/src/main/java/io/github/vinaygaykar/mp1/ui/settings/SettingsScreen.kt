@@ -1,11 +1,15 @@
 package io.github.vinaygaykar.mp1.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -19,6 +23,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -40,6 +47,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val useCleanAlbumGrid by viewModel.useCleanAlbumGrid.collectAsState()
+    val playbackWave by viewModel.playbackWave.collectAsState()
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val collapsedFraction = scrollBehavior.state.collapsedFraction.coerceIn(0f, 1f)
@@ -103,6 +111,42 @@ fun SettingsScreen(
             },
             modifier = Modifier.clickable { viewModel.setUseCleanAlbumGrid(!useCleanAlbumGrid) },
         )
+        var playbackWaveExpanded by remember { mutableStateOf(false) }
+        val playbackWaveOptions = listOf("Frequency", "Energy")
+
+        Box {
+            ListItem(
+                headlineContent = { Text("Playback wave") },
+                supportingContent = { Text(playbackWave) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Select playback wave option",
+                    )
+                },
+                modifier = Modifier.clickable { playbackWaveExpanded = true },
+            )
+            DropdownMenu(
+                expanded = playbackWaveExpanded,
+                onDismissRequest = { playbackWaveExpanded = false },
+            ) {
+                playbackWaveOptions.forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = option,
+                                fontWeight = if (option == playbackWave) FontWeight.Bold else FontWeight.Normal,
+                                color = if (option == playbackWave) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            )
+                        },
+                        onClick = {
+                            viewModel.setPlaybackWave(option)
+                            playbackWaveExpanded = false
+                        },
+                    )
+                }
+            }
+        }
         ListItem(
             headlineContent = { Text("About") },
             supportingContent = { Text("${stringResource(R.string.app_name)} v1.0") },

@@ -31,7 +31,8 @@ data class PlayerUiState(
     val currentIndex: Int = -1,
     val isScanInProgress: Boolean = false,
     val audioEnergyCurve: FloatArray? = null,
-    val audioFrequencyCurve: Array<io.github.vinaygaykar.mp1.utils.FrequencyFrame>? = null
+    val audioFrequencyCurve: Array<io.github.vinaygaykar.mp1.utils.FrequencyFrame>? = null,
+    val playbackWave: String = "Energy"
 )
 
 interface PlayerActions {

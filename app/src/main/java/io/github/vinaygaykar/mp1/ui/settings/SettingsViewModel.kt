@@ -31,6 +31,12 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setUseCleanAlbumGrid(enabled)
     }
 
+    val playbackWave: StateFlow<String> = settingsRepository.playbackWave
+
+    fun setPlaybackWave(wave: String) {
+        settingsRepository.setPlaybackWave(wave)
+    }
+
     val scanFolders: StateFlow<List<ScanFolderEntity>> = scanFolderDao.getAllFolders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

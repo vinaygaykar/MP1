@@ -35,7 +35,8 @@ fun PlayerTimestampBar(
     energy: Float = 0.5f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     minBarWidth: Dp = 140.dp,
-    frequencyFrame: io.github.vinaygaykar.mp1.utils.FrequencyFrame? = null
+    frequencyFrame: io.github.vinaygaykar.mp1.utils.FrequencyFrame? = null,
+    playbackWave: String = "Energy"
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -77,26 +78,13 @@ fun PlayerTimestampBar(
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
-            if (frequencyFrame != null) {
-                DualPeakFrequencyWaveform(
-                    isPlaying = isPlaying,
-                    progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                    scrubFactor = scrubFactor,
-                    frequencyFrame = frequencyFrame,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 12.dp)
-                )
-            } else {
+            if (playbackWave.equals("Energy", ignoreCase = true)) {
                 PlaybackWaveform(
                     isPlaying = isPlaying,
                     progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                     scrubFactor = scrubFactor,
-                    energy = 0f,
-                    waveCycles = 1f,
-                    amplitudeScale = 0.4f,
+                    energy = energy,
+                    waveCycles = waveCycles,
                     aspectRatio = selectedAspectRatio,
                     activeColor = MaterialTheme.colorScheme.primary,
                     inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
@@ -104,6 +92,35 @@ fun PlayerTimestampBar(
                         .weight(1f)
                         .padding(horizontal = 12.dp)
                 )
+            } else {
+                if (frequencyFrame != null) {
+                    DualPeakFrequencyWaveform(
+                        isPlaying = isPlaying,
+                        progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                        scrubFactor = scrubFactor,
+                        frequencyFrame = frequencyFrame,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp)
+                    )
+                } else {
+                    PlaybackWaveform(
+                        isPlaying = isPlaying,
+                        progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                        scrubFactor = scrubFactor,
+                        energy = 0f,
+                        waveCycles = 1f,
+                        amplitudeScale = 0.4f,
+                        aspectRatio = selectedAspectRatio,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp)
+                    )
+                }
             }
             Text(
                 text = formatTime(durationMs),
