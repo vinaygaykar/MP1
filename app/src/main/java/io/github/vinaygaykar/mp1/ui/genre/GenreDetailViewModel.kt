@@ -75,11 +75,22 @@ class GenreDetailViewModel @Inject constructor(
             if (currentSongs.isEmpty()) {
                 player.setMediaItem(song.toMediaItem())
             } else {
-                val mediaItems = withContext(Dispatchers.Default) {
-                    currentSongs.map { it.toMediaItem() }
+                val isShuffleOn = player.shuffleModeEnabled
+                if (isShuffleOn) {
+                    val remainingSongs = withContext(Dispatchers.Default) {
+                        currentSongs.filter { it.id != song.id }.shuffled()
+                    }
+                    val mediaItems = withContext(Dispatchers.Default) {
+                        (listOf(song) + remainingSongs).map { it.toMediaItem() }
+                    }
+                    player.setMediaItems(mediaItems, 0, 0L)
+                } else {
+                    val mediaItems = withContext(Dispatchers.Default) {
+                        currentSongs.map { it.toMediaItem() }
+                    }
+                    val startIndex = currentSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                    player.setMediaItems(mediaItems, startIndex, 0L)
                 }
-                val startIndex = currentSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-                player.setMediaItems(mediaItems, startIndex, 0L)
             }
             player.prepare()
             player.play()
