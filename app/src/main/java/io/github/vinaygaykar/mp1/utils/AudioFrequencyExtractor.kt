@@ -30,6 +30,7 @@ object AudioFrequencyExtractor {
     private const val ENCODING_PCM_FLOAT = 4
 
     const val FREQUENCY_INTERVAL_MS = 250
+    const val DYNAMIC_CONTRAST_POWER = 2.2
 
     @Volatile
     private var activeSongId: String? = null
@@ -183,9 +184,9 @@ object AudioFrequencyExtractor {
 
             val normalized = Array(rawFrames.size) { i ->
                 val (l, m, h) = rawFrames[i]
-                val normL = (((l - minLow) / rangeLow).coerceIn(0f, 1f).toDouble().pow(0.6).toFloat()).coerceIn(0.15f, 1f)
-                val normM = (((m - minMid) / rangeMid).coerceIn(0f, 1f).toDouble().pow(0.6).toFloat()).coerceIn(0.15f, 1f)
-                val normH = (((h - minHigh) / rangeHigh).coerceIn(0f, 1f).toDouble().pow(0.6).toFloat()).coerceIn(0.15f, 1f)
+                val normL = (((l - minLow) / rangeLow).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
+                val normM = (((m - minMid) / rangeMid).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
+                val normH = (((h - minHigh) / rangeHigh).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
                 FrequencyFrame(normL, normM, normH)
             }
 

@@ -96,7 +96,7 @@ fun PlayerTimestampBar(
                     scrubFactor = scrubFactor,
                     energy = 0f,
                     waveCycles = 1f,
-                    amplitudeScale = 0.8f,
+                    amplitudeScale = 0.4f,
                     aspectRatio = selectedAspectRatio,
                     activeColor = MaterialTheme.colorScheme.primary,
                     inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),

@@ -28,13 +28,13 @@ fun DualPeakFrequencyWaveform(
 ) {
     val canvasHeight = 44.dp
 
-    val targetLow = if (isPlaying) (frequencyFrame.low * 1.4f).coerceIn(0.35f, 1f) else 0.05f
-    val targetMid = if (isPlaying) (frequencyFrame.mid * 1.4f).coerceIn(0.35f, 1f) else 0.05f
-    val targetHigh = if (isPlaying) (frequencyFrame.high * 1.4f).coerceIn(0.35f, 1f) else 0.05f
+    val targetLow = if (isPlaying) (frequencyFrame.low * 1.2f).coerceIn(0f, 1f) else 0f
+    val targetMid = if (isPlaying) (frequencyFrame.mid * 1.2f).coerceIn(0f, 1f) else 0f
+    val targetHigh = if (isPlaying) (frequencyFrame.high * 1.2f).coerceIn(0f, 1f) else 0f
 
     val animSpec = spring<Float>(
-        dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessLow
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMedium
     )
 
     val animatedLow by animateFloatAsState(targetValue = targetLow, animationSpec = animSpec, label = "animatedLow")
@@ -74,12 +74,16 @@ fun DualPeakFrequencyWaveform(
         val xPeak3 = startX + trackWidth * 0.833f
         val xEnd = endX
 
-        // Key Y coordinates (Up is negative delta from centerY, valleys plunge deep down)
+        // Dynamic Valley Depths: Valleys plunge deep on heavy beats and rise back up on quiet moments
+        val valley1Depth = maxAmpPx * ((animatedLow + animatedMid) / 2f).coerceIn(0f, 1f) * 0.75f
+        val valley2Depth = maxAmpPx * ((animatedMid + animatedHigh) / 2f).coerceIn(0f, 1f) * 0.75f
+
+        // Key Y coordinates (Up is negative delta from centerY, valleys dip dynamically down)
         val y0 = centerY
         val yPeak1 = centerY - lowAmp                          // Left Peak (Low / Bass)
-        val yValley1 = centerY + (maxAmpPx * 0.65f)            // Deep Valley 1 between Left & Middle Peak
+        val yValley1 = centerY + valley1Depth                  // Dynamic Valley 1
         val yPeak2 = centerY - midAmp                          // Middle Peak (Mid / Vocals)
-        val yValley2 = centerY + (maxAmpPx * 0.65f)            // Deep Valley 2 between Middle & Right Peak
+        val yValley2 = centerY + valley2Depth                  // Dynamic Valley 2
         val yPeak3 = centerY - highAmp                         // Right Peak (High / Treble)
         val yEnd = centerY
 
