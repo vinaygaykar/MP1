@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -112,12 +114,11 @@ fun SettingsScreen(
             modifier = Modifier.clickable { viewModel.setUseCleanAlbumGrid(!useCleanAlbumGrid) },
         )
         var playbackWaveExpanded by remember { mutableStateOf(false) }
-        val playbackWaveOptions = listOf("Frequency", "Energy", "Simplicity")
 
         Box {
             ListItem(
                 headlineContent = { Text("Playback wave") },
-                supportingContent = { Text(playbackWave) },
+                supportingContent = { Text(playbackWave.displayName) },
                 trailingContent = {
                     Icon(
                         imageVector = Icons.Default.ArrowDropDown,
@@ -130,11 +131,11 @@ fun SettingsScreen(
                 expanded = playbackWaveExpanded,
                 onDismissRequest = { playbackWaveExpanded = false },
             ) {
-                playbackWaveOptions.forEach { option ->
+                PlaybackWave.entries.forEach { option ->
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = option,
+                                text = option.displayName,
                                 fontWeight = if (option == playbackWave) FontWeight.Bold else FontWeight.Normal,
                                 color = if (option == playbackWave) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             )

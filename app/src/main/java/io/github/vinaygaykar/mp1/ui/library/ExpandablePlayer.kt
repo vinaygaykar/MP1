@@ -131,6 +131,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
@@ -564,10 +565,13 @@ fun ExpandablePlayer(
             }
         }
 
-        LaunchedEffect(activeSongId, isPlayerVisible) {
+        LaunchedEffect(activeSongId, isPlayerVisible, state.playbackWave) {
             if (isPlayerVisible && activeSongId.isNotEmpty()) {
-                currentActions.ensureAudioEnergyCalculated(activeSongId, Uri.EMPTY)
-                currentActions.ensureAudioFrequencyCalculated(activeSongId, Uri.EMPTY)
+                when (state.playbackWave) {
+                    PlaybackWave.ENERGY -> currentActions.ensureAudioEnergyCalculated(activeSongId, Uri.EMPTY)
+                    PlaybackWave.FREQUENCY -> currentActions.ensureAudioFrequencyCalculated(activeSongId, Uri.EMPTY)
+                    PlaybackWave.SIMPLICITY -> { /* No audio extraction required */ }
+                }
             }
         }
 

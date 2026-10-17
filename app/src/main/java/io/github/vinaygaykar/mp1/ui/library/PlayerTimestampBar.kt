@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+
 @Composable
 fun PlayerTimestampBar(
     displayPositionMs: Long,
@@ -36,7 +38,7 @@ fun PlayerTimestampBar(
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     minBarWidth: Dp = 140.dp,
     frequencyFrame: io.github.vinaygaykar.mp1.utils.FrequencyFrame? = null,
-    playbackWave: String = "Energy"
+    playbackWave: PlaybackWave = PlaybackWave.SIMPLICITY
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -78,8 +80,8 @@ fun PlayerTimestampBar(
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
-            when {
-                playbackWave.equals("Energy", ignoreCase = true) -> {
+            when (playbackWave) {
+                PlaybackWave.ENERGY -> {
                     PlaybackWaveform(
                         isPlaying = isPlaying,
                         progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
@@ -94,7 +96,7 @@ fun PlayerTimestampBar(
                             .padding(horizontal = 12.dp)
                     )
                 }
-                playbackWave.equals("Simplicity", ignoreCase = true) -> {
+                PlaybackWave.SIMPLICITY -> {
                     PlaybackWaveform(
                         isPlaying = isPlaying,
                         progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
@@ -110,7 +112,7 @@ fun PlayerTimestampBar(
                             .padding(horizontal = 12.dp)
                     )
                 }
-                else -> { // Frequency
+                PlaybackWave.FREQUENCY -> {
                     if (frequencyFrame != null) {
                         DualPeakFrequencyWaveform(
                             isPlaying = isPlaying,
