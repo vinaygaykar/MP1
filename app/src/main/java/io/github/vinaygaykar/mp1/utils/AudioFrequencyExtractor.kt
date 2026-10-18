@@ -20,20 +20,56 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
+/** Default fallback energy level for frequency bands. */
+const val DEFAULT_BAND_ENERGY = 0.2f
+
 @Immutable
 data class FrequencyFrame(
-    val low: Float = 0.5f,  // Bass (20Hz - 250Hz)
-    val mid: Float = 0.5f,  // Mids (250Hz - 4000Hz)
-    val high: Float = 0.5f  // Treble (4000Hz - 20000Hz)
+    val low: Float = DEFAULT_BAND_ENERGY,  // Bass (20Hz - 250Hz)
+    val mid: Float = DEFAULT_BAND_ENERGY,  // Mids (250Hz - 4000Hz)
+    val high: Float = DEFAULT_BAND_ENERGY   // Treble (4000Hz - 20000Hz)
 )
 
 object AudioFrequencyExtractor {
 
+    /** Value representing 16-bit PCM integer audio encoding (AudioFormat.ENCODING_PCM_16BIT). */
     private const val ENCODING_PCM_16BIT = 2
+
+    /** Value representing 32-bit floating-point PCM audio encoding (AudioFormat.ENCODING_PCM_FLOAT). */
     private const val ENCODING_PCM_FLOAT = 4
 
+    /** Duration in milliseconds for each frequency analysis window bucket (250 ms). */
     const val FREQUENCY_INTERVAL_MS = 250
+
+    /** Default number of buckets accumulated before emitting a progressive Flow snapshot (4 buckets = 1 second). */
+    const val DEFAULT_EMIT_BATCH_SIZE = 1000 / FREQUENCY_INTERVAL_MS
+
+    /** Exponential power applied to normalized frequency band values to expand non-linear dynamic contrast. */
     const val DYNAMIC_CONTRAST_POWER = 2.2
+
+    /** Fallback sample rate in Hz (CD quality) when not specified in media metadata format. */
+    private const val DEFAULT_SAMPLE_RATE_HZ = 44100
+
+    /** Fallback channel count (stereo) when not specified in media metadata format. */
+    private const val DEFAULT_CHANNEL_COUNT = 2
+
+    /** Upper cutoff frequency in Hz for the bass low-pass filter (250 Hz). */
+    private const val BASS_CUTOFF_FREQ_HZ = 250f
+
+    /** Center frequency in Hz for the mid-range band-pass filter (1000 Hz). */
+    private const val MID_CENTER_FREQ_HZ = 1000f
+
+    /** Bandwidth Q factor for the mid-range band-pass filter. */
+    private const val MID_BANDPASS_Q = 1.0f
+
+    /** Lower cutoff frequency in Hz for the treble high-pass filter (4000 Hz). */
+    private const val TREBLE_CUTOFF_FREQ_HZ = 4000f
+
+    /** Timeout in microseconds for MediaCodec dequeue output buffer operations. */
+    private const val DEQUEUE_OUTPUT_TIMEOUT_US = 100L
+
+    /** Default Q quality factor (1 / sqrt(2) ≈ 0.7071) producing a Butterworth filter response. */
+    private const val DEFAULT_BUTTERWORTH_Q = 0.7071f
 
     @Volatile
     private var activeSongId: String? = null
@@ -61,7 +97,7 @@ object AudioFrequencyExtractor {
         songId: String,
         uri: Uri,
         intervalMs: Int = FREQUENCY_INTERVAL_MS,
-        emitBatchSize: Int = 4
+        emitBatchSize: Int = DEFAULT_EMIT_BATCH_SIZE
     ): Flow<Array<FrequencyFrame>> = flow {
         if (activeSongId == songId && activeFrequencyCurve != null) {
             emit(activeFrequencyCurve!!)
@@ -85,11 +121,11 @@ object AudioFrequencyExtractor {
 
             val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
                 format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-            } else 44100
+            } else DEFAULT_SAMPLE_RATE_HZ
 
             val channelCount = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
                 format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-            } else 2
+            } else DEFAULT_CHANNEL_COUNT
 
             // Mono downmixing means sampleRate samples per second across time
             val samplesPerBucket = max(1, (sampleRate * (intervalMs / 1000f)).toInt())
@@ -100,9 +136,9 @@ object AudioFrequencyExtractor {
             dec.configure(format, null, null, 0)
             dec.start()
 
-            val lowFilter = BiquadFilter.lowPass(sampleRate.toFloat(), 250f)
-            val midFilter = BiquadFilter.bandPass(sampleRate.toFloat(), 1000f, 1f)
-            val highFilter = BiquadFilter.highPass(sampleRate.toFloat(), 4000f)
+            val lowFilter = BiquadFilter.lowPass(sampleRate.toFloat(), BASS_CUTOFF_FREQ_HZ)
+            val midFilter = BiquadFilter.bandPass(sampleRate.toFloat(), MID_CENTER_FREQ_HZ, MID_BANDPASS_Q)
+            val highFilter = BiquadFilter.highPass(sampleRate.toFloat(), TREBLE_CUTOFF_FREQ_HZ)
 
             val rawFrames = mutableListOf<Triple<Float, Float, Float>>()
             val bufferInfo = MediaCodec.BufferInfo()
@@ -145,7 +181,7 @@ object AudioFrequencyExtractor {
                     }
                 }
 
-                var outputBufferIndex = dec.dequeueOutputBuffer(bufferInfo, 100L)
+                var outputBufferIndex = dec.dequeueOutputBuffer(bufferInfo, DEQUEUE_OUTPUT_TIMEOUT_US)
                 while (outputBufferIndex >= 0) {
                     if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         isDecoderEOS = true
@@ -287,7 +323,7 @@ object AudioFrequencyExtractor {
         rawFrames: List<Triple<Float, Float, Float>>
     ): Array<FrequencyFrame> {
         if (rawFrames.isEmpty()) {
-            return arrayOf(FrequencyFrame(0.5f, 0.5f, 0.5f))
+            return arrayOf(FrequencyFrame(DEFAULT_BAND_ENERGY, DEFAULT_BAND_ENERGY, DEFAULT_BAND_ENERGY))
         }
 
         var maxLow = 0.0001f; var minLow = Float.MAX_VALUE
@@ -350,7 +386,7 @@ object AudioFrequencyExtractor {
         }
 
         companion object {
-            fun lowPass(sampleRate: Float, cutoff: Float, q: Float = 0.707f): BiquadFilter {
+            fun lowPass(sampleRate: Float, cutoff: Float, q: Float = DEFAULT_BUTTERWORTH_Q): BiquadFilter {
                 val w0 = (2.0 * Math.PI * cutoff / sampleRate).toFloat()
                 val alpha = (sin(w0.toDouble()) / (2.0 * q)).toFloat()
                 val cosW0 = cos(w0.toDouble()).toFloat()
@@ -365,7 +401,7 @@ object AudioFrequencyExtractor {
                 return BiquadFilter(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
             }
 
-            fun highPass(sampleRate: Float, cutoff: Float, q: Float = 0.707f): BiquadFilter {
+            fun highPass(sampleRate: Float, cutoff: Float, q: Float = DEFAULT_BUTTERWORTH_Q): BiquadFilter {
                 val w0 = (2.0 * Math.PI * cutoff / sampleRate).toFloat()
                 val alpha = (sin(w0.toDouble()) / (2.0 * q)).toFloat()
                 val cosW0 = cos(w0.toDouble()).toFloat()
