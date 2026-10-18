@@ -73,6 +73,7 @@ fun MainScreen(
 ) {
     val navController = rememberNavController()
     val playerState by playerViewModel.uiState.collectAsState()
+    val visualizerState by playerViewModel.visualizerState.collectAsState()
     val hasScanFoldersState by settingsViewModel.hasScanFolders.collectAsState()
 
     if (hasScanFoldersState == null) {
@@ -167,6 +168,7 @@ fun MainScreen(
         ExpandablePlayer(
             state = playerState,
             actions = playerViewModel,
+            visualizerState = visualizerState,
             onProgressUpdate = { expansionProgress.floatValue = it },
             peekHeight = 72.dp,
             bottomOffset = 0.dp,

@@ -18,11 +18,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.vinaygaykar.mp1.data.local.scanner.ScannerRepository
 import io.github.vinaygaykar.mp1.data.repo.SettingsRepository
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.domain.repository.AudioVisualizerRepository
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
-import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -54,10 +55,15 @@ class PlayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+    private val _visualizerState = MutableStateFlow<VisualizerState>(VisualizerState.None)
+    val visualizerState: StateFlow<VisualizerState> = _visualizerState.asStateFlow()
+
     private var positionUpdateJob: Job? = null
     private var currentArtworkJob: Job? = null
-    private var energyExtractionJob: Job? = null
-    private var frequencyExtractionJob: Job? = null
+    private var visualizerJob: Job? = null
+    private var activeVisualizerSongId: String? = null
+    private var activeVisualizerWave: PlaybackWave = PlaybackWave.SIMPLICITY
+    private var isVisualizerPlayerVisible: Boolean = false
     private var queueUpdateJob: Job? = null
     private var activeArtworkUri: Uri? = null
     private var activeMediaId: String? = null
@@ -74,6 +80,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.playbackWave.collect { wave ->
                 _uiState.update { it.copy(playbackWave = wave) }
+                triggerVisualizerExtractionIfNeeded()
             }
         }
 
@@ -164,27 +171,28 @@ class PlayerViewModel @Inject constructor(
         val lyricsLoadingToUse: Boolean
         val lyricsErrorToUse: String?
 
-        val audioEnergyToUse: FloatArray?
-        val audioFrequencyToUse: Array<FrequencyFrame>?
         if (isNewMediaItem) {
-            energyExtractionJob?.cancel()
-            frequencyExtractionJob?.cancel()
-            audioVisualizerRepository.clearCache()
+            if (mediaId != activeVisualizerSongId) {
+                visualizerJob?.cancel()
+                visualizerJob = null
+                audioVisualizerRepository.clearCache()
+                _visualizerState.value = VisualizerState.None
+                activeVisualizerSongId = null
+            }
             lyricsToUse = null
             isSyncedToUse = false
             isLocalToUse = false
             lyricsLoadingToUse = false
             lyricsErrorToUse = null
-            audioEnergyToUse = audioVisualizerRepository.getCachedEnergy(mediaId)
-            audioFrequencyToUse = audioVisualizerRepository.getCachedFrequency(mediaId)
+            if (isVisualizerPlayerVisible) {
+                triggerVisualizerExtractionIfNeeded()
+            }
         } else {
             lyricsToUse = _uiState.value.lyrics
             isSyncedToUse = _uiState.value.isLyricsSynced
             isLocalToUse = _uiState.value.isLyricsLocal
             lyricsLoadingToUse = _uiState.value.lyricsLoading
             lyricsErrorToUse = _uiState.value.lyricsError
-            audioEnergyToUse = _uiState.value.audioEnergyCurve
-            audioFrequencyToUse = _uiState.value.audioFrequencyCurve
         }
 
         val currentWindowIndex = player.currentMediaItemIndex
@@ -217,9 +225,7 @@ class PlayerViewModel @Inject constructor(
                 lyricsLoading = lyricsLoadingToUse,
                 lyricsError = lyricsErrorToUse,
                 queue = _uiState.value.queue,
-                currentIndex = uiCurrentIndex,
-                audioEnergyCurve = audioEnergyToUse,
-                audioFrequencyCurve = audioFrequencyToUse
+                currentIndex = uiCurrentIndex
             )
         }
 
@@ -743,69 +749,76 @@ class PlayerViewModel @Inject constructor(
         updateState()
     }
 
-    override fun cancelAudioExtractions() {
-        energyExtractionJob?.cancel()
-        frequencyExtractionJob?.cancel()
-        energyExtractionJob = null
-        frequencyExtractionJob = null
+    override fun onUpdateVisualizerVisibility(isPlayerVisible: Boolean) {
+        isVisualizerPlayerVisible = isPlayerVisible
+        triggerVisualizerExtractionIfNeeded()
     }
 
-    override fun ensureAudioEnergyCalculated(songId: String, uri: Uri) {
+    private fun triggerVisualizerExtractionIfNeeded() {
         val activeItem = controller?.currentMediaItem
-        val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: songId
-        if (activeId.isEmpty()) return
+        val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: activeMediaId ?: ""
+        val waveMode = _uiState.value.playbackWave
 
-        frequencyExtractionJob?.cancel()
-        frequencyExtractionJob = null
-
-        val cached = audioVisualizerRepository.getCachedEnergy(activeId)
-        if (cached != null) {
-            _uiState.update { it.copy(audioEnergyCurve = cached) }
-            return
-        }
-
-        if (energyExtractionJob?.isActive == true) return
-
-        energyExtractionJob?.cancel()
-        energyExtractionJob = viewModelScope.launch(Dispatchers.IO) {
-            val song = musicRepository.getSongById(activeId)
-            val songUri = song?.uri ?: uri.takeIf { it != Uri.EMPTY } ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
-            if (songUri != Uri.EMPTY) {
-                audioVisualizerRepository.getAudioEnergyFlow(activeId, songUri)
-                    .catch { /* ignore errors during energy extraction */ }
-                    .collect { energyCurve ->
-                        _uiState.update { it.copy(audioEnergyCurve = energyCurve) }
-                    }
+        if (activeId.isEmpty() || waveMode == PlaybackWave.SIMPLICITY) {
+            if (activeVisualizerSongId != null) {
+                visualizerJob?.cancel()
+                visualizerJob = null
+                audioVisualizerRepository.clearCache()
+                _visualizerState.value = VisualizerState.None
+                activeVisualizerSongId = null
+                activeVisualizerWave = PlaybackWave.SIMPLICITY
             }
-        }
-    }
-
-    override fun ensureAudioFrequencyCalculated(songId: String, uri: Uri) {
-        val activeItem = controller?.currentMediaItem
-        val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: songId
-        if (activeId.isEmpty()) return
-
-        energyExtractionJob?.cancel()
-        energyExtractionJob = null
-
-        val cached = audioVisualizerRepository.getCachedFrequency(activeId)
-        if (cached != null) {
-            _uiState.update { it.copy(audioFrequencyCurve = cached) }
             return
         }
 
-        if (frequencyExtractionJob?.isActive == true) return
+        if (!isVisualizerPlayerVisible) {
+            if (activeVisualizerSongId != null && activeVisualizerSongId != activeId) {
+                visualizerJob?.cancel()
+                visualizerJob = null
+                audioVisualizerRepository.clearCache()
+                _visualizerState.value = VisualizerState.None
+                activeVisualizerSongId = null
+                activeVisualizerWave = PlaybackWave.SIMPLICITY
+            }
+            return
+        }
 
-        frequencyExtractionJob?.cancel()
-        frequencyExtractionJob = viewModelScope.launch(Dispatchers.IO) {
+        if (activeVisualizerSongId == activeId && activeVisualizerWave == waveMode && _visualizerState.value !is VisualizerState.None) {
+            return
+        }
+
+        visualizerJob?.cancel()
+        if (activeVisualizerSongId != activeId || activeVisualizerWave != waveMode) {
+            audioVisualizerRepository.clearCache()
+            _visualizerState.value = VisualizerState.None
+        }
+
+        activeVisualizerSongId = activeId
+        activeVisualizerWave = waveMode
+
+        visualizerJob = viewModelScope.launch(Dispatchers.IO) {
             val song = musicRepository.getSongById(activeId)
-            val songUri = song?.uri ?: uri.takeIf { it != Uri.EMPTY } ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
+            val songUri = song?.uri ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
             if (songUri != Uri.EMPTY) {
-                audioVisualizerRepository.getAudioFrequencyFlow(activeId, songUri)
-                    .catch { /* ignore errors during frequency extraction */ }
-                    .collect { frequencyCurve ->
-                        _uiState.update { it.copy(audioFrequencyCurve = frequencyCurve) }
+                when (waveMode) {
+                    PlaybackWave.ENERGY -> {
+                        audioVisualizerRepository.getAudioEnergyFlow(activeId, songUri)
+                            .catch { /* ignore */ }
+                            .collect { energyCurve ->
+                                _visualizerState.value = VisualizerState.Energy(energyCurve)
+                            }
                     }
+                    PlaybackWave.FREQUENCY -> {
+                        audioVisualizerRepository.getAudioFrequencyFlow(activeId, songUri)
+                            .catch { /* ignore */ }
+                            .collect { frequencyCurve ->
+                                _visualizerState.value = VisualizerState.Frequency(frequencyCurve)
+                            }
+                    }
+                    PlaybackWave.SIMPLICITY -> {
+                        _visualizerState.value = VisualizerState.None
+                    }
+                }
             }
         }
     }

@@ -39,9 +39,12 @@ import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -134,6 +137,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
@@ -164,6 +168,7 @@ fun ExpandablePlayer(
     actions: PlayerActions,
     onProgressUpdate: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    visualizerState: VisualizerState = VisualizerState.None,
     peekHeight: Dp = 72.dp,
     bottomOffset: Dp = 0.dp,
     initialExpanded: Boolean = false,
@@ -586,6 +591,17 @@ fun ExpandablePlayer(
             if (showQueue) 1f else 0f
         }
 
+        val defaultOffset =
+            if (initialExpanded) 0f else (screenHeightPx - peekHeightPx - totalBottomGapPx)
+        val dragOffset = try {
+            anchoredDraggableState.requireOffset()
+        } catch (_: Exception) {
+            defaultOffset
+        }
+        val totalRange = screenHeightPx - peekHeightPx - totalBottomGapPx
+
+
+
         BackHandler(enabled = anchoredDraggableState.currentValue != DragValue.COLLAPSED || queueProgress > 0f || showQueue) {
             if (showArtistsDialog) {
                 showArtistsDialog = false
@@ -599,15 +615,6 @@ fun ExpandablePlayer(
                 scope.launch { anchoredDraggableState.animateTo(DragValue.COLLAPSED) }
             }
         }
-
-        val defaultOffset =
-            if (initialExpanded) 0f else (screenHeightPx - peekHeightPx - totalBottomGapPx)
-        val dragOffset = try {
-            anchoredDraggableState.requireOffset()
-        } catch (_: Exception) {
-            defaultOffset
-        }
-        val totalRange = screenHeightPx - peekHeightPx - totalBottomGapPx
         val progress =
             if (totalRange > 0) ((totalRange - dragOffset.coerceAtLeast(0f)) / totalRange).coerceIn(
                 0f,
@@ -629,15 +636,7 @@ fun ExpandablePlayer(
         }
 
         LaunchedEffect(activeSongId, isPlayerVisible, state.playbackWave) {
-            if (isPlayerVisible && activeSongId.isNotEmpty()) {
-                when (state.playbackWave) {
-                    PlaybackWave.ENERGY -> currentActions.ensureAudioEnergyCalculated(activeSongId, Uri.EMPTY)
-                    PlaybackWave.FREQUENCY -> currentActions.ensureAudioFrequencyCalculated(activeSongId, Uri.EMPTY)
-                    PlaybackWave.SIMPLICITY -> currentActions.cancelAudioExtractions()
-                }
-            } else {
-                currentActions.cancelAudioExtractions()
-            }
+            currentActions.onUpdateVisualizerVisibility(isPlayerVisible)
         }
 
         val vinylFace = remember { VinylFace() }
@@ -730,11 +729,86 @@ fun ExpandablePlayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(screenHeight)
-                            .anchoredDraggable(
-                                state = queueAnchoredDraggableState,
-                                orientation = Orientation.Vertical,
-                                enabled = progress > 0.8f && !showLyrics && !showArtistsDialog
-                            )
+                            .pointerInput(progress, showQueue, showLyrics, showArtistsDialog, totalRange, screenHeightPx) {
+                                if (progress > 0.8f && !showLyrics && !showArtistsDialog) {
+                                    detectVerticalDragGestures(
+                                        onVerticalDrag = { change, dragAmount ->
+                                            val currentQueueOffset = try {
+                                                queueAnchoredDraggableState.requireOffset()
+                                            } catch (_: Exception) {
+                                                if (showQueue) 0f else screenHeightPx
+                                            }
+                                            val currentPlayerOffset = try {
+                                                anchoredDraggableState.requireOffset()
+                                            } catch (_: Exception) {
+                                                0f
+                                            }
+
+                                            if (dragAmount > 0f) { // Dragging DOWN
+                                                if (currentQueueOffset < screenHeightPx) {
+                                                    val newOffset = (currentQueueOffset + dragAmount).coerceAtMost(screenHeightPx)
+                                                    queueAnchoredDraggableState.dispatchRawDelta(newOffset - currentQueueOffset)
+                                                    change.consume()
+                                                } else if (currentPlayerOffset < totalRange) {
+                                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtMost(totalRange)
+                                                    anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                                    change.consume()
+                                                }
+                                            } else if (dragAmount < 0f) { // Dragging UP
+                                                if (currentPlayerOffset > 0f) {
+                                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtLeast(0f)
+                                                    anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                                    change.consume()
+                                                } else if (currentQueueOffset > 0f) {
+                                                    val newOffset = (currentQueueOffset + dragAmount).coerceAtLeast(0f)
+                                                    queueAnchoredDraggableState.dispatchRawDelta(newOffset - currentQueueOffset)
+                                                    change.consume()
+                                                }
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            val currentQueueOffset = try {
+                                                queueAnchoredDraggableState.requireOffset()
+                                            } catch (_: Exception) {
+                                                if (showQueue) 0f else screenHeightPx
+                                            }
+                                            val currentPlayerOffset = try {
+                                                anchoredDraggableState.requireOffset()
+                                            } catch (_: Exception) {
+                                                0f
+                                            }
+
+                                            if (currentQueueOffset < screenHeightPx) {
+                                                val target = if (currentQueueOffset < screenHeightPx * 0.6f) DragValue.EXPANDED else DragValue.COLLAPSED
+                                                scope.launch { queueAnchoredDraggableState.animateTo(target) }
+                                            } else if (currentPlayerOffset > 0f) {
+                                                val target = if (currentPlayerOffset > totalRange * 0.4f) DragValue.COLLAPSED else DragValue.EXPANDED
+                                                scope.launch { anchoredDraggableState.animateTo(target) }
+                                            }
+                                        },
+                                        onDragCancel = {
+                                            val currentQueueOffset = try {
+                                                queueAnchoredDraggableState.requireOffset()
+                                            } catch (_: Exception) {
+                                                if (showQueue) 0f else screenHeightPx
+                                            }
+                                            val currentPlayerOffset = try {
+                                                anchoredDraggableState.requireOffset()
+                                            } catch (_: Exception) {
+                                                0f
+                                            }
+
+                                            if (currentQueueOffset < screenHeightPx) {
+                                                val target = if (currentQueueOffset < screenHeightPx * 0.6f) DragValue.EXPANDED else DragValue.COLLAPSED
+                                                scope.launch { queueAnchoredDraggableState.animateTo(target) }
+                                            } else if (currentPlayerOffset > 0f) {
+                                                val target = if (currentPlayerOffset > totalRange * 0.4f) DragValue.COLLAPSED else DragValue.EXPANDED
+                                                scope.launch { anchoredDraggableState.animateTo(target) }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
                     ) {
                         // Expanded Content
                         if (progress > 0f) {
@@ -908,23 +982,31 @@ fun ExpandablePlayer(
                         if (progress > 0f) {
                             val displayPosition =
                                 if (isDraggingScrub) draggedPosition else state.positionMs
-                            val (currentEnergy, currentEnergyDelta) = remember(state.audioEnergyCurve, displayPosition) {
-                                val curve = state.audioEnergyCurve
-                                val bucketIndex = (displayPosition / AudioEnergyExtractor.ENERGY_INTERVAL_MS).toInt()
-                                if (curve != null && bucketIndex in curve.indices) {
-                                    val curr = curve[bucketIndex]
-                                    val prev = if (bucketIndex > 0) curve[bucketIndex - 1] else curr
-                                    val delta = abs(curr - prev)
-                                    (curr as Float?) to delta
+                            val (currentEnergy, currentEnergyDelta) = remember(visualizerState, displayPosition) {
+                                if (visualizerState is VisualizerState.Energy) {
+                                    val curve = visualizerState.curve
+                                    val bucketIndex = (displayPosition / AudioEnergyExtractor.ENERGY_INTERVAL_MS).toInt()
+                                    if (bucketIndex in curve.indices) {
+                                        val curr = curve[bucketIndex]
+                                        val prev = if (bucketIndex > 0) curve[bucketIndex - 1] else curr
+                                        val delta = abs(curr - prev)
+                                        (curr as Float?) to delta
+                                    } else {
+                                        null to 0f
+                                    }
                                 } else {
                                     null to 0f
                                 }
                             }
-                            val currentFrequencyFrame = remember(state.audioFrequencyCurve, displayPosition) {
-                                val curve = state.audioFrequencyCurve
-                                val bucketIndex = (displayPosition / AudioFrequencyExtractor.FREQUENCY_INTERVAL_MS).toInt()
-                                if (curve != null && bucketIndex in curve.indices) {
-                                    curve[bucketIndex]
+                            val currentFrequencyFrame = remember(visualizerState, displayPosition) {
+                                if (visualizerState is VisualizerState.Frequency) {
+                                    val curve = visualizerState.frames
+                                    val bucketIndex = (displayPosition / AudioFrequencyExtractor.FREQUENCY_INTERVAL_MS).toInt()
+                                    if (bucketIndex in curve.indices) {
+                                        curve[bucketIndex]
+                                    } else {
+                                        null
+                                    }
                                 } else {
                                     null
                                 }
@@ -987,99 +1069,88 @@ fun ExpandablePlayer(
                                             .fillMaxSize()
                                             .nestedScroll(boundaryNestedScrollConnection)
                                             .pointerInput(Unit) {
-                                                var dragStarted = false
-                                                var wasPlayingOnDragStart = false
+                                                awaitEachGesture {
+                                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                                    val localCenter = Offset(size.width / 2f, size.height / 2f)
+                                                    val distFromCenter = (down.position - localCenter).getDistance()
+                                                    val artworkRadiusPx = with(density) { (artworkSize / 2).toPx() }
 
-                                                detectDragGestures(
-                                                    onDragStart = { offset ->
-                                                        val localCenter =
-                                                            Offset(size.width / 2f, size.height / 2f)
-                                                        val distFromCenter =
-                                                            (offset - localCenter).getDistance()
-                                                        val artworkRadiusPx =
-                                                            with(density) { (artworkSize / 2).toPx() }
+                                                    if (distFromCenter > artworkRadiusPx && queueProgress == 0f && !showQueue) {
+                                                        var wasPlayingOnDragStart = false
 
-                                                        if (distFromCenter > artworkRadiusPx && queueProgress == 0f && !showQueue) {
-                                                            dragStarted = true
+                                                        val change = awaitTouchSlopOrCancellation(down.id) { change, _ ->
+                                                            change.consume()
+                                                        }
+
+                                                        if (change != null) {
                                                             wasPlayingOnDragStart = currentState.isPlaying
                                                             draggedPosition = currentState.positionMs
                                                             hapticAccumulator = 0f
                                                             invalidHapticAccumulator = 0f
-                                                            lastAngle = calculateAngle(offset, localCenter)
+                                                            lastAngle = calculateAngle(change.position, localCenter)
                                                             if (wasPlayingOnDragStart) currentActions.pause()
-                                                        }
-                                                    },
-                                                    onDrag = { change, _ ->
-                                                        if (dragStarted) {
-                                                            val localCenter =
-                                                                Offset(size.width / 2f, size.height / 2f)
-                                                            val currentAngle =
-                                                                calculateAngle(change.position, localCenter)
-                                                            var delta = currentAngle - lastAngle
-                                                            if (delta > 180f) delta -= 360f
-                                                            if (delta < -180f) delta += 360f
 
-                                                            val positionDelta = (delta / 360f) * 60000f
-                                                            val unconstrainedPosition = draggedPosition + positionDelta.toLong()
-                                                            val minPos = 0L
-                                                            val maxPos = currentState.durationMs
+                                                            val dragSuccess = drag(change.id) { dragChange ->
+                                                                val currentCenter = Offset(size.width / 2f, size.height / 2f)
+                                                                val currentAngle = calculateAngle(dragChange.position, currentCenter)
+                                                                var delta = currentAngle - lastAngle
+                                                                if (delta > 180f) delta -= 360f
+                                                                if (delta < -180f) delta += 360f
 
-                                                            if (unconstrainedPosition in minPos..maxPos) {
-                                                                visualRotation += delta
-                                                                draggedPosition = unconstrainedPosition
-                                                                invalidHapticAccumulator = 0f
+                                                                val positionDelta = (delta / 360f) * 60000f
+                                                                val unconstrainedPosition = draggedPosition + positionDelta.toLong()
+                                                                val minPos = 0L
+                                                                val maxPos = currentState.durationMs
 
-                                                                hapticAccumulator += abs(delta)
-                                                                if (hapticAccumulator >= 10f) {
-                                                                    view.performHapticFeedback(
-                                                                        HapticFeedbackConstants.CLOCK_TICK
-                                                                    )
-                                                                    hapticAccumulator = 0f
-                                                                }
-                                                            } else {
-                                                                val boundaryPos = if (unconstrainedPosition < minPos) minPos else maxPos
-                                                                val posDeltaToBoundary = (boundaryPos - draggedPosition).toFloat()
-                                                                val validFraction = if (positionDelta != 0f) {
-                                                                    (posDeltaToBoundary / positionDelta).coerceIn(0f, 1f)
+                                                                if (unconstrainedPosition in minPos..maxPos) {
+                                                                    visualRotation += delta
+                                                                    draggedPosition = unconstrainedPosition
+                                                                    invalidHapticAccumulator = 0f
+
+                                                                    hapticAccumulator += abs(delta)
+                                                                    if (hapticAccumulator >= 10f) {
+                                                                        view.performHapticFeedback(
+                                                                            HapticFeedbackConstants.CLOCK_TICK
+                                                                        )
+                                                                        hapticAccumulator = 0f
+                                                                    }
                                                                 } else {
-                                                                    0f
+                                                                    val boundaryPos = if (unconstrainedPosition < minPos) minPos else maxPos
+                                                                    val posDeltaToBoundary = (boundaryPos - draggedPosition).toFloat()
+                                                                    val validFraction = if (positionDelta != 0f) {
+                                                                        (posDeltaToBoundary / positionDelta).coerceIn(0f, 1f)
+                                                                    } else {
+                                                                        0f
+                                                                    }
+
+                                                                    val validDelta = delta * validFraction
+                                                                    val invalidDelta = delta - validDelta
+
+                                                                    visualRotation += validDelta
+                                                                    draggedPosition = boundaryPos
+
+                                                                    val invalidDegrees = abs(invalidDelta)
+                                                                    if (invalidHapticAccumulator == 0f || invalidHapticAccumulator + invalidDegrees >= 12f) {
+                                                                        view.performHapticFeedback(HapticFeedbackConstantsCompat.REJECT)
+                                                                        invalidHapticAccumulator = if (invalidHapticAccumulator == 0f) 0.001f else ((invalidHapticAccumulator + invalidDegrees) % 12f)
+                                                                    } else {
+                                                                        invalidHapticAccumulator += invalidDegrees
+                                                                    }
                                                                 }
 
-                                                                val validDelta = delta * validFraction
-                                                                val invalidDelta = delta - validDelta
-
-                                                                visualRotation += validDelta
-                                                                draggedPosition = boundaryPos
-
-                                                                val invalidDegrees = abs(invalidDelta)
-                                                                if (invalidHapticAccumulator == 0f || invalidHapticAccumulator + invalidDegrees >= 12f) {
-                                                                    view.performHapticFeedback(HapticFeedbackConstantsCompat.REJECT)
-                                                                    invalidHapticAccumulator = if (invalidHapticAccumulator == 0f) 0.001f else ((invalidHapticAccumulator + invalidDegrees) % 12f)
-                                                                } else {
-                                                                    invalidHapticAccumulator += invalidDegrees
-                                                                }
+                                                                lastAngle = currentAngle
+                                                                isDraggingScrub = true
+                                                                dragChange.consume()
                                                             }
 
-                                                            lastAngle = currentAngle
-                                                            isDraggingScrub = true
-                                                            change.consume()
-                                                        }
-                                                    },
-                                                    onDragEnd = {
-                                                        if (dragStarted) {
                                                             isDraggingScrub = false
-                                                            currentActions.onSeek(draggedPosition)
-                                                            if (wasPlayingOnDragStart) currentActions.play()
+                                                            if (dragSuccess) {
+                                                                currentActions.onSeek(draggedPosition)
+                                                                if (wasPlayingOnDragStart) currentActions.play()
+                                                            }
                                                         }
-                                                        dragStarted = false
-                                                    },
-                                                    onDragCancel = {
-                                                        if (dragStarted) {
-                                                            isDraggingScrub = false
-                                                        }
-                                                        dragStarted = false
                                                     }
-                                                )
+                                                }
                                             }
                                     ) { page ->
                                         val pageArtworkUri = when {

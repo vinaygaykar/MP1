@@ -118,6 +118,7 @@ fun PlaylistDetailScreen(
     val playlist by viewModel.playlist.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
+    val visualizerState by playerViewModel.visualizerState.collectAsState()
 
     val isDark = isSystemInDarkTheme()
 
@@ -343,6 +344,7 @@ fun PlaylistDetailScreen(
             ExpandablePlayer(
                 state = playerState,
                 actions = playerViewModel,
+                visualizerState = visualizerState,
                 onProgressUpdate = { expansionProgress.floatValue = it },
                 peekHeight = 72.dp,
                 onMiniPlayerPositioned = { miniPlayerTargetOffset = it },

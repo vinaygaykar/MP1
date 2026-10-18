@@ -121,6 +121,7 @@ fun GenreDetailScreen(
     val genre by viewModel.genre.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
+    val visualizerState by playerViewModel.visualizerState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
     var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
@@ -381,6 +382,7 @@ fun GenreDetailScreen(
             ExpandablePlayer(
                 state = playerState,
                 actions = playerViewModel,
+                visualizerState = visualizerState,
                 onProgressUpdate = { expansionProgress.floatValue = it },
                 peekHeight = 72.dp,
                 onMiniPlayerPositioned = { miniPlayerTargetOffset = it },

@@ -171,6 +171,7 @@ fun ArtistDetailScreen(
     val collaborators by viewModel.collaborators.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
+    val visualizerState by playerViewModel.visualizerState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
     var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
@@ -760,6 +761,7 @@ fun ArtistDetailScreen(
         ExpandablePlayer(
             state = playerState,
             actions = playerViewModel,
+            visualizerState = visualizerState,
             onProgressUpdate = { expansionProgress.floatValue = it },
             peekHeight = 72.dp,
             bulgeTrigger = miniPlayerBulgeTrigger,

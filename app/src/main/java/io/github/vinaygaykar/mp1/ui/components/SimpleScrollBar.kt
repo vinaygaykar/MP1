@@ -110,6 +110,7 @@ fun SimpleScrollBar(
             if (totalItems > 0 && visibleItems.isNotEmpty()) {
                 val visibleItemsCount = visibleItems.size
                 val viewportHeight = size.height
+                if (viewportHeight <= 0f) return@Canvas
 
                 val averageItemSize = visibleItems.sumOf { it.size }.toFloat() / visibleItemsCount.coerceAtLeast(1)
                 val estimatedTotalHeight = averageItemSize * totalItems
@@ -118,8 +119,11 @@ fun SimpleScrollBar(
 
                 val scrollProgress = (currentScrollPx / maxScrollPx).coerceIn(0f, 1f)
 
+                val minThumbHeight = 32.dp.toPx().coerceAtMost(viewportHeight)
+                val maxThumbHeight = viewportHeight
+
                 val thumbHeight = (viewportHeight * (viewportHeight / estimatedTotalHeight.coerceAtLeast(viewportHeight)))
-                    .coerceIn(32.dp.toPx(), viewportHeight)
+                    .coerceIn(minThumbHeight, maxThumbHeight)
 
                 val thumbOffsetY = (viewportHeight - thumbHeight) * scrollProgress
 
