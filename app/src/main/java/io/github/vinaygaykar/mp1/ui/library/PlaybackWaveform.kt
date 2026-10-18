@@ -56,7 +56,7 @@ private val SCRUB_STROKE_EXPANSION = 2.dp
 private val WAVE_HEIGHT = 24.dp
 
 /**
- * Simplified 1-cycle sine wave progress bar used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWave.SIMPLICITY].
+ * Simplified 1-cycle sine wave progress bar used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType.SIMPLICITY].
  */
 @Composable
 fun PlaybackWaveform(

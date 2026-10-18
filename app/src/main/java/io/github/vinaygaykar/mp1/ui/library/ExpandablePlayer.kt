@@ -137,7 +137,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState

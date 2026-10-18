@@ -18,7 +18,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.vinaygaykar.mp1.data.local.scanner.ScannerRepository
 import io.github.vinaygaykar.mp1.data.repo.SettingsRepository
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.domain.repository.AudioVisualizerRepository
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
@@ -62,7 +62,7 @@ class PlayerViewModel @Inject constructor(
     private var currentArtworkJob: Job? = null
     private var visualizerJob: Job? = null
     private var activeVisualizerSongId: String? = null
-    private var activeVisualizerWave: PlaybackWave = PlaybackWave.SIMPLICITY
+    private var activeVisualizerWave: PlaybackWaveType = PlaybackWaveType.ENERGY
     private var isVisualizerPlayerVisible: Boolean = false
     private var queueUpdateJob: Job? = null
     private var activeArtworkUri: Uri? = null
@@ -759,14 +759,14 @@ class PlayerViewModel @Inject constructor(
         val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: activeMediaId ?: ""
         val waveMode = _uiState.value.playbackWave
 
-        if (activeId.isEmpty() || waveMode == PlaybackWave.SIMPLICITY) {
+        if (activeId.isEmpty() || waveMode == PlaybackWaveType.SIMPLICITY) {
             if (activeVisualizerSongId != null) {
                 visualizerJob?.cancel()
                 visualizerJob = null
                 audioVisualizerRepository.clearCache()
                 _visualizerState.value = VisualizerState.None
                 activeVisualizerSongId = null
-                activeVisualizerWave = PlaybackWave.SIMPLICITY
+                activeVisualizerWave = PlaybackWaveType.SIMPLICITY
             }
             return
         }
@@ -778,7 +778,7 @@ class PlayerViewModel @Inject constructor(
                 audioVisualizerRepository.clearCache()
                 _visualizerState.value = VisualizerState.None
                 activeVisualizerSongId = null
-                activeVisualizerWave = PlaybackWave.SIMPLICITY
+                activeVisualizerWave = PlaybackWaveType.SIMPLICITY
             }
             return
         }
@@ -801,21 +801,21 @@ class PlayerViewModel @Inject constructor(
             val songUri = song?.uri ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
             if (songUri != Uri.EMPTY) {
                 when (waveMode) {
-                    PlaybackWave.ENERGY -> {
+                    PlaybackWaveType.ENERGY -> {
                         audioVisualizerRepository.getAudioEnergyFlow(activeId, songUri)
                             .catch { /* ignore */ }
                             .collect { energyCurve ->
                                 _visualizerState.value = VisualizerState.Energy(energyCurve)
                             }
                     }
-                    PlaybackWave.FREQUENCY -> {
+                    PlaybackWaveType.FREQUENCY -> {
                         audioVisualizerRepository.getAudioFrequencyFlow(activeId, songUri)
                             .catch { /* ignore */ }
                             .collect { frequencyCurve ->
                                 _visualizerState.value = VisualizerState.Frequency(frequencyCurve)
                             }
                     }
-                    PlaybackWave.SIMPLICITY -> {
+                    PlaybackWaveType.SIMPLICITY -> {
                         _visualizerState.value = VisualizerState.None
                     }
                 }

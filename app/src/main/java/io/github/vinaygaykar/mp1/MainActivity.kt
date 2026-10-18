@@ -110,8 +110,9 @@ fun MainScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { innerPadding ->
-            Box(modifier = Modifier.padding(top = innerPadding.calculateTopPadding())) {
+            Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                 NavHost(
                     navController = navController,
                     startDestination = startDestination,

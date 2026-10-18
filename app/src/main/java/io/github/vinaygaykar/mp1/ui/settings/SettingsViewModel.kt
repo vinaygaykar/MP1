@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -33,9 +33,9 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setUseCleanAlbumGrid(enabled)
     }
 
-    val playbackWave: StateFlow<PlaybackWave> = settingsRepository.playbackWave
+    val playbackWave: StateFlow<PlaybackWaveType> = settingsRepository.playbackWave
 
-    fun setPlaybackWave(wave: PlaybackWave) {
+    fun setPlaybackWave(wave: PlaybackWaveType) {
         settingsRepository.setPlaybackWave(wave)
     }
 

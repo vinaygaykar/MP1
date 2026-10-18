@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,11 +29,11 @@ class SettingsRepository @Inject constructor(
     }
 
     private val _playbackWave = MutableStateFlow(
-        PlaybackWave.fromName(prefs.getString(KEY_PLAYBACK_WAVE, PlaybackWave.SIMPLICITY.name)),
+        PlaybackWaveType.fromName(prefs.getString(KEY_PLAYBACK_WAVE, PlaybackWaveType.ENERGY.name)),
     )
-    val playbackWave: StateFlow<PlaybackWave> = _playbackWave.asStateFlow()
+    val playbackWave: StateFlow<PlaybackWaveType> = _playbackWave.asStateFlow()
 
-    fun setPlaybackWave(value: PlaybackWave) {
+    fun setPlaybackWave(value: PlaybackWaveType) {
         prefs.edit { putString(KEY_PLAYBACK_WAVE, value.name) }
         _playbackWave.value = value
     }

@@ -70,7 +70,7 @@ private val DEFAULT_STROKE_WIDTH = 4.dp
 private val SCRUB_STROKE_EXPANSION = 2.dp
 
 /**
- * Frequency-reactive waveform used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWave.FREQUENCY].
+ * Frequency-reactive waveform used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType.FREQUENCY].
  */
 @Composable
 fun FrequencyWaveform(

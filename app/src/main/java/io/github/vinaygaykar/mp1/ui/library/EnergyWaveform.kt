@@ -86,7 +86,7 @@ private const val MAX_FREQ = 1.0f / MIN_SPEED_MILLIS
 private val WAVE_HEIGHT = 24.dp
 
 /**
- * Dynamic energy-reactive waveform used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWave.ENERGY].
+ * Dynamic energy-reactive waveform used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType.ENERGY].
  */
 @Composable
 fun EnergyWaveform(

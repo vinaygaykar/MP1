@@ -7,7 +7,7 @@ import androidx.media3.common.MediaItem
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWave
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 
 @Immutable
 data class PlayerUiState(
@@ -32,7 +32,7 @@ data class PlayerUiState(
     val queue: ImmutableList<MediaItem> = persistentListOf(),
     val currentIndex: Int = -1,
     val isScanInProgress: Boolean = false,
-    val playbackWave: PlaybackWave = PlaybackWave.SIMPLICITY
+    val playbackWave: PlaybackWaveType = PlaybackWaveType.ENERGY,
 )
 
 interface PlayerActions {
