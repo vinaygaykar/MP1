@@ -14,8 +14,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
 import kotlin.math.sin
+
+/** Alpha transparency factor for the unplayed background track. */
+private const val INACTIVE_TRACK_ALPHA = 0.2f
 
 /** Center-to-crest amplitude (6dp produces 12dp crest-to-trough peak-to-peak height). */
 private val MAX_AMPLITUDE = 6.dp
@@ -29,8 +31,17 @@ private val STROKE_PADDING = 4.dp
 /** Fixed number of sine wave cycles rendered for simplicity mode. */
 private const val WAVE_CYCLES = 1f
 
+/** Constant representing 2 * PI in radians. */
+private const val TWO_PI = 6.2831855f
+
+/** Duration in milliseconds for play/pause amplitude animation transition. */
+private const val PLAYBACK_ANIM_DURATION_MS = 500
+
 /** Duration in milliseconds for one full 2π phase oscillation cycle. */
 private const val SPEED_MILLIS = 2000
+
+/** Maximum radius of the circular scrubbing seek thumb head. */
+private val SCRUB_THUMB_MAX_RADIUS = 8.dp
 
 /** Fixed total height of the waveform canvas container. */
 private val CANVAS_HEIGHT = 88.dp
@@ -54,7 +65,7 @@ fun PlaybackWaveform(
     scrubFactor: Float,
     modifier: Modifier = Modifier,
     activeColor: Color = MaterialTheme.colorScheme.primary,
-    inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+    inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = INACTIVE_TRACK_ALPHA),
     thumbColor: Color = activeColor
 ) {
     val wavelength = WAVE_HEIGHT * ASPECT_RATIO
@@ -63,7 +74,7 @@ fun PlaybackWaveform(
     val infiniteTransition = rememberInfiniteTransition(label = "waveform_simplicity")
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 2f * PI.toFloat(),
+        targetValue = TWO_PI,
         animationSpec = infiniteRepeatable(
             animation = tween(SPEED_MILLIS, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
@@ -73,7 +84,7 @@ fun PlaybackWaveform(
 
     val amplitudeMultiplier by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0f,
-        animationSpec = tween(500),
+        animationSpec = tween(PLAYBACK_ANIM_DURATION_MS),
         label = "amplitude"
     )
 
@@ -102,7 +113,7 @@ fun PlaybackWaveform(
         for (i in 0..steps) {
             val rel = i.toFloat() / steps
             val x = startX + rel * trackWidth
-            val angle = rel.toDouble() * WAVE_CYCLES * 2.0 * PI - phase.toDouble()
+            val angle = rel.toDouble() * WAVE_CYCLES * TWO_PI.toDouble() - phase.toDouble()
             val sine = sin(angle).toFloat()
             val y = centerY + sine * currentAmplitude
             if (i == 0) fullPath.moveTo(x, y) else fullPath.lineTo(x, y)
@@ -123,13 +134,13 @@ fun PlaybackWaveform(
             for (i in 0..activeSteps) {
                 val rel = (i.toFloat() / steps).coerceAtMost(coercedProgress)
                 val x = startX + rel * trackWidth
-                val angle = rel.toDouble() * WAVE_CYCLES * 2.0 * PI - phase.toDouble()
+                val angle = rel.toDouble() * WAVE_CYCLES * TWO_PI.toDouble() - phase.toDouble()
                 val sine = sin(angle).toFloat()
                 val y = centerY + sine * currentAmplitude
                 if (i == 0) activePath.moveTo(x, y) else activePath.lineTo(x, y)
             }
 
-            val endAngle = coercedProgress.toDouble() * WAVE_CYCLES * 2.0 * PI - phase.toDouble()
+            val endAngle = coercedProgress.toDouble() * WAVE_CYCLES * TWO_PI.toDouble() - phase.toDouble()
             val endY = centerY + sin(endAngle).toFloat() * currentAmplitude
             activePath.lineTo(activeEndX, endY)
 
@@ -142,7 +153,7 @@ fun PlaybackWaveform(
 
         // Circular Seek Head
         if (scrubFactor > 0f) {
-            val thumbRadiusPx = 8.dp.toPx() * scrubFactor
+            val thumbRadiusPx = SCRUB_THUMB_MAX_RADIUS.toPx() * scrubFactor
             val thumbX = startX + trackWidth * coercedProgress
             drawCircle(
                 color = thumbColor,
