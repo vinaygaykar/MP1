@@ -759,15 +759,10 @@ fun ExpandablePlayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(screenHeight)
-                            .pointerInput(progress, showQueue, showLyrics, showArtistsDialog, totalRange, screenHeightPx) {
-                                if (progress > 0.8f && !showLyrics && !showArtistsDialog) {
+                            .pointerInput(progress, showQueue, showLyrics, showArtistsDialog, totalRange) {
+                                if (progress > 0.8f && !showQueue && !showLyrics && !showArtistsDialog) {
                                     detectVerticalDragGestures(
                                         onVerticalDrag = { change, dragAmount ->
-                                            val currentQueueOffset = try {
-                                                queueAnchoredDraggableState.requireOffset()
-                                            } catch (_: Exception) {
-                                                if (showQueue) 0f else screenHeightPx
-                                            }
                                             val currentPlayerOffset = try {
                                                 anchoredDraggableState.requireOffset()
                                             } catch (_: Exception) {
@@ -775,11 +770,7 @@ fun ExpandablePlayer(
                                             }
 
                                             if (dragAmount > 0f) { // Dragging DOWN
-                                                if (currentQueueOffset < screenHeightPx) {
-                                                    val newOffset = (currentQueueOffset + dragAmount).coerceAtMost(screenHeightPx)
-                                                    queueAnchoredDraggableState.dispatchRawDelta(newOffset - currentQueueOffset)
-                                                    change.consume()
-                                                } else if (currentPlayerOffset < totalRange) {
+                                                if (currentPlayerOffset < totalRange) {
                                                     val newOffset = (currentPlayerOffset + dragAmount).coerceAtMost(totalRange)
                                                     anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
                                                     change.consume()
@@ -789,49 +780,29 @@ fun ExpandablePlayer(
                                                     val newOffset = (currentPlayerOffset + dragAmount).coerceAtLeast(0f)
                                                     anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
                                                     change.consume()
-                                                } else if (currentQueueOffset > 0f) {
-                                                    val newOffset = (currentQueueOffset + dragAmount).coerceAtLeast(0f)
-                                                    queueAnchoredDraggableState.dispatchRawDelta(newOffset - currentQueueOffset)
-                                                    change.consume()
                                                 }
                                             }
                                         },
                                         onDragEnd = {
-                                            val currentQueueOffset = try {
-                                                queueAnchoredDraggableState.requireOffset()
-                                            } catch (_: Exception) {
-                                                if (showQueue) 0f else screenHeightPx
-                                            }
                                             val currentPlayerOffset = try {
                                                 anchoredDraggableState.requireOffset()
                                             } catch (_: Exception) {
                                                 0f
                                             }
 
-                                            if (currentQueueOffset < screenHeightPx) {
-                                                val target = if (currentQueueOffset < screenHeightPx * 0.6f) DragValue.EXPANDED else DragValue.COLLAPSED
-                                                scope.launch { queueAnchoredDraggableState.animateTo(target) }
-                                            } else if (currentPlayerOffset > 0f) {
+                                            if (currentPlayerOffset > 0f) {
                                                 val target = if (currentPlayerOffset > totalRange * 0.4f) DragValue.COLLAPSED else DragValue.EXPANDED
                                                 scope.launch { anchoredDraggableState.animateTo(target) }
                                             }
                                         },
                                         onDragCancel = {
-                                            val currentQueueOffset = try {
-                                                queueAnchoredDraggableState.requireOffset()
-                                            } catch (_: Exception) {
-                                                if (showQueue) 0f else screenHeightPx
-                                            }
                                             val currentPlayerOffset = try {
                                                 anchoredDraggableState.requireOffset()
                                             } catch (_: Exception) {
                                                 0f
                                             }
 
-                                            if (currentQueueOffset < screenHeightPx) {
-                                                val target = if (currentQueueOffset < screenHeightPx * 0.6f) DragValue.EXPANDED else DragValue.COLLAPSED
-                                                scope.launch { queueAnchoredDraggableState.animateTo(target) }
-                                            } else if (currentPlayerOffset > 0f) {
+                                            if (currentPlayerOffset > 0f) {
                                                 val target = if (currentPlayerOffset > totalRange * 0.4f) DragValue.COLLAPSED else DragValue.EXPANDED
                                                 scope.launch { anchoredDraggableState.animateTo(target) }
                                             }
