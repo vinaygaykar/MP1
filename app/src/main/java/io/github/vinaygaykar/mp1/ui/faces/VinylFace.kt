@@ -101,8 +101,30 @@ class VinylFace : PlayerFace {
                 TrackInfo(state.trackTitle, state.artist, state.album, state.albumId)
             }
 
-            val prevItem = remember(state.queue, state.currentIndex) {
-                if (state.currentIndex > 0) state.queue.getOrNull(state.currentIndex - 1) else null
+            val hasPrevPage = remember(state.queue.size, state.currentIndex, state.hasPrevious, state.repeatMode) {
+                if (state.queue.size <= 1) false
+                else if (state.currentIndex > 0) true
+                else if (state.currentIndex == 0) state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+                else state.hasPrevious
+            }
+
+            val hasNextPage = remember(state.queue.size, state.currentIndex, state.hasNext, state.repeatMode) {
+                if (state.queue.size <= 1) false
+                else if (state.currentIndex in 0 until state.queue.size - 1) true
+                else if (state.currentIndex == state.queue.size - 1) state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+                else state.hasNext
+            }
+
+            val prevItem = remember(state.queue, state.currentIndex, hasPrevPage) {
+                if (!hasPrevPage || state.queue.size <= 1) null
+                else {
+                    val prevIndex = if (state.currentIndex > 0) {
+                        state.currentIndex - 1
+                    } else {
+                        state.queue.size - 1
+                    }
+                    state.queue.getOrNull(prevIndex)
+                }
             }
             val prevTrackInfo = remember(prevItem) {
                 prevItem?.let { item ->
@@ -115,8 +137,16 @@ class VinylFace : PlayerFace {
                 }
             }
 
-            val nextItem = remember(state.queue, state.currentIndex) {
-                if (state.currentIndex >= 0) state.queue.getOrNull(state.currentIndex + 1) else null
+            val nextItem = remember(state.queue, state.currentIndex, hasNextPage) {
+                if (!hasNextPage || state.queue.size <= 1) null
+                else {
+                    val nextIndex = if (state.currentIndex in state.queue.indices && state.currentIndex + 1 < state.queue.size) {
+                        state.currentIndex + 1
+                    } else {
+                        0
+                    }
+                    state.queue.getOrNull(nextIndex)
+                }
             }
             val nextTrackInfo = remember(nextItem) {
                 nextItem?.let { item ->
@@ -129,8 +159,8 @@ class VinylFace : PlayerFace {
                 }
             }
 
-            val currentTrackPageIndex = if (state.hasPrevious) 1 else 0
-            val totalPageCount = 1 + (if (state.hasPrevious) 1 else 0) + (if (state.hasNext) 1 else 0)
+            val currentTrackPageIndex = if (hasPrevPage) 1 else 0
+            val totalPageCount = 1 + (if (hasPrevPage) 1 else 0) + (if (hasNextPage) 1 else 0)
 
             Box(
                 modifier = modifier
@@ -141,8 +171,8 @@ class VinylFace : PlayerFace {
                 for (page in 0 until totalPageCount) {
                     val trackInfo = when {
                         page == currentTrackPageIndex -> currentTrackInfo
-                        state.hasPrevious && page == currentTrackPageIndex - 1 -> prevTrackInfo
-                        state.hasNext && page == currentTrackPageIndex + 1 -> nextTrackInfo
+                        hasPrevPage && page == currentTrackPageIndex - 1 -> prevTrackInfo
+                        hasNextPage && page == currentTrackPageIndex + 1 -> nextTrackInfo
                         else -> null
                     }
 

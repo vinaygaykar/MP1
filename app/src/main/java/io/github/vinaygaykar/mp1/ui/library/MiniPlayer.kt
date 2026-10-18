@@ -86,27 +86,41 @@ fun MiniPlayer(
         animRotation
     } else rotation
 
-    val prevItem = remember(state.queue, state.currentIndex, state.hasPrevious) {
-        if (!state.hasPrevious || state.queue.isEmpty()) null
+    val hasPrevPage = remember(state.queue.size, state.currentIndex, state.hasPrevious, state.repeatMode) {
+        if (state.queue.size <= 1) false
+        else if (state.currentIndex > 0) true
+        else if (state.currentIndex == 0) state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+        else state.hasPrevious
+    }
+
+    val hasNextPage = remember(state.queue.size, state.currentIndex, state.hasNext, state.repeatMode) {
+        if (state.queue.size <= 1) false
+        else if (state.currentIndex in 0 until state.queue.size - 1) true
+        else if (state.currentIndex == state.queue.size - 1) state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+        else state.hasNext
+    }
+
+    val prevItem = remember(state.queue, state.currentIndex, hasPrevPage) {
+        if (!hasPrevPage || state.queue.size <= 1) null
         else {
             val prevIndex = if (state.currentIndex > 0) {
                 state.currentIndex - 1
-            } else if (state.queue.isNotEmpty()) {
+            } else {
                 state.queue.size - 1
-            } else -1
-            if (prevIndex in state.queue.indices) state.queue[prevIndex] else null
+            }
+            state.queue.getOrNull(prevIndex)
         }
     }
 
-    val nextItem = remember(state.queue, state.currentIndex, state.hasNext) {
-        if (!state.hasNext || state.queue.isEmpty()) null
+    val nextItem = remember(state.queue, state.currentIndex, hasNextPage) {
+        if (!hasNextPage || state.queue.size <= 1) null
         else {
             val nextIndex = if ((state.currentIndex in state.queue.indices) && (state.currentIndex + 1 < state.queue.size)) {
                 state.currentIndex + 1
-            } else if (state.queue.isNotEmpty()) {
+            } else {
                 0
-            } else -1
-            if (nextIndex in state.queue.indices) state.queue[nextIndex] else null
+            }
+            state.queue.getOrNull(nextIndex)
         }
     }
 
@@ -120,8 +134,8 @@ fun MiniPlayer(
 
     var containerWidthPx by remember { mutableFloatStateOf(0f) }
 
-    val currentTrackPageIndex = if (state.hasPrevious) 1 else 0
-    val totalPageCount = 1 + (if (state.hasPrevious) 1 else 0) + (if (state.hasNext) 1 else 0)
+    val currentTrackPageIndex = if (hasPrevPage) 1 else 0
+    val totalPageCount = 1 + (if (hasPrevPage) 1 else 0) + (if (hasNextPage) 1 else 0)
 
     val pagerState = rememberPagerState(
         initialPage = currentTrackPageIndex,
@@ -130,7 +144,7 @@ fun MiniPlayer(
 
     val boundaryOffsetAnimatable = remember { Animatable(0f) }
 
-    LaunchedEffect(state.currentIndex, state.trackTitle, state.hasPrevious, state.hasNext) {
+    LaunchedEffect(state.currentIndex, state.trackTitle, hasPrevPage, hasNextPage) {
         if (pagerState.currentPage != currentTrackPageIndex) {
             pagerState.scrollToPage(currentTrackPageIndex)
         }
@@ -158,7 +172,7 @@ fun MiniPlayer(
         }
     }
 
-    val boundaryNestedScrollConnection = remember(state.hasPrevious, state.hasNext, totalPageCount, currentTrackPageIndex) {
+    val boundaryNestedScrollConnection = remember(hasPrevPage, hasNextPage, totalPageCount, currentTrackPageIndex) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val currentOffset = boundaryOffsetAnimatable.value
@@ -188,8 +202,8 @@ fun MiniPlayer(
                 val deltaX = available.x
                 if (deltaX == 0f) return Offset.Zero
 
-                val isAtPrevBoundary = !state.hasPrevious && deltaX > 0f && pagerState.currentPage == 0
-                val isAtNextBoundary = !state.hasNext && deltaX < 0f && pagerState.currentPage == totalPageCount - 1
+                val isAtPrevBoundary = !hasPrevPage && deltaX > 0f && pagerState.currentPage == 0
+                val isAtNextBoundary = !hasNextPage && deltaX < 0f && pagerState.currentPage == totalPageCount - 1
 
                 if (isAtPrevBoundary || isAtNextBoundary) {
                     val currentOffset = boundaryOffsetAnimatable.value
