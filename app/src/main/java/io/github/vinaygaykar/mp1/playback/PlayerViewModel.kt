@@ -18,11 +18,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.vinaygaykar.mp1.data.local.scanner.ScannerRepository
 import io.github.vinaygaykar.mp1.data.repo.SettingsRepository
+import io.github.vinaygaykar.mp1.domain.repository.AudioVisualizerRepository
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
-import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
-import io.github.vinaygaykar.mp1.utils.AudioFrequencyExtractor
 import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,7 +46,8 @@ class PlayerViewModel @Inject constructor(
     private val lyricsRepository: LyricsRepository,
     private val musicRepository: MusicRepository,
     private val scannerRepository: ScannerRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val audioVisualizerRepository: AudioVisualizerRepository
 ) : ViewModel(), PlayerActions {
 
     private var controller: MediaController? = null
@@ -169,15 +169,14 @@ class PlayerViewModel @Inject constructor(
         if (isNewMediaItem) {
             energyExtractionJob?.cancel()
             frequencyExtractionJob?.cancel()
-            AudioEnergyExtractor.clearCache()
-            AudioFrequencyExtractor.clearCache()
+            audioVisualizerRepository.clearCache()
             lyricsToUse = null
             isSyncedToUse = false
             isLocalToUse = false
             lyricsLoadingToUse = false
             lyricsErrorToUse = null
-            audioEnergyToUse = AudioEnergyExtractor.getCachedEnergy(mediaId)
-            audioFrequencyToUse = AudioFrequencyExtractor.getCachedFrequency(mediaId)
+            audioEnergyToUse = audioVisualizerRepository.getCachedEnergy(mediaId)
+            audioFrequencyToUse = audioVisualizerRepository.getCachedFrequency(mediaId)
         } else {
             lyricsToUse = _uiState.value.lyrics
             isSyncedToUse = _uiState.value.isLyricsSynced
@@ -759,22 +758,24 @@ class PlayerViewModel @Inject constructor(
         frequencyExtractionJob?.cancel()
         frequencyExtractionJob = null
 
-        if (_uiState.value.audioEnergyCurve != null) return
-        val cached = AudioEnergyExtractor.getCachedEnergy(activeId)
+        val cached = audioVisualizerRepository.getCachedEnergy(activeId)
         if (cached != null) {
             _uiState.update { it.copy(audioEnergyCurve = cached) }
             return
         }
+
+        if (energyExtractionJob?.isActive == true) return
 
         energyExtractionJob?.cancel()
         energyExtractionJob = viewModelScope.launch(Dispatchers.IO) {
             val song = musicRepository.getSongById(activeId)
             val songUri = song?.uri ?: uri.takeIf { it != Uri.EMPTY } ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
             if (songUri != Uri.EMPTY) {
-                val result = AudioEnergyExtractor.extractEnergy(context, activeId, songUri)
-                result.onSuccess { energyCurve ->
-                    _uiState.update { it.copy(audioEnergyCurve = energyCurve) }
-                }
+                audioVisualizerRepository.getAudioEnergyFlow(activeId, songUri)
+                    .catch { /* ignore errors during energy extraction */ }
+                    .collect { energyCurve ->
+                        _uiState.update { it.copy(audioEnergyCurve = energyCurve) }
+                    }
             }
         }
     }
@@ -787,19 +788,20 @@ class PlayerViewModel @Inject constructor(
         energyExtractionJob?.cancel()
         energyExtractionJob = null
 
-        if (_uiState.value.audioFrequencyCurve != null) return
-        val cached = AudioFrequencyExtractor.getCachedFrequency(activeId)
+        val cached = audioVisualizerRepository.getCachedFrequency(activeId)
         if (cached != null) {
             _uiState.update { it.copy(audioFrequencyCurve = cached) }
             return
         }
+
+        if (frequencyExtractionJob?.isActive == true) return
 
         frequencyExtractionJob?.cancel()
         frequencyExtractionJob = viewModelScope.launch(Dispatchers.IO) {
             val song = musicRepository.getSongById(activeId)
             val songUri = song?.uri ?: uri.takeIf { it != Uri.EMPTY } ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
             if (songUri != Uri.EMPTY) {
-                AudioFrequencyExtractor.extractFrequencyFlow(context, activeId, songUri)
+                audioVisualizerRepository.getAudioFrequencyFlow(activeId, songUri)
                     .catch { /* ignore errors during frequency extraction */ }
                     .collect { frequencyCurve ->
                         _uiState.update { it.copy(audioFrequencyCurve = frequencyCurve) }

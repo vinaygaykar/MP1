@@ -6,7 +6,12 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.last
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.max
@@ -18,7 +23,7 @@ object AudioEnergyExtractor {
     private const val TIMEOUT_US = 1000L
     private const val ENCODING_PCM_16BIT = 2
     private const val ENCODING_PCM_FLOAT = 4
-    
+
     // Window set to 250ms (0.25 seconds)
     const val ENERGY_INTERVAL_MS = 250
 
@@ -37,27 +42,38 @@ object AudioEnergyExtractor {
         activeEnergyCurve = null
     }
 
-    suspend fun extractEnergy(
+    /**
+     * Extracts audio energy curve progressively as a Flow, emitting updated FloatArrays
+     * of buckets as soon as they become available during decoding.
+     *
+     * @param emitBatchSize How many buckets to accumulate before emitting a progressive snapshot.
+     */
+    fun extractEnergyFlow(
         context: Context,
         songId: String,
         uri: Uri,
-        intervalMs: Int = ENERGY_INTERVAL_MS
-    ): Result<FloatArray> = withContext(Dispatchers.IO) {
+        intervalMs: Int = ENERGY_INTERVAL_MS,
+        emitBatchSize: Int = 4
+    ): Flow<FloatArray> = flow {
         if (activeSongId == songId && activeEnergyCurve != null) {
-            return@withContext Result.success(activeEnergyCurve!!)
+            emit(activeEnergyCurve!!)
+            return@flow
         }
 
-        runCatching {
-            val extractor = MediaExtractor()
-            extractor.setDataSource(context, uri, null)
+        var extractor: MediaExtractor? = null
+        var decoder: MediaCodec? = null
 
-            val trackIndex = findAudioTrack(extractor)
+        try {
+            val ext = MediaExtractor()
+            extractor = ext
+            ext.setDataSource(context, uri, null)
+
+            val trackIndex = findAudioTrack(ext)
             if (trackIndex == -1) {
-                extractor.release()
                 error("No audio track found in media file")
             }
-            extractor.selectTrack(trackIndex)
-            val format = extractor.getTrackFormat(trackIndex)
+            ext.selectTrack(trackIndex)
+            val format = ext.getTrackFormat(trackIndex)
 
             val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
                 format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
@@ -70,39 +86,48 @@ object AudioEnergyExtractor {
             val samplesPerBucket = max(1, (sampleRate * channelCount * (intervalMs / 1000f)).toInt())
 
             val mime = format.getString(MediaFormat.KEY_MIME) ?: error("MIME type not found")
-            val decoder = MediaCodec.createDecoderByType(mime)
-            decoder.configure(format, null, null, 0)
-            decoder.start()
+            val dec = MediaCodec.createDecoderByType(mime)
+            decoder = dec
+            dec.configure(format, null, null, 0)
+            dec.start()
 
             val rawRmsList = mutableListOf<Float>()
             val bufferInfo = MediaCodec.BufferInfo()
-            var isEndOfStream = false
+            var isDecoderEOS = false
+            var isExtractorEOS = false
 
             var currentSquareSum = 0.0
             var currentSampleCount = 0
 
-            while (!isEndOfStream) {
-                val inputBufferIndex = decoder.dequeueInputBuffer(TIMEOUT_US)
-                if (inputBufferIndex >= 0) {
-                    val inputBuffer = decoder.getInputBuffer(inputBufferIndex)
-                    if (inputBuffer == null) {
-                        decoder.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                        isEndOfStream = true
-                    } else {
-                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                        if (sampleSize < 0) {
-                            decoder.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            isEndOfStream = true
+            while (!isDecoderEOS) {
+                currentCoroutineContext().ensureActive()
+
+                if (!isExtractorEOS) {
+                    val inputBufferIndex = dec.dequeueInputBuffer(TIMEOUT_US)
+                    if (inputBufferIndex >= 0) {
+                        val inputBuffer = dec.getInputBuffer(inputBufferIndex)
+                        if (inputBuffer == null) {
+                            dec.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            isExtractorEOS = true
                         } else {
-                            decoder.queueInputBuffer(inputBufferIndex, 0, sampleSize, extractor.sampleTime, 0)
-                            extractor.advance()
+                            val sampleSize = ext.readSampleData(inputBuffer, 0)
+                            if (sampleSize < 0) {
+                                dec.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                                isExtractorEOS = true
+                            } else {
+                                dec.queueInputBuffer(inputBufferIndex, 0, sampleSize, ext.sampleTime, 0)
+                                ext.advance()
+                            }
                         }
                     }
                 }
 
-                var outputBufferIndex = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
+                var outputBufferIndex = dec.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
                 while (outputBufferIndex >= 0) {
-                    val outputBuffer = decoder.getOutputBuffer(outputBufferIndex)
+                    if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        isDecoderEOS = true
+                    }
+                    val outputBuffer = dec.getOutputBuffer(outputBufferIndex)
                     if (outputBuffer != null && bufferInfo.size > 0) {
                         val samples = byteBufferToFloats(outputBuffer, bufferInfo, format)
                         for (sample in samples) {
@@ -114,11 +139,19 @@ object AudioEnergyExtractor {
                                 rawRmsList.add(rms)
                                 currentSquareSum = 0.0
                                 currentSampleCount = 0
+
+                                if (rawRmsList.size == 1 || rawRmsList.size % emitBatchSize == 0) {
+                                    emit(processRawRmsToEnergyCurve(rawRmsList))
+                                }
                             }
                         }
                     }
-                    decoder.releaseOutputBuffer(outputBufferIndex, false)
-                    outputBufferIndex = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
+                    dec.releaseOutputBuffer(outputBufferIndex, false)
+                    if (!isDecoderEOS) {
+                        outputBufferIndex = dec.dequeueOutputBuffer(bufferInfo, 0L)
+                    } else {
+                        outputBufferIndex = MediaCodec.INFO_TRY_AGAIN_LATER
+                    }
                 }
             }
 
@@ -127,41 +160,54 @@ object AudioEnergyExtractor {
                 rawRmsList.add(rms)
             }
 
-            decoder.stop()
-            decoder.release()
-            extractor.release()
-
-            if (rawRmsList.isEmpty()) {
-                return@runCatching FloatArray(1) { 0.5f }
-            }
-
-            var maxRms = 0.0001f
-            var minRms = Float.MAX_VALUE
-            for (rms in rawRmsList) {
-                if (rms > maxRms) maxRms = rms
-                if (rms < minRms) minRms = rms
-            }
-
-            val range = max(0.0001f, maxRms - minRms)
-            val normalized = FloatArray(rawRmsList.size) { i ->
-                val linearNorm = ((rawRmsList[i] - minRms) / range).coerceIn(0f, 1f)
-                linearNorm.toDouble().pow(1.8).toFloat().coerceIn(0f, 1f)
-            }
-
-            // 3-point weighted moving average filter to eliminate frame jitter
-            val smoothed = FloatArray(normalized.size)
-            for (i in normalized.indices) {
-                val prev = normalized.getOrElse(i - 1) { normalized[i] }
-                val curr = normalized[i]
-                val next = normalized.getOrElse(i + 1) { normalized[i] }
-                smoothed[i] = (prev + 2f * curr + next) / 4f
-            }
-
-            // Store memory for current playing song only
+            val finalCurve = processRawRmsToEnergyCurve(rawRmsList)
             activeSongId = songId
-            activeEnergyCurve = smoothed
-            smoothed
+            activeEnergyCurve = finalCurve
+            emit(finalCurve)
+        } finally {
+            runCatching { decoder?.stop() }
+            runCatching { decoder?.release() }
+            runCatching { extractor?.release() }
         }
+    }.flowOn(Dispatchers.IO)
+
+    suspend fun extractEnergy(
+        context: Context,
+        songId: String,
+        uri: Uri,
+        intervalMs: Int = ENERGY_INTERVAL_MS
+    ): Result<FloatArray> = runCatching {
+        extractEnergyFlow(context, songId, uri, intervalMs).last()
+    }
+
+    private fun processRawRmsToEnergyCurve(rawRmsList: List<Float>): FloatArray {
+        if (rawRmsList.isEmpty()) {
+            return FloatArray(1) { 0.5f }
+        }
+
+        var maxRms = 0.0001f
+        var minRms = Float.MAX_VALUE
+        for (rms in rawRmsList) {
+            if (rms > maxRms) maxRms = rms
+            if (rms < minRms) minRms = rms
+        }
+
+        val range = max(0.0001f, maxRms - minRms)
+        val normalized = FloatArray(rawRmsList.size) { i ->
+            val linearNorm = ((rawRmsList[i] - minRms) / range).coerceIn(0f, 1f)
+            linearNorm.toDouble().pow(1.8).toFloat().coerceIn(0f, 1f)
+        }
+
+        // 3-point weighted moving average filter to eliminate frame jitter
+        val smoothed = FloatArray(normalized.size)
+        for (i in normalized.indices) {
+            val prev = normalized.getOrElse(i - 1) { normalized[i] }
+            val curr = normalized[i]
+            val next = normalized.getOrElse(i + 1) { normalized[i] }
+            smoothed[i] = (prev + 2f * curr + next) / 4f
+        }
+
+        return smoothed
     }
 
     private fun findAudioTrack(extractor: MediaExtractor): Int {

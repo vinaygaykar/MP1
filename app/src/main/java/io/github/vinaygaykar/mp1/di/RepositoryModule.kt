@@ -1,8 +1,10 @@
 package io.github.vinaygaykar.mp1.di
 
+import io.github.vinaygaykar.mp1.data.repo.AudioVisualizerRepositoryImpl
 import io.github.vinaygaykar.mp1.data.repo.LyricsRepositoryImpl
 import io.github.vinaygaykar.mp1.data.repo.MusicRepositoryImpl
 import io.github.vinaygaykar.mp1.data.repo.PlaylistRepositoryImpl
+import io.github.vinaygaykar.mp1.domain.repository.AudioVisualizerRepository
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.domain.repository.PlaylistRepository
@@ -33,4 +35,10 @@ abstract class RepositoryModule {
     abstract fun bindPlaylistRepository(
         playlistRepositoryImpl: PlaylistRepositoryImpl
     ): PlaylistRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAudioVisualizerRepository(
+        audioVisualizerRepositoryImpl: AudioVisualizerRepositoryImpl
+    ): AudioVisualizerRepository
 }

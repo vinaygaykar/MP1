@@ -6,7 +6,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -28,6 +34,24 @@ private val DEFAULT_STROKE_WIDTH = 4.dp
 /** Extra stroke width expansion added during scrubbing. */
 private val SCRUB_STROKE_EXPANSION = 2.dp
 
+/** Energy split threshold: below this energy ramps oscillation speed, above this energy adds wave cycles up to 3. */
+private const val ENERGY_SPLIT_THRESHOLD = 0.6f
+
+/** Fastest phase animation duration (500ms period = 2.0 Hz). */
+private const val MIN_SPEED_MILLIS = 500
+
+/** Slowest phase animation duration (4000ms period = 0.25 Hz). */
+private const val MAX_SPEED_MILLIS = 4000
+
+/** Minimum oscillation frequency (0.25 Hz = 4000ms period). */
+private const val MIN_FREQ = 1.0f / MAX_SPEED_MILLIS
+
+/** Maximum oscillation frequency (2.0 Hz = 500ms period). */
+private const val MAX_FREQ = 1.0f / MIN_SPEED_MILLIS
+
+/** Default height of the active waveform oscillation. */
+private val WAVE_HEIGHT = 24.dp
+
 /**
  * Dynamic energy-reactive waveform used for [io.github.vinaygaykar.mp1.domain.models.PlaybackWave.ENERGY].
  */
@@ -46,16 +70,17 @@ fun EnergyWaveform(
     inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
     thumbColor: Color = activeColor
 ) {
-    val waveHeight = 24.dp
     val strokePadding = 4.dp
 
     val coercedEnergy = energy.coerceIn(0f, 1f)
-    val coercedEnergyDelta = (energyDelta * 2.5f).coerceIn(0f, 1f)
 
+    // For energy <= 0.6: Speed ramps 0.25Hz -> 2.0Hz (4000ms -> 500ms), cycles stay at 1.0
+    // For energy > 0.6: Speed stays at 2.0Hz (500ms), cycles ramp from 1.0 to 3.0
     val targetCycles = if (waveCycles != DEFAULT_WAVE_CYCLES) {
         waveCycles
     } else {
-        1.0f + (coercedEnergyDelta * 2.0f)
+        val energyForCycles = ((coercedEnergy - ENERGY_SPLIT_THRESHOLD) / (1.0f - ENERGY_SPLIT_THRESHOLD)).coerceIn(0f, 1f)
+        1.0f + (energyForCycles * 2.0f)
     }
 
     val animatedCycles by animateFloatAsState(
@@ -77,25 +102,31 @@ fun EnergyWaveform(
         label = "animatedAmplitudeScale"
     )
 
-    val minFreq = 1.0f / 12000f
-    val maxFreq = 1.0f / 500f
-    val currentFreq = minFreq + ((maxFreq - minFreq) * coercedEnergy)
-    val speedMillis = (1.0f / currentFreq).toInt().coerceIn(500, 12000)
+    // Linear frequency ramp from 0.25 Hz (4000 ms) to 2.0 Hz (500 ms) over energy 0.0 -> 0.6
+    val energyForSpeed = (coercedEnergy / ENERGY_SPLIT_THRESHOLD).coerceIn(0f, 1f)
+    val currentFreq = MIN_FREQ + ((MAX_FREQ - MIN_FREQ) * energyForSpeed)
+    val currentFreqState by rememberUpdatedState(currentFreq)
 
     val safeCycles = animatedCycles.coerceAtLeast(0.1f)
-    val wavelength = waveHeight * aspectRatio.coerceIn(1.0f, 1.5f)
+    val wavelength = WAVE_HEIGHT * aspectRatio.coerceIn(1.0f, 1.5f)
     val targetWaveWidth = wavelength * safeCycles + strokePadding
 
-    val infiniteTransition = rememberInfiniteTransition(label = "waveform_energy")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * PI.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(speedMillis, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
+    var phase by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
+        var lastFrameNanos = 0L
+        while (true) {
+            withFrameNanos { frameNanos ->
+                if (lastFrameNanos != 0L) {
+                    val frameDeltaMillis = (frameNanos - lastFrameNanos) / 1_000_000f
+                    val deltaPhase = 2f * PI.toFloat() * currentFreqState * frameDeltaMillis
+                    phase = (phase + deltaPhase) % (2f * PI.toFloat())
+                }
+                lastFrameNanos = frameNanos
+            }
+        }
+    }
 
     val amplitudeMultiplier by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0f,

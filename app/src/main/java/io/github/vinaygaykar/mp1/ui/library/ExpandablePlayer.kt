@@ -871,15 +871,14 @@ fun ExpandablePlayer(
                                 if (isDraggingScrub) draggedPosition else state.positionMs
                             val (currentEnergy, currentEnergyDelta) = remember(state.audioEnergyCurve, displayPosition) {
                                 val curve = state.audioEnergyCurve
-                                if (curve != null && curve.isNotEmpty()) {
-                                    val bucketIndex = (displayPosition / AudioEnergyExtractor.ENERGY_INTERVAL_MS)
-                                        .toInt().coerceIn(0, curve.lastIndex)
+                                val bucketIndex = (displayPosition / AudioEnergyExtractor.ENERGY_INTERVAL_MS).toInt()
+                                if (curve != null && bucketIndex in curve.indices) {
                                     val curr = curve[bucketIndex]
                                     val prev = if (bucketIndex > 0) curve[bucketIndex - 1] else curr
-                                    val delta = kotlin.math.abs(curr - prev)
-                                    curr to delta
+                                    val delta = abs(curr - prev)
+                                    (curr as Float?) to delta
                                 } else {
-                                    0.5f to 0f
+                                    null to 0f
                                 }
                             }
                             val currentFrequencyFrame = remember(state.audioFrequencyCurve, displayPosition) {

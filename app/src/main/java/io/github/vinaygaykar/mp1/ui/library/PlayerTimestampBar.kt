@@ -34,7 +34,7 @@ fun PlayerTimestampBar(
     recordY: Dp,
     progress: Float,
     modifier: Modifier = Modifier,
-    energy: Float = 0.5f,
+    energy: Float? = null,
     energyDelta: Float = 0f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     minBarWidth: Dp = 140.dp,
@@ -83,20 +83,33 @@ fun PlayerTimestampBar(
             )
             when (playbackWave) {
                 PlaybackWave.ENERGY -> {
-                    EnergyWaveform(
-                        isPlaying = isPlaying,
-                        progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                        scrubFactor = scrubFactor,
-                        energy = energy,
-                        energyDelta = energyDelta,
-                        waveCycles = waveCycles,
-                        aspectRatio = selectedAspectRatio,
-                        activeColor = MaterialTheme.colorScheme.primary,
-                        inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
-                    )
+                    if (energy != null) {
+                        EnergyWaveform(
+                            isPlaying = isPlaying,
+                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                            scrubFactor = scrubFactor,
+                            energy = energy,
+                            energyDelta = energyDelta,
+                            waveCycles = waveCycles,
+                            aspectRatio = selectedAspectRatio,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                        )
+                    } else {
+                        PlaybackWaveform(
+                            isPlaying = isPlaying,
+                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                            scrubFactor = scrubFactor,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp)
+                        )
+                    }
                 }
                 PlaybackWave.SIMPLICITY -> {
                     PlaybackWaveform(
