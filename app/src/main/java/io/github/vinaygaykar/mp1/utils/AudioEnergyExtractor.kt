@@ -20,12 +20,32 @@ import kotlin.math.sqrt
 
 object AudioEnergyExtractor {
 
+    /** Timeout in microseconds for MediaCodec buffer dequeue operations. */
     private const val TIMEOUT_US = 1000L
+
+    /** Value representing 16-bit PCM integer audio encoding (AudioFormat.ENCODING_PCM_16BIT). */
     private const val ENCODING_PCM_16BIT = 2
+
+    /** Value representing 32-bit floating-point PCM audio encoding (AudioFormat.ENCODING_PCM_FLOAT). */
     private const val ENCODING_PCM_FLOAT = 4
 
-    // Window set to 250ms (0.25 seconds)
+    /** Duration in milliseconds for each RMS energy analysis window bucket (250 ms). */
     const val ENERGY_INTERVAL_MS = 250
+
+    /** Default number of buckets accumulated before emitting a progressive Flow snapshot (4 buckets = 1 second). */
+    const val DEFAULT_EMIT_BATCH_SIZE = 1000 / ENERGY_INTERVAL_MS
+
+    /** Exponential power applied to normalized RMS values to expand non-linear dynamic energy contrast. */
+    const val ENERGY_DYNAMIC_CONTRAST_POWER = 1.8
+
+    /** Fallback sample rate in Hz (CD quality) when not specified in media metadata format. */
+    private const val DEFAULT_SAMPLE_RATE_HZ = 44100
+
+    /** Fallback channel count (stereo) when not specified in media metadata format. */
+    private const val DEFAULT_CHANNEL_COUNT = 2
+
+    /** Fallback energy level emitted when processing an empty RMS dataset. */
+    private const val DEFAULT_ENERGY_FALLBACK = 0.2f
 
     @Volatile
     private var activeSongId: String? = null
@@ -53,7 +73,7 @@ object AudioEnergyExtractor {
         songId: String,
         uri: Uri,
         intervalMs: Int = ENERGY_INTERVAL_MS,
-        emitBatchSize: Int = 4
+        emitBatchSize: Int = DEFAULT_EMIT_BATCH_SIZE
     ): Flow<FloatArray> = flow {
         if (activeSongId == songId && activeEnergyCurve != null) {
             emit(activeEnergyCurve!!)
@@ -77,11 +97,11 @@ object AudioEnergyExtractor {
 
             val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
                 format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-            } else 44100
+            } else DEFAULT_SAMPLE_RATE_HZ
 
             val channelCount = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
                 format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-            } else 2
+            } else DEFAULT_CHANNEL_COUNT
 
             val samplesPerBucket = max(1, (sampleRate * channelCount * (intervalMs / 1000f)).toInt())
 
@@ -182,7 +202,7 @@ object AudioEnergyExtractor {
 
     private fun processRawRmsToEnergyCurve(rawRmsList: List<Float>): FloatArray {
         if (rawRmsList.isEmpty()) {
-            return FloatArray(1) { 0.5f }
+            return FloatArray(1) { DEFAULT_ENERGY_FALLBACK }
         }
 
         var maxRms = 0.0001f
@@ -195,7 +215,7 @@ object AudioEnergyExtractor {
         val range = max(0.0001f, maxRms - minRms)
         val normalized = FloatArray(rawRmsList.size) { i ->
             val linearNorm = ((rawRmsList[i] - minRms) / range).coerceIn(0f, 1f)
-            linearNorm.toDouble().pow(1.8).toFloat().coerceIn(0f, 1f)
+            linearNorm.toDouble().pow(ENERGY_DYNAMIC_CONTRAST_POWER).toFloat().coerceIn(0f, 1f)
         }
 
         // 3-point weighted moving average filter to eliminate frame jitter
