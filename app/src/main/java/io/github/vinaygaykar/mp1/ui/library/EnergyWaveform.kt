@@ -20,11 +20,43 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.sin
 
 const val DEFAULT_WAVE_CYCLES = 3f
+
+/** Default energy level when not provided. */
+const val DEFAULT_ENERGY_LEVEL = 0.2f
+
+/** Default aspect ratio for waveform calculations. */
+const val DEFAULT_ASPECT_RATIO = 1.5f
+
+/** Minimum allowed aspect ratio for wave width calculation. */
+private const val MIN_ASPECT_RATIO = 1.0f
+
+/** Maximum allowed aspect ratio for wave width calculation. */
+private const val MAX_ASPECT_RATIO = 1.5f
+
+/** Alpha transparency factor for the unplayed background track. */
+private const val INACTIVE_TRACK_ALPHA = 0.2f
+
+/** Extra padding added to wave canvas width bounds. */
+private val STROKE_PADDING = 4.dp
+
+/** Minimum threshold floor for wave cycle count. */
+private const val MIN_CYCLE_COUNT_FLOOR = 1f
+
+/** Constant representing 2 * PI in radians. */
+private const val TWO_PI = 6.2831855f
+
+/** Duration in milliseconds for play/pause amplitude animation transition. */
+private const val PLAYBACK_ANIM_DURATION_MS = 500
+
+/** Base maximum center-to-crest amplitude height. */
+private val BASE_MAX_AMPLITUDE = 6.dp
+
+/** Maximum radius of the circular scrubbing seek thumb head. */
+private val SCRUB_THUMB_MAX_RADIUS = 8.dp
 
 /** Fixed total height of the waveform canvas container. */
 private val CANVAS_HEIGHT = 88.dp
@@ -62,17 +94,14 @@ fun EnergyWaveform(
     progress: Float,
     scrubFactor: Float,
     modifier: Modifier = Modifier,
-    energy: Float = 0.5f,
-    energyDelta: Float = 0f,
+    energy: Float = DEFAULT_ENERGY_LEVEL,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     amplitudeScale: Float? = null,
-    aspectRatio: Float = 1.5f,
+    aspectRatio: Float = DEFAULT_ASPECT_RATIO,
     activeColor: Color = MaterialTheme.colorScheme.primary,
-    inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+    inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = INACTIVE_TRACK_ALPHA),
     thumbColor: Color = activeColor
 ) {
-    val strokePadding = 4.dp
-
     val coercedEnergy = energy.coerceIn(0f, 1f)
 
     // For energy <= 0.6: Speed ramps 0.25Hz -> 2.0Hz (4000ms -> 500ms), cycles stay at 1.0
@@ -109,9 +138,9 @@ fun EnergyWaveform(
     val currentFreq = MIN_FREQ + ((MAX_FREQ - MIN_FREQ) * energyForSpeed)
     val currentFreqState by rememberUpdatedState(currentFreq)
 
-    val safeCycles = animatedCycles.coerceAtLeast(0.1f)
-    val wavelength = WAVE_HEIGHT * aspectRatio.coerceIn(1.0f, 1.5f)
-    val targetWaveWidth = wavelength * safeCycles + strokePadding
+    val safeCycles = animatedCycles.coerceAtLeast(MIN_CYCLE_COUNT_FLOOR)
+    val wavelength = WAVE_HEIGHT * aspectRatio.coerceIn(MIN_ASPECT_RATIO, MAX_ASPECT_RATIO)
+    val targetWaveWidth = wavelength * safeCycles + STROKE_PADDING
 
     var phase by remember { mutableFloatStateOf(0f) }
 
@@ -122,8 +151,8 @@ fun EnergyWaveform(
             withFrameNanos { frameNanos ->
                 if (lastFrameNanos != 0L) {
                     val frameDeltaMillis = (frameNanos - lastFrameNanos) / 1_000_000f
-                    val deltaPhase = 2f * PI.toFloat() * currentFreqState * frameDeltaMillis
-                    phase = (phase + deltaPhase) % (2f * PI.toFloat())
+                    val deltaPhase = TWO_PI * currentFreqState * frameDeltaMillis
+                    phase = (phase + deltaPhase) % TWO_PI
                 }
                 lastFrameNanos = frameNanos
             }
@@ -132,7 +161,7 @@ fun EnergyWaveform(
 
     val amplitudeMultiplier by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0f,
-        animationSpec = tween(500),
+        animationSpec = tween(PLAYBACK_ANIM_DURATION_MS),
         label = "amplitude"
     )
 
@@ -147,8 +176,8 @@ fun EnergyWaveform(
         val strokeWidthPx = DEFAULT_STROKE_WIDTH.toPx() + SCRUB_STROKE_EXPANSION.toPx() * scrubFactor
         val halfStroke = strokeWidthPx / 2f
 
-        // 6dp center-to-crest amplitude produces a 12dp crest-to-trough peak-to-peak height
-        val baseMaxAmplitude = 6.dp.toPx()
+        // Base center-to-crest amplitude
+        val baseMaxAmplitude = BASE_MAX_AMPLITUDE.toPx()
         val maxAmplitude = baseMaxAmplitude * animatedAmplitudeScale
 
         val currentAmplitude = maxAmplitude * amplitudeMultiplier * (1f - scrubFactor)
@@ -165,7 +194,7 @@ fun EnergyWaveform(
         for (i in 0..steps) {
             val rel = i.toFloat() / steps
             val x = startX + rel * trackWidth
-            val angle = rel.toDouble() * animatedCycles * 2.0 * PI - phase.toDouble()
+            val angle = rel.toDouble() * animatedCycles * TWO_PI.toDouble() - phase.toDouble()
             val sine = sin(angle).toFloat()
             val y = centerY + sine * currentAmplitude
             if (i == 0) fullPath.moveTo(x, y) else fullPath.lineTo(x, y)
@@ -186,13 +215,13 @@ fun EnergyWaveform(
             for (i in 0..activeSteps) {
                 val rel = (i.toFloat() / steps).coerceAtMost(coercedProgress)
                 val x = startX + rel * trackWidth
-                val angle = rel.toDouble() * animatedCycles * 2.0 * PI - phase.toDouble()
+                val angle = rel.toDouble() * animatedCycles * TWO_PI.toDouble() - phase.toDouble()
                 val sine = sin(angle).toFloat()
                 val y = centerY + sine * currentAmplitude
                 if (i == 0) activePath.moveTo(x, y) else activePath.lineTo(x, y)
             }
 
-            val endAngle = coercedProgress.toDouble() * animatedCycles * 2.0 * PI - phase.toDouble()
+            val endAngle = coercedProgress.toDouble() * animatedCycles * TWO_PI.toDouble() - phase.toDouble()
             val endY = centerY + sin(endAngle).toFloat() * currentAmplitude
             activePath.lineTo(activeEndX, endY)
 
@@ -205,7 +234,7 @@ fun EnergyWaveform(
 
         // Circular Seek Head
         if (scrubFactor > 0f) {
-            val thumbRadiusPx = 8.dp.toPx() * scrubFactor
+            val thumbRadiusPx = SCRUB_THUMB_MAX_RADIUS.toPx() * scrubFactor
             val thumbX = startX + trackWidth * coercedProgress
             drawCircle(
                 color = thumbColor,
