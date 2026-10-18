@@ -15,6 +15,51 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 
+/** Alpha transparency factor for the unplayed background track. */
+private const val INACTIVE_TRACK_ALPHA = 0.2f
+
+/** Gain boost multiplier applied to raw frequency band amplitude values. */
+private const val BAND_GAIN_BOOST = 1.2f
+
+/** Canvas vertical edge padding offset. */
+private val CANVAS_PADDING = 1.dp
+
+/** Minimum maximum amplitude height floor for waveform peaks. */
+private val MIN_MAX_AMPLITUDE = 6.dp
+
+/** Normalized X position ratio along the track for Left Peak 1 (Bass). */
+private const val X_PEAK_1_RATIO = 0.166f
+
+/** Normalized X position ratio along the track for Valley 1 (Bass/Mids transition). */
+private const val X_VALLEY_1_RATIO = 0.333f
+
+/** Normalized X position ratio along the track for Middle Peak 2 (Mids). */
+private const val X_PEAK_2_RATIO = 0.500f
+
+/** Normalized X position ratio along the track for Valley 2 (Mids/Treble transition). */
+private const val X_VALLEY_2_RATIO = 0.666f
+
+/** Normalized X position ratio along the track for Right Peak 3 (Treble). */
+private const val X_PEAK_3_RATIO = 0.833f
+
+/** Dynamic scale factor determining valley depth relative to neighboring peak amplitudes. */
+private const val VALLEY_DEPTH_SCALE = 0.75f
+
+/** Tangent handle weight for start/end entry points of the waveform curve. */
+private const val BEZIER_TANGENT_WEIGHT_ENTRY = 0.5f
+
+/** Tangent handle weight for peak control points of the waveform curve. */
+private const val BEZIER_TANGENT_WEIGHT_PEAK = 0.3f
+
+/** Tangent handle weight for valley control points of the waveform curve. */
+private const val BEZIER_TANGENT_WEIGHT_VALLEY = 0.4f
+
+/** Maximum radius of the circular scrubbing seek thumb head. */
+private val SCRUB_THUMB_MAX_RADIUS = 8.dp
+
+/** Bernstein polynomial coefficient (3) for 3rd-degree cubic Bezier evaluation. */
+private const val CUBIC_BEZIER_COEFF = 3f
+
 /** Fixed total height of the waveform canvas container. */
 private val CANVAS_HEIGHT = 88.dp
 
@@ -35,12 +80,12 @@ fun FrequencyWaveform(
     frequencyFrame: FrequencyFrame,
     modifier: Modifier = Modifier,
     activeColor: Color = MaterialTheme.colorScheme.primary,
-    inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+    inactiveColor: Color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = INACTIVE_TRACK_ALPHA),
     thumbColor: Color = activeColor
 ) {
-    val targetLow = if (isPlaying) (frequencyFrame.low * 1.2f).coerceIn(0f, 1f) else 0f
-    val targetMid = if (isPlaying) (frequencyFrame.mid * 1.2f).coerceIn(0f, 1f) else 0f
-    val targetHigh = if (isPlaying) (frequencyFrame.high * 1.2f).coerceIn(0f, 1f) else 0f
+    val targetLow = if (isPlaying) (frequencyFrame.low * BAND_GAIN_BOOST).coerceIn(0f, 1f) else 0f
+    val targetMid = if (isPlaying) (frequencyFrame.mid * BAND_GAIN_BOOST).coerceIn(0f, 1f) else 0f
+    val targetHigh = if (isPlaying) (frequencyFrame.high * BAND_GAIN_BOOST).coerceIn(0f, 1f) else 0f
 
     val animSpec = spring<Float>(
         dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -68,7 +113,7 @@ fun FrequencyWaveform(
 
         // Amplitude drops to 0 when scrubbing (scrubFactor = 1f), morphing into a flat progressbar
         val morphFactor = 1f - scrubFactor
-        val baseMaxAmp = (height / 2f - halfStroke - 1.dp.toPx()).coerceAtLeast(6.dp.toPx())
+        val baseMaxAmp = (height / 2f - halfStroke - CANVAS_PADDING.toPx()).coerceAtLeast(MIN_MAX_AMPLITUDE.toPx())
         val maxAmpPx = baseMaxAmp * morphFactor
 
         val lowAmp = maxAmpPx * animatedLow
@@ -77,16 +122,16 @@ fun FrequencyWaveform(
 
         // 3 Peaks + 2 Valleys X positions along track
         val x0 = startX
-        val xPeak1 = startX + trackWidth * 0.166f
-        val xValley1 = startX + trackWidth * 0.333f
-        val xPeak2 = startX + trackWidth * 0.500f
-        val xValley2 = startX + trackWidth * 0.666f
-        val xPeak3 = startX + trackWidth * 0.833f
+        val xPeak1 = startX + trackWidth * X_PEAK_1_RATIO
+        val xValley1 = startX + trackWidth * X_VALLEY_1_RATIO
+        val xPeak2 = startX + trackWidth * X_PEAK_2_RATIO
+        val xValley2 = startX + trackWidth * X_VALLEY_2_RATIO
+        val xPeak3 = startX + trackWidth * X_PEAK_3_RATIO
         val xEnd = endX
 
         // Dynamic Valley Depths: Valleys plunge deep on heavy beats and rise back up on quiet moments
-        val valley1Depth = maxAmpPx * ((animatedLow + animatedMid) / 2f).coerceIn(0f, 1f) * 0.75f
-        val valley2Depth = maxAmpPx * ((animatedMid + animatedHigh) / 2f).coerceIn(0f, 1f) * 0.75f
+        val valley1Depth = maxAmpPx * ((animatedLow + animatedMid) / 2f).coerceIn(0f, 1f) * VALLEY_DEPTH_SCALE
+        val valley2Depth = maxAmpPx * ((animatedMid + animatedHigh) / 2f).coerceIn(0f, 1f) * VALLEY_DEPTH_SCALE
 
         // Key Y coordinates (Up is negative delta from centerY, valleys dip dynamically down)
         val y0 = centerY
@@ -103,43 +148,43 @@ fun FrequencyWaveform(
 
             // Segment 1: Start -> Left Peak (Low)
             cubicTo(
-                x0 + (xPeak1 - x0) * 0.5f, y0,
-                xPeak1 - (xPeak1 - x0) * 0.3f, yPeak1,
+                x0 + (xPeak1 - x0) * BEZIER_TANGENT_WEIGHT_ENTRY, y0,
+                xPeak1 - (xPeak1 - x0) * BEZIER_TANGENT_WEIGHT_PEAK, yPeak1,
                 xPeak1, yPeak1
             )
 
             // Segment 2: Left Peak -> Valley 1
             cubicTo(
-                xPeak1 + (xValley1 - xPeak1) * 0.4f, yPeak1,
-                xValley1 - (xValley1 - xPeak1) * 0.4f, yValley1,
+                xPeak1 + (xValley1 - xPeak1) * BEZIER_TANGENT_WEIGHT_VALLEY, yPeak1,
+                xValley1 - (xValley1 - xPeak1) * BEZIER_TANGENT_WEIGHT_VALLEY, yValley1,
                 xValley1, yValley1
             )
 
             // Segment 3: Valley 1 -> Middle Peak (Mid)
             cubicTo(
-                xValley1 + (xPeak2 - xValley1) * 0.4f, yValley1,
-                xPeak2 - (xPeak2 - xValley1) * 0.4f, yPeak2,
+                xValley1 + (xPeak2 - xValley1) * BEZIER_TANGENT_WEIGHT_VALLEY, yValley1,
+                xPeak2 - (xPeak2 - xValley1) * BEZIER_TANGENT_WEIGHT_VALLEY, yPeak2,
                 xPeak2, yPeak2
             )
 
             // Segment 4: Middle Peak -> Valley 2
             cubicTo(
-                xPeak2 + (xValley2 - xPeak2) * 0.4f, yPeak2,
-                xValley2 - (xValley2 - xPeak2) * 0.4f, yValley2,
+                xPeak2 + (xValley2 - xPeak2) * BEZIER_TANGENT_WEIGHT_VALLEY, yPeak2,
+                xValley2 - (xValley2 - xPeak2) * BEZIER_TANGENT_WEIGHT_VALLEY, yValley2,
                 xValley2, yValley2
             )
 
             // Segment 5: Valley 2 -> Right Peak (High)
             cubicTo(
-                xValley2 + (xPeak3 - xValley2) * 0.4f, yValley2,
-                xPeak3 - (xPeak3 - xValley2) * 0.4f, yPeak3,
+                xValley2 + (xPeak3 - xValley2) * BEZIER_TANGENT_WEIGHT_VALLEY, yValley2,
+                xPeak3 - (xPeak3 - xValley2) * BEZIER_TANGENT_WEIGHT_VALLEY, yPeak3,
                 xPeak3, yPeak3
             )
 
             // Segment 6: Right Peak -> End
             cubicTo(
-                xPeak3 + (xEnd - xPeak3) * 0.3f, yPeak3,
-                xEnd - (xEnd - xPeak3) * 0.5f, yEnd,
+                xPeak3 + (xEnd - xPeak3) * BEZIER_TANGENT_WEIGHT_PEAK, yPeak3,
+                xEnd - (xEnd - xPeak3) * BEZIER_TANGENT_WEIGHT_ENTRY, yEnd,
                 xEnd, yEnd
             )
         }
@@ -186,7 +231,7 @@ fun FrequencyWaveform(
 
         // Draw circular seek head thumb when scrubbing
         if (scrubFactor > 0f) {
-            val thumbRadiusPx = 8.dp.toPx() * scrubFactor
+            val thumbRadiusPx = SCRUB_THUMB_MAX_RADIUS.toPx() * scrubFactor
             val thumbX = startX + trackWidth * coercedProgress
             val thumbY = centerY
             drawCircle(
@@ -209,28 +254,28 @@ private fun evaluate3PeakCurveY(
     yEnd: Float
 ): Float {
     return when {
-        rel <= 0.166f -> {
-            val s = rel / 0.166f
+        rel <= X_PEAK_1_RATIO -> {
+            val s = rel / X_PEAK_1_RATIO
             cubicBezier1D(y0, y0, yP1, yP1, s)
         }
-        rel <= 0.333f -> {
-            val s = (rel - 0.166f) / 0.167f
+        rel <= X_VALLEY_1_RATIO -> {
+            val s = (rel - X_PEAK_1_RATIO) / (X_VALLEY_1_RATIO - X_PEAK_1_RATIO)
             cubicBezier1D(yP1, yP1, yV1, yV1, s)
         }
-        rel <= 0.500f -> {
-            val s = (rel - 0.333f) / 0.167f
+        rel <= X_PEAK_2_RATIO -> {
+            val s = (rel - X_VALLEY_1_RATIO) / (X_PEAK_2_RATIO - X_VALLEY_1_RATIO)
             cubicBezier1D(yV1, yV1, yP2, yP2, s)
         }
-        rel <= 0.666f -> {
-            val s = (rel - 0.500f) / 0.166f
+        rel <= X_VALLEY_2_RATIO -> {
+            val s = (rel - X_PEAK_2_RATIO) / (X_VALLEY_2_RATIO - X_PEAK_2_RATIO)
             cubicBezier1D(yP2, yP2, yV2, yV2, s)
         }
-        rel <= 0.833f -> {
-            val s = (rel - 0.666f) / 0.167f
+        rel <= X_PEAK_3_RATIO -> {
+            val s = (rel - X_VALLEY_2_RATIO) / (X_PEAK_3_RATIO - X_VALLEY_2_RATIO)
             cubicBezier1D(yV2, yV2, yP3, yP3, s)
         }
         else -> {
-            val s = (rel - 0.833f) / 0.167f
+            val s = (rel - X_PEAK_3_RATIO) / (1f - X_PEAK_3_RATIO)
             cubicBezier1D(yP3, yP3, yEnd, yEnd, s)
         }
     }
@@ -243,5 +288,5 @@ private fun cubicBezier1D(p0: Float, p1: Float, p2: Float, p3: Float, t: Float):
     val uuu = uu * u
     val ttt = tt * t
 
-    return uuu * p0 + 3f * uu * t * p1 + 3f * u * tt * p2 + ttt * p3
+    return uuu * p0 + CUBIC_BEZIER_COEFF * uu * t * p1 + CUBIC_BEZIER_COEFF * u * tt * p2 + ttt * p3
 }
