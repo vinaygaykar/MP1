@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
+import kotlin.math.ceil
 import kotlin.math.sin
 
 const val DEFAULT_WAVE_CYCLES = 3f
@@ -75,12 +76,13 @@ fun EnergyWaveform(
     val coercedEnergy = energy.coerceIn(0f, 1f)
 
     // For energy <= 0.6: Speed ramps 0.25Hz -> 2.0Hz (4000ms -> 500ms), cycles stay at 1.0
-    // For energy > 0.6: Speed stays at 2.0Hz (500ms), cycles ramp from 1.0 to 3.0
+    // For energy > 0.6: Speed stays at 2.0Hz (500ms), cycles ramp from 1.0 to 3.0, clamped up (ceiled) to 0.5 steps
     val targetCycles = if (waveCycles != DEFAULT_WAVE_CYCLES) {
         waveCycles
     } else {
         val energyForCycles = ((coercedEnergy - ENERGY_SPLIT_THRESHOLD) / (1.0f - ENERGY_SPLIT_THRESHOLD)).coerceIn(0f, 1f)
-        1.0f + (energyForCycles * 2.0f)
+        val rawCycles = 1.0f + (energyForCycles * 2.0f)
+        ceil(rawCycles / 0.5f) * 0.5f
     }
 
     val animatedCycles by animateFloatAsState(
