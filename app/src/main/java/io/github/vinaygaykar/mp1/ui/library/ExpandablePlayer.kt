@@ -28,8 +28,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
@@ -525,13 +527,74 @@ fun ExpandablePlayer(
             anchoredDraggableState.updateAnchors(anchors)
         }
 
-        BackHandler(enabled = anchoredDraggableState.currentValue != DragValue.COLLAPSED) {
+        val queueAnchors = remember(screenHeightPx) {
+            DraggableAnchors {
+                DragValue.COLLAPSED at screenHeightPx
+                DragValue.EXPANDED at 0f
+            }
+        }
+
+        val queueAnchoredDraggableState = remember {
+            AnchoredDraggableState(
+                initialValue = DragValue.COLLAPSED,
+                positionalThreshold = { distance: Float -> distance * 0.4f },
+                velocityThreshold = { with(density) { 100.dp.toPx() } },
+                snapAnimationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                decayAnimationSpec = splineBasedDecay
+            )
+        }
+
+        SideEffect {
+            queueAnchoredDraggableState.updateAnchors(queueAnchors)
+        }
+
+        LaunchedEffect(showQueue) {
+            if (showQueue) {
+                if (queueAnchoredDraggableState.targetValue != DragValue.EXPANDED) {
+                    queueAnchoredDraggableState.animateTo(DragValue.EXPANDED)
+                }
+            } else {
+                if (queueAnchoredDraggableState.targetValue != DragValue.COLLAPSED) {
+                    queueAnchoredDraggableState.animateTo(DragValue.COLLAPSED)
+                }
+            }
+        }
+
+        LaunchedEffect(queueAnchoredDraggableState) {
+            snapshotFlow { queueAnchoredDraggableState.currentValue to queueAnchoredDraggableState.targetValue }
+                .collect { (current, target) ->
+                    if (current == DragValue.COLLAPSED && target == DragValue.COLLAPSED) {
+                        if (showQueue) showQueue = false
+                    } else if (current == DragValue.EXPANDED || target == DragValue.EXPANDED) {
+                        if (!showQueue) showQueue = true
+                    }
+                }
+        }
+
+        val queueOffset = try {
+            queueAnchoredDraggableState.requireOffset()
+        } catch (_: Exception) {
+            if (showQueue) 0f else screenHeightPx
+        }
+
+        val queueProgress = if (screenHeightPx > 0f) {
+            ((screenHeightPx - queueOffset.coerceAtLeast(0f)) / screenHeightPx).coerceIn(0f, 1f)
+        } else {
+            if (showQueue) 1f else 0f
+        }
+
+        BackHandler(enabled = anchoredDraggableState.currentValue != DragValue.COLLAPSED || queueProgress > 0f || showQueue) {
             if (showArtistsDialog) {
                 showArtistsDialog = false
             } else if (showLyrics) {
                 showLyrics = false
-            } else if (showQueue) {
-                showQueue = false
+            } else if (queueProgress > 0f || showQueue) {
+                scope.launch {
+                    queueAnchoredDraggableState.animateTo(DragValue.COLLAPSED)
+                }
             } else {
                 scope.launch { anchoredDraggableState.animateTo(DragValue.COLLAPSED) }
             }
@@ -667,35 +730,11 @@ fun ExpandablePlayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(screenHeight)
-                            .pointerInput(progress, showQueue, showLyrics) {
-                                if (progress > 0.8f && !showQueue && !showLyrics) {
-                                    awaitEachGesture {
-                                        val down = awaitFirstDown(requireUnconsumed = false)
-                                        var totalY = 0f
-                                        val pointerId = down.id
-                                        do {
-                                            val event = awaitPointerEvent()
-                                            val pointer =
-                                                event.changes.find { it.id == pointerId } ?: break
-                                            if (pointer.pressed) {
-                                                val deltaY = pointer.positionChange().y
-                                                if (deltaY < 0f) {
-                                                    totalY += deltaY
-                                                    if (totalY < -50f) {
-                                                        showQueue = true
-                                                        pointer.consume()
-                                                        break
-                                                    }
-                                                } else if (deltaY > 10f) {
-                                                    break
-                                                }
-                                            } else {
-                                                break
-                                            }
-                                        } while (event.changes.any { it.pressed })
-                                    }
-                                }
-                            }
+                            .anchoredDraggable(
+                                state = queueAnchoredDraggableState,
+                                orientation = Orientation.Vertical,
+                                enabled = progress > 0.8f && !showLyrics && !showArtistsDialog
+                            )
                     ) {
                         // Expanded Content
                         if (progress > 0f) {
@@ -943,7 +982,7 @@ fun ExpandablePlayer(
                                 CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
                                     HorizontalPager(
                                         state = pagerState,
-                                        userScrollEnabled = !showQueue && !showLyrics && !showArtistsDialog,
+                                        userScrollEnabled = !showQueue && queueProgress == 0f && !showLyrics && !showArtistsDialog,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .nestedScroll(boundaryNestedScrollConnection)
@@ -960,7 +999,7 @@ fun ExpandablePlayer(
                                                         val artworkRadiusPx =
                                                             with(density) { (artworkSize / 2).toPx() }
 
-                                                        if (distFromCenter > artworkRadiusPx) {
+                                                        if (distFromCenter > artworkRadiusPx && queueProgress == 0f && !showQueue) {
                                                             dragStarted = true
                                                             wasPlayingOnDragStart = currentState.isPlaying
                                                             draggedPosition = currentState.positionMs
@@ -1140,12 +1179,43 @@ fun ExpandablePlayer(
                         }
 
                         // Queue Overlay Sheet
-                        if (showQueue) {
-                            QueueBottomSheet(
-                                state = state,
-                                actions = actions,
-                                onDismissRequest = { showQueue = false }
+                        if (queueProgress > 0f || showQueue) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = queueProgress }
+                                    .background(Color.Black.copy(alpha = 0.5f))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        enabled = queueProgress > 0f
+                                    ) {
+                                        scope.launch {
+                                            queueAnchoredDraggableState.animateTo(DragValue.COLLAPSED)
+                                        }
+                                    }
                             )
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .offset { IntOffset(0, queueOffset.roundToInt()) }
+                                    .anchoredDraggable(queueAnchoredDraggableState, Orientation.Vertical),
+                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                tonalElevation = 8.dp
+                            ) {
+                                QueueBottomSheetContent(
+                                    state = state,
+                                    actions = actions,
+                                    onDismiss = {
+                                        scope.launch {
+                                            queueAnchoredDraggableState.animateTo(DragValue.COLLAPSED)
+                                        }
+                                    }
+                                )
+                            }
                         }
 
                         // Song Artists Dialog

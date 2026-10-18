@@ -89,7 +89,6 @@ fun PlayerTimestampBar(
                             progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
                             scrubFactor = scrubFactor,
                             energy = energy,
-                            energyDelta = energyDelta,
                             waveCycles = waveCycles,
                             aspectRatio = selectedAspectRatio,
                             activeColor = MaterialTheme.colorScheme.primary,

@@ -78,7 +78,7 @@ fun QueueBottomSheet(
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = modifier.fillMaxSize()
         ) {
-            QueueBottomSheetContent(state = state, actions = actions)
+            QueueBottomSheetContent(state = state, actions = actions, onDismiss = onDismissRequest)
         }
     } else {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -91,7 +91,7 @@ fun QueueBottomSheet(
             scrimColor = Color.Black.copy(alpha = 0.5f),
             modifier = modifier.fillMaxHeight()
         ) {
-            QueueBottomSheetContent(state = state, actions = actions)
+            QueueBottomSheetContent(state = state, actions = actions, onDismiss = onDismissRequest)
         }
     }
 }
@@ -101,7 +101,8 @@ fun QueueBottomSheet(
 fun QueueBottomSheetContent(
     state: PlayerUiState,
     actions: PlayerActions,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {}
 ) {
     var selectedIndices by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedIndices.isNotEmpty()
@@ -124,40 +125,153 @@ fun QueueBottomSheetContent(
     }
 
     Column(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
     ) {
-        if (state.queue.isEmpty()) {
-            // Header Bar
-            Row(
+        // Top Header Surface (Fixed at top, outside LazyColumn so dragging down here always closes sheet)
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(vertical = 4.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Top Drag Handle Indicator
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Playing Queue",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                    Box(
+                        modifier = Modifier
+                            .size(width = 36.dp, height = 4.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                     )
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                }
+
+                // "Playing Queue" Title & Track Count
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "0",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            text = "Playing Queue",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ) {
+                            Text(
+                                text = "${state.queue.size}",
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Selection or Queue Actions Row
+                if (isSelectionMode) {
+                    SelectionActionRow(
+                        selectedCount = selectedIndices.size,
+                        onSelectAll = { selectedIndices = state.queue.indices.toSet() },
+                        onDeselect = { selectedIndices = emptySet() },
+                        onOptionsClick = { showQueueMultiSelectionSheet = true },
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                } else if (state.queue.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val isShuffleEnabled = state.queue.size > 1
+                        val shuffleContainerColor by animateColorAsState(
+                            targetValue = if (state.isShuffleOn) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerLowest
+                            },
+                            label = "shuffle_btn_bg"
+                        )
+                        val shuffleContentColor by animateColorAsState(
+                            targetValue = if (state.isShuffleOn) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            label = "shuffle_btn_content"
+                        )
+
+                        // Clear All Button (Left)
+                        OutlinedButton(
+                            onClick = { actions.clearQueue() },
+                            enabled = state.queue.size > 1,
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.ClearAll,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Clear All",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        // Shuffle Button (Right)
+                        FilledTonalButton(
+                            onClick = { actions.onShuffleToggle() },
+                            enabled = isShuffleEnabled,
+                            shape = CircleShape,
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = shuffleContainerColor,
+                                contentColor = shuffleContentColor,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.5f),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (state.isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (state.isShuffleOn) "Shuffle On" else "Shuffle Off",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
+        }
 
+        // Queue Body: Songs List or Empty State
+        if (state.queue.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -174,48 +288,15 @@ fun QueueBottomSheetContent(
             val lazyListState = rememberLazyListState()
             var draggedKey by remember { mutableStateOf<String?>(null) }
             var dragOffsetY by remember { mutableFloatStateOf(0f) }
-            var stickyHeaderHeightPx by remember { mutableIntStateOf(0) }
             val coroutineScope = rememberCoroutineScope()
 
-            var isPlayingQueueHeaderVisible by remember { mutableStateOf(true) }
-
-            val nestedScrollConnection = remember {
-                object : NestedScrollConnection {
-                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                        val delta = available.y
-                        if (delta < -12f) {
-                            isPlayingQueueHeaderVisible = false
-                        } else if (delta > 12f) {
-                            isPlayingQueueHeaderVisible = true
-                        }
-                        return Offset.Zero
-                    }
-                }
-            }
-
-            val isAtTop by remember {
-                derivedStateOf {
-                    lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset == 0
-                }
-            }
-
-            val showPlayingQueueHeader = isPlayingQueueHeaderVisible || isAtTop
-
             var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
-            val density = LocalDensity.current
-            val extraOffsetPx = remember(density) { with(density) { 12.dp.roundToPx() } }
 
             // Scroll to current playing song ONCE when sheet opens
-            LaunchedEffect(stickyHeaderHeightPx, state.currentIndex, state.queue.size) {
+            LaunchedEffect(state.currentIndex, state.queue.size) {
                 if (!hasScrolledToInitialPosition && state.currentIndex in state.queue.indices) {
-                    if (stickyHeaderHeightPx > 0) {
-                        val scrollOffset = -(stickyHeaderHeightPx + extraOffsetPx)
-                        lazyListState.scrollToItem(
-                            index = state.currentIndex + 1,
-                            scrollOffset = scrollOffset
-                        )
-                        hasScrolledToInitialPosition = true
-                    }
+                    lazyListState.scrollToItem(index = state.currentIndex)
+                    hasScrolledToInitialPosition = true
                 }
             }
 
@@ -238,149 +319,10 @@ fun QueueBottomSheetContent(
             ) {
                 LazyColumn(
                     state = lazyListState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(nestedScrollConnection),
-                    contentPadding = PaddingValues(top = 0.dp, bottom = 12.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    // Header: Action Row & Animated "Playing Queue" Title (Sticky Header)
-                    stickyHeader(key = "header_actions") {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onGloballyPositioned { layoutCoordinates ->
-                                    stickyHeaderHeightPx = layoutCoordinates.size.height
-                                }
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                AnimatedVisibility(
-                                    visible = showPlayingQueueHeader,
-                                    enter = expandVertically() + fadeIn(),
-                                    exit = shrinkVertically() + fadeOut()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                text = "Playing Queue",
-                                                style = MaterialTheme.typography.titleLarge,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                            ) {
-                                                Text(
-                                                    text = "${state.queue.size}",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (isSelectionMode) {
-                                    SelectionActionRow(
-                                        selectedCount = selectedIndices.size,
-                                        onSelectAll = { selectedIndices = state.queue.indices.toSet() },
-                                        onDeselect = { selectedIndices = emptySet() },
-                                        onOptionsClick = { showQueueMultiSelectionSheet = true },
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    )
-                                } else {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        val isShuffleEnabled = state.queue.size > 1
-                                        val shuffleContainerColor by animateColorAsState(
-                                            targetValue = if (state.isShuffleOn) {
-                                                MaterialTheme.colorScheme.primaryContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.surfaceContainerLowest
-                                            },
-                                            label = "shuffle_btn_bg"
-                                        )
-                                        val shuffleContentColor by animateColorAsState(
-                                            targetValue = if (state.isShuffleOn) {
-                                                MaterialTheme.colorScheme.onPrimaryContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurface
-                                            },
-                                            label = "shuffle_btn_content"
-                                        )
-
-                                        // Clear All Button (Left)
-                                        OutlinedButton(
-                                            onClick = { actions.clearQueue() },
-                                            enabled = state.queue.size > 1,
-                                            shape = CircleShape,
-                                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.ClearAll,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "Clear All",
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-
-                                        // Shuffle Button (Right)
-                                        FilledTonalButton(
-                                            onClick = { actions.onShuffleToggle() },
-                                            enabled = isShuffleEnabled,
-                                            shape = CircleShape,
-                                            colors = ButtonDefaults.filledTonalButtonColors(
-                                                containerColor = shuffleContainerColor,
-                                                contentColor = shuffleContentColor,
-                                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.5f),
-                                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                            ),
-                                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (state.isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = if (state.isShuffleOn) "Shuffle On" else "Shuffle Off",
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Queue Songs
                     itemsIndexed(
                         items = state.queue,
                         key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
@@ -413,22 +355,20 @@ fun QueueBottomSheetContent(
                                 val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
                                 val listIndex = itemKeys.indexOf(currentKey)
                                 if (listIndex == -1) return@QueueItemRow
-                                val lazyListIndex = listIndex + 1
 
-                                val draggedItemInfo = visibleItems.firstOrNull { it.index == lazyListIndex }
+                                val draggedItemInfo = visibleItems.firstOrNull { it.index == listIndex }
                                 if (draggedItemInfo != null) {
                                     val draggedItemTop = draggedItemInfo.offset + dragOffsetY
                                     val draggedItemCenter = draggedItemTop + draggedItemInfo.size / 2f
 
                                     val targetItem = visibleItems.firstOrNull { itemInfo ->
-                                        itemInfo.index >= 1 &&
-                                                itemInfo.index != lazyListIndex &&
+                                        itemInfo.index != listIndex &&
                                                 draggedItemCenter >= itemInfo.offset &&
                                                 draggedItemCenter <= (itemInfo.offset + itemInfo.size)
                                     }
 
                                     if (targetItem != null) {
-                                        val targetQueueIndex = targetItem.index - 1
+                                        val targetQueueIndex = targetItem.index
                                         actions.moveQueueItem(listIndex, targetQueueIndex)
                                         dragOffsetY += (draggedItemInfo.offset - targetItem.offset)
                                     }
