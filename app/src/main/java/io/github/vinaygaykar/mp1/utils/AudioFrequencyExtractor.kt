@@ -7,8 +7,12 @@ import android.media.MediaFormat
 import android.net.Uri
 import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.nio.ByteBuffer
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.last
 import java.nio.ByteOrder
 import kotlin.math.cos
 import kotlin.math.max
@@ -25,7 +29,6 @@ data class FrequencyFrame(
 
 object AudioFrequencyExtractor {
 
-    private const val TIMEOUT_US = 1000L
     private const val ENCODING_PCM_16BIT = 2
     private const val ENCODING_PCM_FLOAT = 4
 
@@ -47,27 +50,38 @@ object AudioFrequencyExtractor {
         activeFrequencyCurve = null
     }
 
-    suspend fun extractFrequency(
+    /**
+     * Extracts frequency frames progressively as a Flow, emitting updated arrays
+     * of buckets as soon as they become available during decoding.
+     *
+     * @param emitBatchSize How many buckets to accumulate before emitting a progressive snapshot.
+     */
+    fun extractFrequencyFlow(
         context: Context,
         songId: String,
         uri: Uri,
-        intervalMs: Int = FREQUENCY_INTERVAL_MS
-    ): Result<Array<FrequencyFrame>> = withContext(Dispatchers.IO) {
+        intervalMs: Int = FREQUENCY_INTERVAL_MS,
+        emitBatchSize: Int = 4
+    ): Flow<Array<FrequencyFrame>> = flow {
         if (activeSongId == songId && activeFrequencyCurve != null) {
-            return@withContext Result.success(activeFrequencyCurve!!)
+            emit(activeFrequencyCurve!!)
+            return@flow
         }
 
-        runCatching {
-            val extractor = MediaExtractor()
-            extractor.setDataSource(context, uri, null)
+        var extractor: MediaExtractor? = null
+        var decoder: MediaCodec? = null
 
-            val trackIndex = findAudioTrack(extractor)
+        try {
+            val ext = MediaExtractor()
+            extractor = ext
+            ext.setDataSource(context, uri, null)
+
+            val trackIndex = findAudioTrack(ext)
             if (trackIndex == -1) {
-                extractor.release()
                 error("No audio track found in media file")
             }
-            extractor.selectTrack(trackIndex)
-            val format = extractor.getTrackFormat(trackIndex)
+            ext.selectTrack(trackIndex)
+            val format = ext.getTrackFormat(trackIndex)
 
             val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
                 format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
@@ -77,136 +91,185 @@ object AudioFrequencyExtractor {
                 format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
             } else 2
 
-            val samplesPerBucket = max(1, (sampleRate * channelCount * (intervalMs / 1000f)).toInt())
+            // Mono downmixing means sampleRate samples per second across time
+            val samplesPerBucket = max(1, (sampleRate * (intervalMs / 1000f)).toInt())
 
             val mime = format.getString(MediaFormat.KEY_MIME) ?: error("MIME type not found")
-            val decoder = MediaCodec.createDecoderByType(mime)
-            decoder.configure(format, null, null, 0)
-            decoder.start()
+            val dec = MediaCodec.createDecoderByType(mime)
+            decoder = dec
+            dec.configure(format, null, null, 0)
+            dec.start()
 
-            // Initialize Biquad Filters for Low, Mid, High bands
-            val lowFilter = BiquadFilter.lowPass(sampleRate.toDouble(), 250.0)
-            val midFilter = BiquadFilter.bandPass(sampleRate.toDouble(), 1000.0, 1.0)
-            val highFilter = BiquadFilter.highPass(sampleRate.toDouble(), 4000.0)
+            val lowFilter = BiquadFilter.lowPass(sampleRate.toFloat(), 250f)
+            val midFilter = BiquadFilter.bandPass(sampleRate.toFloat(), 1000f, 1f)
+            val highFilter = BiquadFilter.highPass(sampleRate.toFloat(), 4000f)
 
             val rawFrames = mutableListOf<Triple<Float, Float, Float>>()
             val bufferInfo = MediaCodec.BufferInfo()
-            var isEndOfStream = false
 
-            var sumLowSq = 0.0
-            var sumMidSq = 0.0
-            var sumHighSq = 0.0
+            var sumLowSq = 0f
+            var sumMidSq = 0f
+            var sumHighSq = 0f
             var sampleCount = 0
 
-            while (!isEndOfStream) {
-                val inputBufferIndex = decoder.dequeueInputBuffer(TIMEOUT_US)
-                if (inputBufferIndex >= 0) {
-                    val inputBuffer = decoder.getInputBuffer(inputBufferIndex)
-                    if (inputBuffer == null) {
-                        decoder.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                        isEndOfStream = true
-                    } else {
-                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                        if (sampleSize < 0) {
-                            decoder.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            isEndOfStream = true
+            val pcmEncoding = if (format.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+                format.getInteger(MediaFormat.KEY_PCM_ENCODING)
+            } else ENCODING_PCM_16BIT
+
+            var isExtractorEOS = false
+            var isDecoderEOS = false
+
+            val invChannelCount = 1f / channelCount
+            val invShortMax = 1f / Short.MAX_VALUE
+
+            while (!isDecoderEOS) {
+                currentCoroutineContext().ensureActive()
+
+                if (!isExtractorEOS) {
+                    val inputBufferIndex = dec.dequeueInputBuffer(0L)
+                    if (inputBufferIndex >= 0) {
+                        val inputBuffer = dec.getInputBuffer(inputBufferIndex)
+                        if (inputBuffer == null) {
+                            dec.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            isExtractorEOS = true
                         } else {
-                            decoder.queueInputBuffer(inputBufferIndex, 0, sampleSize, extractor.sampleTime, 0)
-                            extractor.advance()
+                            val sampleSize = ext.readSampleData(inputBuffer, 0)
+                            if (sampleSize < 0) {
+                                dec.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                                isExtractorEOS = true
+                            } else {
+                                dec.queueInputBuffer(inputBufferIndex, 0, sampleSize, ext.sampleTime, 0)
+                                ext.advance()
+                            }
                         }
                     }
                 }
 
-                var outputBufferIndex = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
+                var outputBufferIndex = dec.dequeueOutputBuffer(bufferInfo, 100L)
                 while (outputBufferIndex >= 0) {
-                    val outputBuffer = decoder.getOutputBuffer(outputBufferIndex)
+                    if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        isDecoderEOS = true
+                    }
+                    val outputBuffer = dec.getOutputBuffer(outputBufferIndex)
                     if (outputBuffer != null && bufferInfo.size > 0) {
-                        val samples = byteBufferToFloats(outputBuffer, bufferInfo, format)
-                        for (sample in samples) {
-                            val lowSample = lowFilter.process(sample.toDouble())
-                            val midSample = midFilter.process(sample.toDouble())
-                            val highSample = highFilter.process(sample.toDouble())
+                        val dup = outputBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+                        val startPos = bufferInfo.offset.coerceAtLeast(0)
+                        val endPos = (bufferInfo.offset + bufferInfo.size).coerceAtMost(outputBuffer.capacity())
 
-                            sumLowSq += lowSample * lowSample
-                            sumMidSq += midSample * midSample
-                            sumHighSq += highSample * highSample
-                            sampleCount++
+                        if (startPos < endPos) {
+                            dup.position(startPos)
+                            dup.limit(endPos)
 
-                            if (sampleCount >= samplesPerBucket) {
-                                val rmsLow = sqrt(sumLowSq / sampleCount).toFloat()
-                                val rmsMid = sqrt(sumMidSq / sampleCount).toFloat()
-                                val rmsHigh = sqrt(sumHighSq / sampleCount).toFloat()
+                            when (pcmEncoding) {
+                                ENCODING_PCM_FLOAT -> {
+                                    val floatBuffer = dup.asFloatBuffer()
+                                    val frameCount = floatBuffer.remaining() / channelCount
+                                    for (f in 0 until frameCount) {
+                                        var sum = 0f
+                                        for (c in 0 until channelCount) {
+                                            sum += floatBuffer.get()
+                                        }
+                                        val sample = sum * invChannelCount
 
-                                rawFrames.add(Triple(rmsLow, rmsMid, rmsHigh))
+                                        val lowSample = lowFilter.process(sample)
+                                        val midSample = midFilter.process(sample)
+                                        val highSample = highFilter.process(sample)
 
-                                sumLowSq = 0.0
-                                sumMidSq = 0.0
-                                sumHighSq = 0.0
-                                sampleCount = 0
+                                        sumLowSq += lowSample * lowSample
+                                        sumMidSq += midSample * midSample
+                                        sumHighSq += highSample * highSample
+                                        sampleCount++
+
+                                        if (sampleCount >= samplesPerBucket) {
+                                            val rmsLow = sqrt(sumLowSq / sampleCount)
+                                            val rmsMid = sqrt(sumMidSq / sampleCount)
+                                            val rmsHigh = sqrt(sumHighSq / sampleCount)
+                                            rawFrames.add(Triple(rmsLow, rmsMid, rmsHigh))
+
+                                            sumLowSq = 0f
+                                            sumMidSq = 0f
+                                            sumHighSq = 0f
+                                            sampleCount = 0
+
+                                            if (rawFrames.size == 1 || rawFrames.size % emitBatchSize == 0) {
+                                                emit(processRawFramesToFrequencyFrames(rawFrames))
+                                            }
+                                        }
+                                    }
+                                }
+                                else -> { // ENCODING_PCM_16BIT
+                                    val shortBuffer = dup.asShortBuffer()
+                                    val frameCount = shortBuffer.remaining() / channelCount
+                                    for (f in 0 until frameCount) {
+                                        var sum = 0f
+                                        for (c in 0 until channelCount) {
+                                            sum += shortBuffer.get()
+                                        }
+                                        val sample = sum * invChannelCount * invShortMax
+
+                                        val lowSample = lowFilter.process(sample)
+                                        val midSample = midFilter.process(sample)
+                                        val highSample = highFilter.process(sample)
+
+                                        sumLowSq += lowSample * lowSample
+                                        sumMidSq += midSample * midSample
+                                        sumHighSq += highSample * highSample
+                                        sampleCount++
+
+                                        if (sampleCount >= samplesPerBucket) {
+                                            val rmsLow = sqrt(sumLowSq / sampleCount)
+                                            val rmsMid = sqrt(sumMidSq / sampleCount)
+                                            val rmsHigh = sqrt(sumHighSq / sampleCount)
+                                            rawFrames.add(Triple(rmsLow, rmsMid, rmsHigh))
+
+                                            sumLowSq = 0f
+                                            sumMidSq = 0f
+                                            sumHighSq = 0f
+                                            sampleCount = 0
+
+                                            if (rawFrames.size == 1 || rawFrames.size % emitBatchSize == 0) {
+                                                emit(processRawFramesToFrequencyFrames(rawFrames))
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    decoder.releaseOutputBuffer(outputBufferIndex, false)
-                    outputBufferIndex = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
+                    dec.releaseOutputBuffer(outputBufferIndex, false)
+                    if (!isDecoderEOS) {
+                        outputBufferIndex = dec.dequeueOutputBuffer(bufferInfo, 0L)
+                    } else {
+                        outputBufferIndex = MediaCodec.INFO_TRY_AGAIN_LATER
+                    }
                 }
             }
 
             if (sampleCount > 0) {
-                val rmsLow = sqrt(sumLowSq / sampleCount).toFloat()
-                val rmsMid = sqrt(sumMidSq / sampleCount).toFloat()
-                val rmsHigh = sqrt(sumHighSq / sampleCount).toFloat()
+                val rmsLow = sqrt(sumLowSq / sampleCount)
+                val rmsMid = sqrt(sumMidSq / sampleCount)
+                val rmsHigh = sqrt(sumHighSq / sampleCount)
                 rawFrames.add(Triple(rmsLow, rmsMid, rmsHigh))
             }
 
-            decoder.stop()
-            decoder.release()
-            extractor.release()
-
-            if (rawFrames.isEmpty()) {
-                val defaultArray = arrayOf(FrequencyFrame(0.5f, 0.5f, 0.5f))
-                return@runCatching defaultArray
-            }
-
-            // Normalization
-            var maxLow = 0.0001f; var minLow = Float.MAX_VALUE
-            var maxMid = 0.0001f; var minMid = Float.MAX_VALUE
-            var maxHigh = 0.0001f; var minHigh = Float.MAX_VALUE
-
-            for ((l, m, h) in rawFrames) {
-                if (l > maxLow) maxLow = l; if (l < minLow) minLow = l
-                if (m > maxMid) maxMid = m; if (m < minMid) minMid = m
-                if (h > maxHigh) maxHigh = h; if (h < minHigh) minHigh = h
-            }
-
-            val rangeLow = max(0.0001f, maxLow - minLow)
-            val rangeMid = max(0.0001f, maxMid - minMid)
-            val rangeHigh = max(0.0001f, maxHigh - minHigh)
-
-            val normalized = Array(rawFrames.size) { i ->
-                val (l, m, h) = rawFrames[i]
-                val normL = (((l - minLow) / rangeLow).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
-                val normM = (((m - minMid) / rangeMid).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
-                val normH = (((h - minHigh) / rangeHigh).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
-                FrequencyFrame(normL, normM, normH)
-            }
-
-            // 3-point weighted moving average smoothing
-            val smoothed = Array(normalized.size) { i ->
-                val prev = normalized.getOrElse(i - 1) { normalized[i] }
-                val curr = normalized[i]
-                val next = normalized.getOrElse(i + 1) { normalized[i] }
-
-                FrequencyFrame(
-                    low = (prev.low + 2f * curr.low + next.low) / 4f,
-                    mid = (prev.mid + 2f * curr.mid + next.mid) / 4f,
-                    high = (prev.high + 2f * curr.high + next.high) / 4f
-                )
-            }
-
+            val finalFrames = processRawFramesToFrequencyFrames(rawFrames)
             activeSongId = songId
-            activeFrequencyCurve = smoothed
-            smoothed
+            activeFrequencyCurve = finalFrames
+            emit(finalFrames)
+        } finally {
+            runCatching { decoder?.stop() }
+            runCatching { decoder?.release() }
+            runCatching { extractor?.release() }
         }
+    }.flowOn(Dispatchers.IO)
+
+    suspend fun extractFrequency(
+        context: Context,
+        songId: String,
+        uri: Uri,
+        intervalMs: Int = FREQUENCY_INTERVAL_MS
+    ): Result<Array<FrequencyFrame>> = runCatching {
+        extractFrequencyFlow(context, songId, uri, intervalMs).last()
     }
 
     private fun findAudioTrack(extractor: MediaExtractor): Int {
@@ -220,57 +283,64 @@ object AudioFrequencyExtractor {
         return -1
     }
 
-    private fun byteBufferToFloats(
-        buffer: ByteBuffer,
-        bufferInfo: MediaCodec.BufferInfo,
-        format: MediaFormat
-    ): FloatArray {
-        val pcmEncoding = if (format.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
-            format.getInteger(MediaFormat.KEY_PCM_ENCODING)
-        } else ENCODING_PCM_16BIT
+    private fun processRawFramesToFrequencyFrames(
+        rawFrames: List<Triple<Float, Float, Float>>
+    ): Array<FrequencyFrame> {
+        if (rawFrames.isEmpty()) {
+            return arrayOf(FrequencyFrame(0.5f, 0.5f, 0.5f))
+        }
 
-        val dup = buffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
-        val startPos = bufferInfo.offset.coerceAtLeast(0)
-        val endPos = (bufferInfo.offset + bufferInfo.size).coerceAtMost(buffer.capacity())
-        if (startPos >= endPos) return FloatArray(0)
+        var maxLow = 0.0001f; var minLow = Float.MAX_VALUE
+        var maxMid = 0.0001f; var minMid = Float.MAX_VALUE
+        var maxHigh = 0.0001f; var minHigh = Float.MAX_VALUE
 
-        dup.position(startPos)
-        dup.limit(endPos)
+        for (i in rawFrames.indices) {
+            val (l, m, h) = rawFrames[i]
+            if (l > maxLow) maxLow = l; if (l < minLow) minLow = l
+            if (m > maxMid) maxMid = m; if (m < minMid) minMid = m
+            if (h > maxHigh) maxHigh = h; if (h < minHigh) minHigh = h
+        }
 
-        return when (pcmEncoding) {
-            ENCODING_PCM_16BIT -> {
-                val shortBuffer = dup.asShortBuffer()
-                FloatArray(shortBuffer.remaining()) {
-                    shortBuffer.get().toFloat() / Short.MAX_VALUE
-                }
-            }
-            ENCODING_PCM_FLOAT -> {
-                val floatBuffer = dup.asFloatBuffer()
-                FloatArray(floatBuffer.remaining()) { floatBuffer.get() }
-            }
-            else -> {
-                val shortBuffer = dup.asShortBuffer()
-                FloatArray(shortBuffer.remaining()) {
-                    shortBuffer.get().toFloat() / Short.MAX_VALUE
-                }
-            }
+        val rangeLow = max(0.0001f, maxLow - minLow)
+        val rangeMid = max(0.0001f, maxMid - minMid)
+        val rangeHigh = max(0.0001f, maxHigh - minHigh)
+
+        val normalized = Array(rawFrames.size) { i ->
+            val (l, m, h) = rawFrames[i]
+            val normL = (((l - minLow) / rangeLow).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
+            val normM = (((m - minMid) / rangeMid).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
+            val normH = (((h - minHigh) / rangeHigh).coerceIn(0f, 1f).toDouble().pow(DYNAMIC_CONTRAST_POWER).toFloat()).coerceIn(0f, 1f)
+            FrequencyFrame(normL, normM, normH)
+        }
+
+        // 3-point weighted moving average smoothing
+        return Array(normalized.size) { i ->
+            val prev = normalized.getOrElse(i - 1) { normalized[i] }
+            val curr = normalized[i]
+            val next = normalized.getOrElse(i + 1) { normalized[i] }
+
+            FrequencyFrame(
+                low = (prev.low + 2f * curr.low + next.low) / 4f,
+                mid = (prev.mid + 2f * curr.mid + next.mid) / 4f,
+                high = (prev.high + 2f * curr.high + next.high) / 4f
+            )
         }
     }
 
-    // Biquad Filter Helper
+    // Biquad Filter Helper using Float operations
     private class BiquadFilter(
-        private val b0: Double,
-        private val b1: Double,
-        private val b2: Double,
-        private val a1: Double,
-        private val a2: Double
+        private val b0: Float,
+        private val b1: Float,
+        private val b2: Float,
+        private val a1: Float,
+        private val a2: Float
     ) {
-        private var x1 = 0.0
-        private var x2 = 0.0
-        private var y1 = 0.0
-        private var y2 = 0.0
+        private var x1 = 0f
+        private var x2 = 0f
+        private var y1 = 0f
+        private var y2 = 0f
 
-        fun process(x: Double): Double {
+        fun process(x: Float): Float {
             val y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
             x2 = x1
             x1 = x
@@ -280,47 +350,47 @@ object AudioFrequencyExtractor {
         }
 
         companion object {
-            fun lowPass(sampleRate: Double, cutoff: Double, q: Double = 0.707): BiquadFilter {
-                val w0 = 2.0 * Math.PI * cutoff / sampleRate
-                val alpha = sin(w0) / (2.0 * q)
-                val cosW0 = cos(w0)
+            fun lowPass(sampleRate: Float, cutoff: Float, q: Float = 0.707f): BiquadFilter {
+                val w0 = (2.0 * Math.PI * cutoff / sampleRate).toFloat()
+                val alpha = (sin(w0.toDouble()) / (2.0 * q)).toFloat()
+                val cosW0 = cos(w0.toDouble()).toFloat()
 
-                val b0 = (1.0 - cosW0) / 2.0
-                val b1 = 1.0 - cosW0
-                val b2 = (1.0 - cosW0) / 2.0
-                val a0 = 1.0 + alpha
-                val a1 = -2.0 * cosW0
-                val a2 = 1.0 - alpha
-
-                return BiquadFilter(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
-            }
-
-            fun highPass(sampleRate: Double, cutoff: Double, q: Double = 0.707): BiquadFilter {
-                val w0 = 2.0 * Math.PI * cutoff / sampleRate
-                val alpha = sin(w0) / (2.0 * q)
-                val cosW0 = cos(w0)
-
-                val b0 = (1.0 + cosW0) / 2.0
-                val b1 = -(1.0 + cosW0)
-                val b2 = (1.0 + cosW0) / 2.0
-                val a0 = 1.0 + alpha
-                val a1 = -2.0 * cosW0
-                val a2 = 1.0 - alpha
+                val b0 = (1f - cosW0) / 2f
+                val b1 = 1f - cosW0
+                val b2 = (1f - cosW0) / 2f
+                val a0 = 1f + alpha
+                val a1 = -2f * cosW0
+                val a2 = 1f - alpha
 
                 return BiquadFilter(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
             }
 
-            fun bandPass(sampleRate: Double, centerFreq: Double, q: Double = 1.0): BiquadFilter {
-                val w0 = 2.0 * Math.PI * centerFreq / sampleRate
-                val alpha = sin(w0) / (2.0 * q)
-                val cosW0 = cos(w0)
+            fun highPass(sampleRate: Float, cutoff: Float, q: Float = 0.707f): BiquadFilter {
+                val w0 = (2.0 * Math.PI * cutoff / sampleRate).toFloat()
+                val alpha = (sin(w0.toDouble()) / (2.0 * q)).toFloat()
+                val cosW0 = cos(w0.toDouble()).toFloat()
+
+                val b0 = (1f + cosW0) / 2f
+                val b1 = -(1f + cosW0)
+                val b2 = (1f + cosW0) / 2f
+                val a0 = 1f + alpha
+                val a1 = -2f * cosW0
+                val a2 = 1f - alpha
+
+                return BiquadFilter(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
+            }
+
+            fun bandPass(sampleRate: Float, centerFreq: Float, q: Float = 1.0f): BiquadFilter {
+                val w0 = (2.0 * Math.PI * centerFreq / sampleRate).toFloat()
+                val alpha = (sin(w0.toDouble()) / (2.0 * q)).toFloat()
+                val cosW0 = cos(w0.toDouble()).toFloat()
 
                 val b0 = alpha
-                val b1 = 0.0
+                val b1 = 0f
                 val b2 = -alpha
-                val a0 = 1.0 + alpha
-                val a1 = -2.0 * cosW0
-                val a2 = 1.0 - alpha
+                val a0 = 1f + alpha
+                val a1 = -2f * cosW0
+                val a2 = 1f - alpha
 
                 return BiquadFilter(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
             }

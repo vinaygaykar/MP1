@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.guava.await
@@ -798,10 +799,11 @@ class PlayerViewModel @Inject constructor(
             val song = musicRepository.getSongById(activeId)
             val songUri = song?.uri ?: uri.takeIf { it != Uri.EMPTY } ?: activeItem?.requestMetadata?.mediaUri ?: Uri.EMPTY
             if (songUri != Uri.EMPTY) {
-                val result = AudioFrequencyExtractor.extractFrequency(context, activeId, songUri)
-                result.onSuccess { frequencyCurve ->
-                    _uiState.update { it.copy(audioFrequencyCurve = frequencyCurve) }
-                }
+                AudioFrequencyExtractor.extractFrequencyFlow(context, activeId, songUri)
+                    .catch { /* ignore errors during frequency extraction */ }
+                    .collect { frequencyCurve ->
+                        _uiState.update { it.copy(audioFrequencyCurve = frequencyCurve) }
+                    }
             }
         }
     }

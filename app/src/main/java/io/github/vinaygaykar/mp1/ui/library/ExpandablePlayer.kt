@@ -884,9 +884,8 @@ fun ExpandablePlayer(
                             }
                             val currentFrequencyFrame = remember(state.audioFrequencyCurve, displayPosition) {
                                 val curve = state.audioFrequencyCurve
-                                if (curve != null && curve.isNotEmpty()) {
-                                    val bucketIndex = (displayPosition / AudioFrequencyExtractor.FREQUENCY_INTERVAL_MS)
-                                        .toInt().coerceIn(0, curve.lastIndex)
+                                val bucketIndex = (displayPosition / AudioFrequencyExtractor.FREQUENCY_INTERVAL_MS).toInt()
+                                if (curve != null && bucketIndex in curve.indices) {
                                     curve[bucketIndex]
                                 } else {
                                     null
