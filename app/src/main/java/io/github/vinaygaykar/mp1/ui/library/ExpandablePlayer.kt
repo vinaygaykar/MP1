@@ -366,11 +366,13 @@ fun ExpandablePlayer(
         }
     }
 
-    LaunchedEffect(pagerState.settledPage, currentTrackPageIndex) {
-        if (pagerState.settledPage < currentTrackPageIndex) {
+    val targetTrackPageIndex by rememberUpdatedState(currentTrackPageIndex)
+
+    LaunchedEffect(pagerState.settledPage) {
+        if (pagerState.settledPage < targetTrackPageIndex) {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             actions.onPrevious()
-        } else if (pagerState.settledPage > currentTrackPageIndex) {
+        } else if (pagerState.settledPage > targetTrackPageIndex) {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             actions.onNext()
         }
