@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -375,178 +376,188 @@ fun LibraryContent(
                 )
             }
         }
-        // Layer 1: Collapsible Top Bar Header (Title + Tabs)
+        // Main 1-Column Layout
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .graphicsLayer {
-                    translationY = scrollBehavior.state.heightOffset
-                    alpha = (1f - scrollBehavior.state.collapsedFraction).coerceIn(0f, 1f)
-                }
-                .background(MaterialTheme.colorScheme.surface)
-                .onGloballyPositioned { coordinates ->
-                    collapsibleHeaderHeightPx = coordinates.size.height.toFloat()
-                }
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
-            // Title Row with App Name + Search & Settings
-            Row(
+            // Layer 1: Collapsible Top Bar Header (Title + Tabs)
+            var maxMeasuredHeaderHeightPx by remember { mutableFloatStateOf(0f) }
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onSearchClick) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                    .then(
+                        if (maxMeasuredHeaderHeightPx > 0f) {
+                            val targetPx = (maxMeasuredHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f)
+                            Modifier.height(with(density) { targetPx.toDp() })
+                        } else Modifier
+                    )
+                    .clipToBounds()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .graphicsLayer {
+                        alpha = (1f - scrollBehavior.state.collapsedFraction).coerceIn(0f, 1f)
                     }
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-
-            CompositionLocalProvider(
-                LocalRippleConfiguration provides null
-            ) {
-                ScrollableTabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    containerColor = Color.Transparent,
-                    edgePadding = 16.dp,
-                    divider = {},
-                    indicator = { tabPositions ->
-                        if (tabPositions.isNotEmpty()) {
-                            val currentPage = pagerState.currentPage.coerceIn(0, tabPositions.size - 1)
-                            val currentTab = tabPositions[currentPage]
-                            val fraction = pagerState.currentPageOffsetFraction
-
-                            val targetPage = if (fraction > 0) {
-                                (currentPage + 1).coerceAtMost(tabPositions.size - 1)
-                            } else if (fraction < 0) {
-                                (currentPage - 1).coerceAtLeast(0)
-                            } else {
-                                currentPage
-                            }
-                            val targetTab = tabPositions[targetPage]
-
-                            val absFraction = fraction.absoluteValue
-                            val currentLeft = currentTab.left
-                            val currentRight = currentTab.right
-                            val targetLeft = targetTab.left
-                            val targetRight = targetTab.right
-
-                            val indicatorLeft = currentLeft + (targetLeft - currentLeft) * absFraction
-                            val indicatorRight =
-                                currentRight + (targetRight - currentRight) * absFraction
-
-                            Box(
-                                modifier = Modifier
-                                    .wrapContentSize(Alignment.BottomStart)
-                                    .offset(x = indicatorLeft)
-                                    .width(indicatorRight - indicatorLeft)
-                                    .fillMaxHeight()
-                                    .padding(vertical = 4.dp, horizontal = 2.dp)
-                                    .zIndex(-1f)
-                                    .background(
-                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        shape = CircleShape
-                                    )
-                            )
+                    .onGloballyPositioned { coordinates ->
+                        val h = coordinates.size.height.toFloat()
+                        if (h > maxMeasuredHeaderHeightPx) {
+                            maxMeasuredHeaderHeightPx = h
+                            collapsibleHeaderHeightPx = h
                         }
-                    },
+                    }
+            ) {
+                // Title Row with App Name + Search & Settings
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    tabs.forEachIndexed { index, title ->
-                        val isSelected = pagerState.currentPage == index
-                        val interactionSource = remember { MutableInteractionSource() }
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.headlineMedium
+                    )
 
-                        val animatedLetterSpacing by animateFloatAsState(
-                            targetValue = if (isSelected) 0.5f else -0.5f,
-                            animationSpec = tween(durationMillis = 250),
-                            label = "letterSpacing"
-                        )
-                        val animatedColor by animateColorAsState(
-                            targetValue = if (isSelected) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            animationSpec = tween(durationMillis = 250),
-                            label = "color"
-                        )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onSearchClick) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
 
-                        Tab(
-                            selected = isSelected,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(index)
+                CompositionLocalProvider(
+                    LocalRippleConfiguration provides null
+                ) {
+                    ScrollableTabRow(
+                        selectedTabIndex = pagerState.currentPage,
+                        containerColor = Color.Transparent,
+                        edgePadding = 16.dp,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            if (tabPositions.isNotEmpty()) {
+                                val currentPage = pagerState.currentPage.coerceIn(0, tabPositions.size - 1)
+                                val currentTab = tabPositions[currentPage]
+                                val fraction = pagerState.currentPageOffsetFraction
+
+                                val targetPage = if (fraction > 0) {
+                                    (currentPage + 1).coerceAtMost(tabPositions.size - 1)
+                                } else if (fraction < 0) {
+                                    (currentPage - 1).coerceAtLeast(0)
+                                } else {
+                                    currentPage
                                 }
-                            },
-                            interactionSource = interactionSource,
-                            selectedContentColor = MaterialTheme.colorScheme.onSurface,
-                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            text = {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        letterSpacing = animatedLetterSpacing.sp
-                                    ),
-                                    color = animatedColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Clip,
-                                    textAlign = TextAlign.Center
+                                val targetTab = tabPositions[targetPage]
+
+                                val absFraction = fraction.absoluteValue
+                                val currentLeft = currentTab.left
+                                val currentRight = currentTab.right
+                                val targetLeft = targetTab.left
+                                val targetRight = targetTab.right
+
+                                val indicatorLeft = currentLeft + (targetLeft - currentLeft) * absFraction
+                                val indicatorRight =
+                                    currentRight + (targetRight - currentRight) * absFraction
+
+                                Box(
+                                    modifier = Modifier
+                                        .wrapContentSize(Alignment.BottomStart)
+                                        .offset(x = indicatorLeft)
+                                        .width(indicatorRight - indicatorLeft)
+                                        .fillMaxHeight()
+                                        .padding(vertical = 4.dp, horizontal = 2.dp)
+                                        .zIndex(-1f)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            shape = CircleShape
+                                        )
                                 )
                             }
-                        )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            val isSelected = pagerState.currentPage == index
+                            val interactionSource = remember { MutableInteractionSource() }
+
+                            val animatedLetterSpacing by animateFloatAsState(
+                                targetValue = if (isSelected) 0.5f else -0.5f,
+                                animationSpec = tween(durationMillis = 250),
+                                label = "letterSpacing"
+                            )
+                            val animatedColor by animateColorAsState(
+                                targetValue = if (isSelected) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                animationSpec = tween(durationMillis = 250),
+                                label = "color"
+                            )
+
+                            Tab(
+                                selected = isSelected,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                },
+                                interactionSource = interactionSource,
+                                selectedContentColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            letterSpacing = animatedLetterSpacing.sp
+                                        ),
+                                        color = animatedColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Layer 1.2: Scan in Progress Banner (positioned below tabs on list area, always visible at top when collapsed)
-        val displayFolder = remember(currentFolder) {
-            currentFolder
-                ?.removePrefix("primary:")
-                ?.removePrefix("primary")
-                ?.trim()
-        }
+            // Layer 1.2: Scan in Progress Banner
+            val displayFolder = remember(currentFolder) {
+                currentFolder
+                    ?.removePrefix("primary:")
+                    ?.removePrefix("primary")
+                    ?.trim()
+            }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .graphicsLayer {
-                    translationY = (collapsibleHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f)
-                }
-                .zIndex(2f)
-                .onGloballyPositioned { coordinates ->
-                    noticeBannerHeightPx = if (isScanning) coordinates.size.height.toFloat() else 0f
-                }
-        ) {
             AnimatedVisibility(
                 visible = isScanning,
                 enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+                exit = shrinkVertically() + fadeOut(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        noticeBannerHeightPx = if (isScanning) coordinates.size.height.toFloat() else 0f
+                    }
             ) {
                 NoticeBanner(
                     title = "Library scan in progress...",
@@ -570,19 +581,8 @@ fun LibraryContent(
                     }
                 )
             }
-        }
 
-        // Layer 1.5: Sticky Selection Action Row (positioned below tabs and banner)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .graphicsLayer {
-                    translationY = (collapsibleHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f) +
-                            (if (isScanning) noticeBannerHeightPx else 0f)
-                }
-                .zIndex(1.5f)
-        ) {
+            // Layer 1.5: Sticky Selection Action Row
             AnimatedVisibility(
                 visible = isSelectionMode && pagerState.currentPage == 1,
                 enter = expandVertically() + fadeIn(),
@@ -609,127 +609,121 @@ fun LibraryContent(
                     }
                 )
             }
-        }
 
-        // Layer 0: Content Surface (occupies full screen height, translates UP to sit below sticky headers)
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationY =
-                        (collapsibleHeaderHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f) +
-                                (if (isScanning) noticeBannerHeightPx else 0f) +
-                                selectionRowHeightPx
-                },
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> PlaylistGrid(
-                        playlists = playlists,
-                        onCreateClick = { showCreateDialog = true },
-                        onImportClick = { importPlaylistLauncher.launch("*/*") },
-                        contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
-                    )
+            // Layer 0: Content Surface
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (page) {
+                        0 -> PlaylistGrid(
+                            playlists = playlists,
+                            onCreateClick = { showCreateDialog = true },
+                            onImportClick = { importPlaylistLauncher.launch("*/*") },
+                            contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
+                        )
 
-                    1 -> {
-                        val effectiveHeaderPx = collapsibleHeaderHeightPx + (if (isScanning) noticeBannerHeightPx else 0f)
-                        val headerHeightDp = remember(effectiveHeaderPx, density) {
-                            if (effectiveHeaderPx > 0f) {
-                                with(density) { effectiveHeaderPx.toDp() }
+                        1 -> {
+                            val effectiveHeaderPx = collapsibleHeaderHeightPx + (if (isScanning) noticeBannerHeightPx else 0f)
+                            val headerHeightDp = remember(effectiveHeaderPx, density) {
+                                if (effectiveHeaderPx > 0f) {
+                                    with(density) { effectiveHeaderPx.toDp() }
+                                } else {
+                                    104.dp
+                                }
+                            }
+                            SongList(
+                                songs = songs,
+                                onSongClick = { song ->
+                                    if (isSelectionMode) {
+                                        toggleSongSelection(song)
+                                    } else {
+                                        onPlaySong(song, songs)
+                                    }
+                                },
+                                onSongLongClick = { song ->
+                                    toggleSongSelection(song)
+                                },
+                                selectedSongIds = selectedSongIds,
+                                isSelectionMode = isSelectionMode,
+                                onSwipeRight = { song, offset, size ->
+                                    onAddToQueue(song)
+                                    if (isPlayerActive) {
+                                        flyingArtworks.add(
+                                            FlyingArtworkItem(
+                                                artworkUri = song.artworkUri,
+                                                startOffset = offset,
+                                                startSize = size
+                                            )
+                                        )
+                                    }
+                                },
+                                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
+                                headerHeight = headerHeightDp
+                            )
+                        }
+
+                        2 -> {
+                            if (useCleanAlbumGrid) {
+                                AlbumGridClean(
+                                    albums = albums,
+                                    onAlbumClick = { album, offset, size ->
+                                        val intent =
+                                            Intent(context, AlbumDetailActivity::class.java).apply {
+                                                putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
+                                            }
+                                        launchActivityWithScaleUp(
+                                            context = context,
+                                            intent = intent,
+                                            view = view,
+                                            startX = offset.x.toInt(),
+                                            startY = offset.y.toInt(),
+                                            width = size.width,
+                                            height = size.height
+                                        )
+                                    },
+                                    contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
+                                )
                             } else {
-                                104.dp
+                                AlbumGridPunk(
+                                    albums = albums,
+                                    onAlbumClick = { album ->
+                                        val intent =
+                                            Intent(context, AlbumDetailActivity::class.java).apply {
+                                                putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
+                                            }
+                                        launchActivityWithScaleUp(context = context, intent = intent, view = view)
+                                    },
+                                    contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
+                                )
                             }
                         }
-                        SongList(
-                            songs = songs,
-                            onSongClick = { song ->
-                                if (isSelectionMode) {
-                                    toggleSongSelection(song)
-                                } else {
-                                    onPlaySong(song, songs)
-                                }
+
+                        3 -> ArtistGrid(
+                            artists = artists,
+                            onArtistClick = { artist, offset, size ->
+                                val intent =
+                                    Intent(context, ArtistDetailActivity::class.java).apply {
+                                        putExtra(ArtistDetailActivity.EXTRA_ARTIST_ID, artist.id)
+                                    }
+                                launchActivityWithScaleUp(
+                                    context = context,
+                                    intent = intent,
+                                    view = view,
+                                    startX = offset.x.toInt(),
+                                    startY = offset.y.toInt(),
+                                    width = size.width,
+                                    height = size.height
+                                )
                             },
-                            onSongLongClick = { song ->
-                                toggleSongSelection(song)
-                            },
-                            selectedSongIds = selectedSongIds,
-                            isSelectionMode = isSelectionMode,
-                            onSwipeRight = { song, offset, size ->
-                                onAddToQueue(song)
-                                if (isPlayerActive) {
-                                    flyingArtworks.add(
-                                        FlyingArtworkItem(
-                                            artworkUri = song.artworkUri,
-                                            startOffset = offset,
-                                            startSize = size
-                                        )
-                                    )
-                                }
-                            },
-                            contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
-                            headerHeight = headerHeightDp
+                            contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
                         )
-                    }
-
-                    2 -> {
-                        if (useCleanAlbumGrid) {
-                            AlbumGridClean(
-                                albums = albums,
-                                onAlbumClick = { album, offset, size ->
-                                    val intent =
-                                        Intent(context, AlbumDetailActivity::class.java).apply {
-                                            putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
-                                        }
-                                    launchActivityWithScaleUp(
-                                        context = context,
-                                        intent = intent,
-                                        view = view,
-                                        startX = offset.x.toInt(),
-                                        startY = offset.y.toInt(),
-                                        width = size.width,
-                                        height = size.height
-                                    )
-                                },
-                                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
-                            )
-                        } else {
-                            AlbumGridPunk(
-                                albums = albums,
-                                onAlbumClick = { album ->
-                                    val intent =
-                                        Intent(context, AlbumDetailActivity::class.java).apply {
-                                            putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
-                                        }
-                                    launchActivityWithScaleUp(context = context, intent = intent, view = view)
-                                },
-                                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
-                            )
-                        }
-                    }
-
-                    3 -> ArtistGrid(
-                        artists = artists,
-                        onArtistClick = { artist, offset, size ->
-                            val intent =
-                                Intent(context, ArtistDetailActivity::class.java).apply {
-                                    putExtra(ArtistDetailActivity.EXTRA_ARTIST_ID, artist.id)
-                                }
-                            launchActivityWithScaleUp(
-                                context = context,
-                                intent = intent,
-                                view = view,
-                                startX = offset.x.toInt(),
-                                startY = offset.y.toInt(),
-                                width = size.width,
-                                height = size.height
-                            )
-                        },
-                        contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
-                    )
 //
 //                    4 -> GenreList(
 //                        genres = genres,
@@ -746,6 +740,7 @@ fun LibraryContent(
                 }
             }
         }
+        }
 
         // Layer 2: Floating Category Dropdown & Action Buttons
         if (isFloatingVisible) {
@@ -755,8 +750,9 @@ fun LibraryContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(top = noticeBannerHeightDp)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .offset(y = noticeBannerHeightDp)
                     .align(Alignment.TopCenter)
                     .zIndex(3f),
                 horizontalArrangement = Arrangement.SpaceBetween,
