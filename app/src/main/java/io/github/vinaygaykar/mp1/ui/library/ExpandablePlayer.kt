@@ -335,18 +335,28 @@ fun ExpandablePlayer(
     )
 
     val scale = remember { Animatable(1f) }
-    val hasPrevPage = remember(state.queue.size, state.currentIndex, state.hasPrevious, state.repeatMode) {
-        if (state.queue.size <= 1) false
-        else if (state.currentIndex > 0) true
-        else if (state.currentIndex == 0) state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
-        else state.hasPrevious
+    val hasPrevPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
+        if (state.queue.size <= 1) {
+            state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+        } else {
+            if (state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL) {
+                true
+            } else {
+                state.currentIndex > 0
+            }
+        }
     }
 
-    val hasNextPage = remember(state.queue.size, state.currentIndex, state.hasNext, state.repeatMode) {
-        if (state.queue.size <= 1) false
-        else if (state.currentIndex in 0 until state.queue.size - 1) true
-        else if (state.currentIndex == state.queue.size - 1) state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
-        else state.hasNext
+    val hasNextPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
+        if (state.queue.size <= 1) {
+            state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+        } else {
+            if (state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL) {
+                true
+            } else {
+                state.currentIndex in 0 until state.queue.size - 1
+            }
+        }
     }
 
     val currentTrackPageIndex = if (hasPrevPage) 1 else 0
@@ -372,9 +382,15 @@ fun ExpandablePlayer(
         if (pagerState.settledPage < targetTrackPageIndex) {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             actions.onPrevious()
+            if (pagerState.currentPage != targetTrackPageIndex) {
+                pagerState.scrollToPage(targetTrackPageIndex)
+            }
         } else if (pagerState.settledPage > targetTrackPageIndex) {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             actions.onNext()
+            if (pagerState.currentPage != targetTrackPageIndex) {
+                pagerState.scrollToPage(targetTrackPageIndex)
+            }
         }
     }
 
@@ -659,7 +675,7 @@ fun ExpandablePlayer(
         val vinylFace = remember { VinylFace() }
 
         val prevItem = remember(state.queue, state.currentIndex, hasPrevPage) {
-            if (!hasPrevPage || state.queue.size <= 1) null
+            if (!hasPrevPage || state.queue.isEmpty()) null
             else {
                 val prevIndex = if (state.currentIndex > 0) {
                     state.currentIndex - 1
@@ -672,9 +688,9 @@ fun ExpandablePlayer(
         val prevArtworkUri = remember(prevItem) { prevItem?.mediaMetadata?.artworkUri }
 
         val nextItem = remember(state.queue, state.currentIndex, hasNextPage) {
-            if (!hasNextPage || state.queue.size <= 1) null
+            if (!hasNextPage || state.queue.isEmpty()) null
             else {
-                val nextIndex = if (state.currentIndex in state.queue.indices && state.currentIndex + 1 < state.queue.size) {
+                val nextIndex = if (state.currentIndex in 0 until state.queue.size - 1) {
                     state.currentIndex + 1
                 } else {
                     0

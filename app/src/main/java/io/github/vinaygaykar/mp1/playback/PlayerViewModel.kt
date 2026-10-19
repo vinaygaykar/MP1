@@ -436,11 +436,73 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onNext() {
-        controller?.seekToNextMediaItem()
+        val player = controller ?: return
+        val queue = _uiState.value.queue
+        val currentIdx = _uiState.value.currentIndex
+        val repeatMode = player.repeatMode
+
+        if (queue.isEmpty() || currentIdx < 0) {
+            player.seekToNextMediaItem()
+            return
+        }
+
+        if (repeatMode == Player.REPEAT_MODE_ONE) {
+            if (queue.size > 1 && currentIdx < queue.size - 1) {
+                onSkipToQueueItem(currentIdx + 1)
+            } else {
+                player.seekTo(0, 0L)
+                player.play()
+            }
+        } else if (repeatMode == Player.REPEAT_MODE_ALL) {
+            if (queue.size > 1) {
+                val nextIdx = (currentIdx + 1) % queue.size
+                onSkipToQueueItem(nextIdx)
+            } else {
+                player.seekTo(0, 0L)
+                player.play()
+            }
+        } else {
+            if (currentIdx < queue.size - 1) {
+                onSkipToQueueItem(currentIdx + 1)
+            } else {
+                player.seekToNextMediaItem()
+            }
+        }
     }
 
     override fun onPrevious() {
-        controller?.seekToPreviousMediaItem()
+        val player = controller ?: return
+        val queue = _uiState.value.queue
+        val currentIdx = _uiState.value.currentIndex
+        val repeatMode = player.repeatMode
+
+        if (queue.isEmpty() || currentIdx < 0) {
+            player.seekToPreviousMediaItem()
+            return
+        }
+
+        if (repeatMode == Player.REPEAT_MODE_ONE) {
+            if (queue.size > 1 && currentIdx > 0) {
+                onSkipToQueueItem(currentIdx - 1)
+            } else {
+                player.seekTo(0, 0L)
+                player.play()
+            }
+        } else if (repeatMode == Player.REPEAT_MODE_ALL) {
+            if (queue.size > 1) {
+                val prevIdx = if (currentIdx > 0) currentIdx - 1 else queue.size - 1
+                onSkipToQueueItem(prevIdx)
+            } else {
+                player.seekTo(0, 0L)
+                player.play()
+            }
+        } else {
+            if (currentIdx > 0) {
+                onSkipToQueueItem(currentIdx - 1)
+            } else {
+                player.seekToPreviousMediaItem()
+            }
+        }
     }
 
     override fun onSeek(positionMs: Long) {
