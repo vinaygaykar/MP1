@@ -280,8 +280,14 @@ class PlayerViewModel @Inject constructor(
 
             if (isShuffleOn && count > 1) {
                 val visited = BooleanArray(count)
-                var index = timeline.getFirstWindowIndex(true)
                 var visitedCount = 0
+
+                // Anchor shuffle queue at currentWindowIndex so the playing track is always first
+                var index = if (currentWindowIndex in 0 until count) {
+                    currentWindowIndex
+                } else {
+                    timeline.getFirstWindowIndex(true)
+                }
 
                 while (index in 0 until count && !visited[index] && visitedCount < count) {
                     visited[index] = true
@@ -290,6 +296,20 @@ class PlayerViewModel @Inject constructor(
                     newWindowIndices.add(index)
                     visitedCount++
                     index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, true)
+                }
+
+                if (visitedCount < count) {
+                    var fallbackIndex = timeline.getFirstWindowIndex(true)
+                    while (fallbackIndex in 0 until count && visitedCount < count) {
+                        if (!visited[fallbackIndex]) {
+                            visited[fallbackIndex] = true
+                            timeline.getWindow(fallbackIndex, window)
+                            newQueue.add(window.mediaItem)
+                            newWindowIndices.add(fallbackIndex)
+                            visitedCount++
+                        }
+                        fallbackIndex = timeline.getNextWindowIndex(fallbackIndex, Player.REPEAT_MODE_OFF, true)
+                    }
                 }
 
                 if (visitedCount < count) {
