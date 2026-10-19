@@ -121,10 +121,7 @@ class LibraryViewModel @Inject constructor(
             val currentSongs = songList.ifEmpty { songs.value }
             if (currentSongs.isEmpty()) return@launch
 
-            val isShuffleOn = player.shuffleModeEnabled
-
             val startIndex = currentSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-            val totalSongs = currentSongs.size
 
             // 1. Immediately play the clicked song with minimal IPC overhead
             val targetMediaItem = withContext(Dispatchers.Default) {
@@ -134,36 +131,21 @@ class LibraryViewModel @Inject constructor(
             player.prepare()
             player.play()
 
-            if (totalSongs <= 1) return@launch
+            if (currentSongs.size <= 1) return@launch
 
-            // 2. Asynchronously load the remaining queue in optimized background chunks
+            // 2. Asynchronously load the full queue in natural order (0..N-1) after UI animation window
             launch(Dispatchers.Default) {
+                val allMediaItems = currentSongs.map { it.toMediaItem() }
                 // Yield briefly to let initial click animation & miniplayer transition render smoothly
-                delay(100)
+                delay(150)
 
-                val remainingSongs = if (isShuffleOn) {
-                    currentSongs.filterIndexed { index, _ -> index != startIndex }.shuffled()
-                } else {
-                    val trailingSongs = currentSongs.subList(startIndex + 1, totalSongs)
-                    val leadingSongs = currentSongs.subList(0, startIndex)
-                    trailingSongs + leadingSongs
-                }
-
-                val chunkSize = 200 // Larger chunk size drastically reduces IPC roundtrips
-
-                var offset = 0
-                while (offset < remainingSongs.size) {
-                    val chunkEnd = (offset + chunkSize).coerceAtMost(remainingSongs.size)
-                    val chunkSongs = remainingSongs.subList(offset, chunkEnd)
-                    val chunkMediaItems = chunkSongs.map { it.toMediaItem() }
-                    withContext(Dispatchers.Main) {
-                        val activePlayer = controller ?: return@withContext
-                        activePlayer.addMediaItems(chunkMediaItems)
-                    }
-                    offset = chunkEnd
-                    if (offset < remainingSongs.size) {
-                        delay(50) // Yield to allow main thread UI rendering frame loop
-                    }
+                withContext(Dispatchers.Main) {
+                    val activePlayer = controller ?: return@withContext
+                    activePlayer.setMediaItems(
+                        allMediaItems,
+                        startIndex,
+                        activePlayer.currentPosition
+                    )
                 }
             }
         }
