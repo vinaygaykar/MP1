@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -694,6 +695,130 @@ fun PlaylistSelectionBottomSheet(
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+/**
+ * Row displaying circular playlist icons of up to 5 selected playlists overlapping each other.
+ */
+@Composable
+fun OverlappingPlaylistsRow(
+    playlists: List<Playlist>,
+    modifier: Modifier = Modifier
+) {
+    val displayPlaylists = remember(playlists) { playlists.take(5) }
+    val overlapOffset = 32.dp
+    val avatarSize = 56.dp
+
+    Box(
+        modifier = modifier
+            .width(avatarSize + overlapOffset * (displayPlaylists.size - 1).coerceAtLeast(0))
+            .height(avatarSize),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        displayPlaylists.forEachIndexed { index, playlist ->
+            Box(
+                modifier = Modifier
+                    .offset(x = overlapOffset * index)
+                    .size(avatarSize)
+                    .zIndex((displayPlaylists.size - index).toFloat())
+                    .border(2.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Bottom sheet for playlist multi-selection mode.
+ * Displays selected playlist count and overlapping icons, with a single button: Delete.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlaylistMultiSelectionBottomSheet(
+    selectedPlaylists: List<Playlist>,
+    onDismiss: () -> Unit,
+    onDeletePlaylists: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+        ) {
+            // First Row: Overlapping circular playlist icons on left, selected count on right
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                OverlappingPlaylistsRow(playlists = selectedPlaylists)
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "${selectedPlaylists.size}",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = if (selectedPlaylists.size == 1) "Playlist Selected" else "Playlists Selected",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 1 button only: Delete
+            Button(
+                onClick = {
+                    onDeletePlaylists()
+                    onDismiss()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Delete",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))

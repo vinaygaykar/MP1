@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import io.github.vinaygaykar.mp1.ui.playlist.PlaylistDetailActivity
+import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -18,9 +19,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,9 +60,11 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -195,6 +201,7 @@ fun LibraryScreen(
         onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
         onAddToQueue = { viewModel.addToQueue(it) },
         onCreatePlaylist = { viewModel.createPlaylist(it) },
+        onDeletePlaylists = { viewModel.deletePlaylists(it) },
         onImportPlaylist = { viewModel.importPlaylist(it) },
         onAddSongsToPlaylist = { playlistId, songsToAdd ->
             viewModel.addSongsToPlaylist(playlistId, songsToAdd)
@@ -227,6 +234,7 @@ fun LibraryContent(
     onPlaySong: (Song, List<Song>) -> Unit = { _, _ -> },
     onAddToQueue: (Song) -> Unit = {},
     onCreatePlaylist: (String) -> Unit = {},
+    onDeletePlaylists: (Set<Long>) -> Unit = {},
     onImportPlaylist: (Uri) -> Unit = {},
     onAddSongsToPlaylist: (Long, List<Song>) -> Unit = { _, _ -> },
     onCreatePlaylistWithSongs: (String, List<Song>) -> Unit = { _, _ -> }
@@ -262,11 +270,17 @@ fun LibraryContent(
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { tabs.size })
 
     var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
+    var selectedPlaylistIds by remember { mutableStateOf(setOf<Long>()) }
     val isSelectionMode = selectedSongIds.isNotEmpty()
+    val isPlaylistSelectionMode = selectedPlaylistIds.isNotEmpty()
     var showMultiSelectionSheet by remember { mutableStateOf(false) }
+    var showPlaylistMultiSelectionSheet by remember { mutableStateOf(false) }
 
     val selectedSongs = remember(songs, selectedSongIds) {
         songs.filter { selectedSongIds.contains(it.id) }
+    }
+    val selectedPlaylists = remember(playlists, selectedPlaylistIds) {
+        playlists.filter { selectedPlaylistIds.contains(it.id) }
     }
 
     if (showCreatePlaylistForSelectionDialog) {
@@ -287,12 +301,22 @@ fun LibraryContent(
         }
     }
 
-    BackHandler(enabled = isSelectionMode) {
+    fun togglePlaylistSelection(playlist: Playlist) {
+        selectedPlaylistIds = if (selectedPlaylistIds.contains(playlist.id)) {
+            selectedPlaylistIds - playlist.id
+        } else {
+            selectedPlaylistIds + playlist.id
+        }
+    }
+
+    BackHandler(enabled = isSelectionMode || isPlaylistSelectionMode) {
         selectedSongIds = emptySet()
+        selectedPlaylistIds = emptySet()
     }
 
     LaunchedEffect(pagerState.currentPage) {
         selectedSongIds = emptySet()
+        selectedPlaylistIds = emptySet()
     }
 
     // Measure top header height dynamically
@@ -306,8 +330,8 @@ fun LibraryContent(
         }
     }
 
-    LaunchedEffect(isSelectionMode, pagerState.currentPage) {
-        if (!(isSelectionMode && pagerState.currentPage == 1)) {
+    LaunchedEffect(isSelectionMode, isPlaylistSelectionMode, pagerState.currentPage) {
+        if (!(isSelectionMode && pagerState.currentPage == 1) && !(isPlaylistSelectionMode && pagerState.currentPage == 0)) {
             selectionRowHeightPx = 0f
         }
     }
@@ -330,7 +354,9 @@ fun LibraryContent(
 
     val isFloatingVisible by remember {
         derivedStateOf {
-            scrollBehavior.state.collapsedFraction > 0.9f && !(isSelectionMode && pagerState.currentPage == 1)
+            scrollBehavior.state.collapsedFraction > 0.9f &&
+                !(isSelectionMode && pagerState.currentPage == 1) &&
+                !(isPlaylistSelectionMode && pagerState.currentPage == 0)
         }
     }
 
@@ -584,30 +610,45 @@ fun LibraryContent(
 
             // Layer 1.5: Sticky Selection Action Row
             AnimatedVisibility(
-                visible = isSelectionMode && pagerState.currentPage == 1,
+                visible = (isSelectionMode && pagerState.currentPage == 1) || (isPlaylistSelectionMode && pagerState.currentPage == 0),
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface)
                     .onGloballyPositioned { coordinates ->
-                        if (isSelectionMode && pagerState.currentPage == 1) {
+                        if ((isSelectionMode && pagerState.currentPage == 1) || (isPlaylistSelectionMode && pagerState.currentPage == 0)) {
                             selectionRowHeightPx = coordinates.size.height.toFloat()
                         }
                     }
             ) {
-                SelectionActionRow(
-                    selectedCount = selectedSongIds.size,
-                    onSelectAll = {
-                        selectedSongIds = songs.map { it.id }.toSet()
-                    },
-                    onDeselect = {
-                        selectedSongIds = emptySet()
-                    },
-                    onOptionsClick = {
-                        showMultiSelectionSheet = true
-                    }
-                )
+                if (pagerState.currentPage == 0) {
+                    SelectionActionRow(
+                        selectedCount = selectedPlaylistIds.size,
+                        onSelectAll = {
+                            selectedPlaylistIds = playlists.map { it.id }.toSet()
+                        },
+                        onDeselect = {
+                            selectedPlaylistIds = emptySet()
+                        },
+                        onOptionsClick = {
+                            showPlaylistMultiSelectionSheet = true
+                        }
+                    )
+                } else if (pagerState.currentPage == 1) {
+                    SelectionActionRow(
+                        selectedCount = selectedSongIds.size,
+                        onSelectAll = {
+                            selectedSongIds = songs.map { it.id }.toSet()
+                        },
+                        onDeselect = {
+                            selectedSongIds = emptySet()
+                        },
+                        onOptionsClick = {
+                            showMultiSelectionSheet = true
+                        }
+                    )
+                }
             }
 
             // Layer 0: Content Surface
@@ -626,6 +667,22 @@ fun LibraryContent(
                             playlists = playlists,
                             onCreateClick = { showCreateDialog = true },
                             onImportClick = { importPlaylistLauncher.launch("*/*") },
+                            selectedPlaylistIds = selectedPlaylistIds,
+                            isSelectionMode = isPlaylistSelectionMode,
+                            onPlaylistClick = { playlist ->
+                                if (isPlaylistSelectionMode) {
+                                    togglePlaylistSelection(playlist)
+                                } else {
+                                    val intent = Intent(context, PlaylistDetailActivity::class.java).apply {
+                                        putExtra(PlaylistDetailActivity.EXTRA_PLAYLIST_ID, playlist.id)
+                                        putExtra(PlaylistDetailActivity.EXTRA_PLAYLIST_NAME, playlist.name)
+                                    }
+                                    context.startActivity(intent)
+                                }
+                            },
+                            onPlaylistLongClick = { playlist ->
+                                togglePlaylistSelection(playlist)
+                            },
                             contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
                         )
 
@@ -874,6 +931,18 @@ fun LibraryContent(
                 onCreateNewPlaylist = {
                     showPlaylistSelectionSheet = false
                     showCreatePlaylistForSelectionDialog = true
+                }
+            )
+        }
+
+        // Playlist Multi-selection Bottom Sheet
+        if (showPlaylistMultiSelectionSheet) {
+            PlaylistMultiSelectionBottomSheet(
+                selectedPlaylists = selectedPlaylists,
+                onDismiss = { showPlaylistMultiSelectionSheet = false },
+                onDeletePlaylists = {
+                    onDeletePlaylists(selectedPlaylistIds)
+                    selectedPlaylistIds = emptySet()
                 }
             )
         }
@@ -1357,10 +1426,12 @@ fun PlaylistGrid(
     onCreateClick: () -> Unit,
     onImportClick: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    selectedPlaylistIds: Set<Long> = emptySet(),
+    isSelectionMode: Boolean = false,
+    onPlaylistClick: (Playlist) -> Unit = {},
+    onPlaylistLongClick: (Playlist) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-
     LazyVerticalGrid(
         columns = GridCells.Fixed(1),
         contentPadding = contentPadding,
@@ -1473,37 +1544,64 @@ fun PlaylistGrid(
                 items = playlists,
                 key = { it.id }
             ) { playlist ->
+                val isSelected = selectedPlaylistIds.contains(playlist.id)
                 PlaylistItemCard(
                     playlist = playlist,
-                    onClick = {
-                        val intent = Intent(context, PlaylistDetailActivity::class.java).apply {
-                            putExtra(PlaylistDetailActivity.EXTRA_PLAYLIST_ID, playlist.id)
-                            putExtra(PlaylistDetailActivity.EXTRA_PLAYLIST_NAME, playlist.name)
-                        }
-                        context.startActivity(intent)
-                    }
+                    onClick = { onPlaylistClick(playlist) },
+                    isSelected = isSelected,
+                    isSelectionMode = isSelectionMode,
+                    onLongClick = { onPlaylistLongClick(playlist) }
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlaylistItemCard(
     playlist: Playlist,
     onClick: () -> Unit = {},
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val view = LocalView.current
+
     Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (isSelected) {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                } else Modifier
+            ),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 2.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .combinedClickable(
+                    onClick = {
+                        if (isSelectionMode) {
+                            onLongClick()
+                        } else {
+                            onClick()
+                        }
+                    },
+                    onLongClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        onLongClick()
+                    }
+                )
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1511,14 +1609,25 @@ fun PlaylistItemCard(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.primaryContainer
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -1532,6 +1641,16 @@ fun PlaylistItemCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+
+            if (isSelectionMode) {
+                IconButton(onClick = onLongClick) {
+                    Icon(
+                        imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = if (isSelected) "Selected" else "Unselected",
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

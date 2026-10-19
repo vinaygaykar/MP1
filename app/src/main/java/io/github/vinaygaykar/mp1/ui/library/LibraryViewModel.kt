@@ -108,6 +108,14 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun deletePlaylists(playlistIds: Set<Long>) {
+        viewModelScope.launch {
+            playlistIds.forEach { playlistId ->
+                playlistRepository.deletePlaylist(playlistId)
+            }
+        }
+    }
+
     suspend fun getArtistImageUrl(artistName: String, artistId: String): String? {
         return artistImageRepository.getArtistImageUrl(artistName, artistId)
     }
