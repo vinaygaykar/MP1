@@ -1,7 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.settings
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,17 +19,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.NavigateNext
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -60,7 +55,6 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.vinaygaykar.mp1.R
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,16 +66,13 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val useCleanAlbumGrid by viewModel.useCleanAlbumGrid.collectAsState()
-    val playbackWave by viewModel.playbackWave.collectAsState()
 
     SettingsContent(
         useCleanAlbumGrid = useCleanAlbumGrid,
-        playbackWave = playbackWave,
         bottomPadding = bottomPadding,
         onBack = onBack,
         onNavigateToScanLocations = onNavigateToScanLocations,
         onSetUseCleanAlbumGrid = { viewModel.setUseCleanAlbumGrid(it) },
-        onSetPlaybackWave = { viewModel.setPlaybackWave(it) },
     )
 }
 
@@ -89,12 +80,10 @@ fun SettingsScreen(
 @Composable
 fun SettingsContent(
     useCleanAlbumGrid: Boolean,
-    playbackWave: PlaybackWaveType,
     bottomPadding: Dp = 0.dp,
     onBack: () -> Unit = {},
     onNavigateToScanLocations: () -> Unit = {},
     onSetUseCleanAlbumGrid: (Boolean) -> Unit = {},
-    onSetPlaybackWave: (PlaybackWaveType) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val collapsedFraction = scrollBehavior.state.collapsedFraction.coerceIn(0f, 1f)
@@ -171,105 +160,7 @@ fun SettingsContent(
                 )
             }
 
-            // Section 2: Playback & Visualization
-            SettingsSectionHeader(title = "PLAYBACK & AUDIO")
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.size(44.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.GraphicEq,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Text(
-                                    text = "Playback Waveform",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Icon(
-                                    imageVector = Icons.Rounded.Science,
-                                    contentDescription = "Experimental Feature",
-                                    tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                            Text(
-                                text = "Choose visual wave animation for now playing",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                    ) {
-                        PlaybackWaveType.entries.forEach { option ->
-                            val selected = option == playbackWave
-                            FilterChip(
-                                selected = selected,
-                                onClick = { onSetPlaybackWave(option) },
-                                label = {
-                                    Text(
-                                        text = option.displayName,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                    )
-                                },
-                                leadingIcon = if (selected) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    }
-                                } else null,
-                                shape = RoundedCornerShape(16.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Section 3: Layout
+            // Section 2: Layout
             SettingsSectionHeader(title = "LAYOUT")
             Card(
                 colors = CardDefaults.cardColors(
@@ -306,7 +197,7 @@ fun SettingsContent(
                 )
             }
 
-            // Section 4: About
+            // Section 3: About
             SettingsSectionHeader(title = "ABOUT")
             Card(
                 colors = CardDefaults.cardColors(
@@ -460,7 +351,6 @@ private fun SettingsScreenLightPreview() {
     MusicPlayerTheme(darkTheme = false) {
         SettingsContent(
             useCleanAlbumGrid = true,
-            playbackWave = PlaybackWaveType.ENERGY,
             bottomPadding = 80.dp,
         )
     }
@@ -472,7 +362,6 @@ private fun SettingsScreenDarkPreview() {
     MusicPlayerTheme(darkTheme = true) {
         SettingsContent(
             useCleanAlbumGrid = false,
-            playbackWave = PlaybackWaveType.FREQUENCY,
             bottomPadding = 80.dp,
         )
     }

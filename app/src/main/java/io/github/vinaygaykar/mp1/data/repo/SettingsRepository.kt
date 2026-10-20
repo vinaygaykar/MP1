@@ -18,6 +18,13 @@ class SettingsRepository @Inject constructor(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
+    init {
+        // Force migrate all users to ENERGY playback wave type regardless of previous selection
+        if (prefs.getString(KEY_PLAYBACK_WAVE, null) != PlaybackWaveType.ENERGY.name) {
+            prefs.edit { putString(KEY_PLAYBACK_WAVE, PlaybackWaveType.ENERGY.name) }
+        }
+    }
+
     private val _useCleanAlbumGrid = MutableStateFlow(
         prefs.getBoolean(KEY_USE_CLEAN_ALBUM_GRID, false),
     )
