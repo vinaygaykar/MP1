@@ -95,16 +95,31 @@ class PlaylistRepositoryImpl @Inject constructor(
 
     override suspend fun importPlaylist(uri: Uri): Long {
         val fileName = getFileNameFromUri(uri) ?: "Imported Playlist"
-        val playlistName = fileName.substringBeforeLast(".")
-            .ifBlank { "Imported Playlist" }
 
-        val playlistId = playlistDao.insertPlaylist(PlaylistEntity(name = playlistName))
+        // 1. Validate file extension if present
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        val supportedExtensions = setOf("m3u", "m3u8", "pls", "txt", "wpl")
+        if (ext.isNotEmpty() && ext !in supportedExtensions) {
+            return -1L
+        }
 
-        // Read lines from imported playlist file (M3U, PLS, TXT, etc.)
+        // 2. Read lines and check for binary / non-text content
         val songIdentifiers = mutableListOf<String>()
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                inputStream.bufferedReader().useLines { lines ->
+                val buffered = inputStream.buffered()
+                buffered.mark(2048)
+                val buffer = ByteArray(2048)
+                val readBytes = buffered.read(buffer)
+                if (readBytes > 0) {
+                    val sample = buffer.copyOf(readBytes)
+                    if (isBinaryContent(sample)) {
+                        return -1L
+                    }
+                }
+                buffered.reset()
+
+                buffered.bufferedReader().useLines { lines ->
                     lines.forEach { rawLine ->
                         val line = rawLine.trim()
                         if (line.isNotBlank() && !line.startsWith("#")) {
@@ -115,37 +130,107 @@ class PlaylistRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            return -1L
         }
 
-        if (songIdentifiers.isNotEmpty()) {
-            val allSongs = songDao.getAllSongs().first()
-            val matchedPlaylistSongs = mutableListOf<PlaylistSongEntity>()
-            var pos = 0
+        if (songIdentifiers.isEmpty()) {
+            return -1L
+        }
 
-            for (identifier in songIdentifiers) {
-                val matchedSong = allSongs.find { song ->
-                    song.uri.contains(identifier, ignoreCase = true) ||
-                            identifier.contains(song.title, ignoreCase = true) ||
-                            song.relativePath.contains(identifier, ignoreCase = true) ||
-                            song.fileName.contains(identifier, ignoreCase = true)
+        val allSongs = songDao.getAllSongs().first()
+        val matchedPlaylistSongs = mutableListOf<PlaylistSongEntity>()
+        var pos = 0
+
+        val playlistName = fileName.substringBeforeLast(".")
+            .ifBlank { "Imported Playlist" }
+
+        var playlistId = -1L
+
+        for (identifier in songIdentifiers) {
+            val matchedSong = findMatchingSong(identifier, allSongs)
+            if (matchedSong != null) {
+                if (playlistId == -1L) {
+                    playlistId = playlistDao.insertPlaylist(PlaylistEntity(name = playlistName))
                 }
-                if (matchedSong != null) {
-                    matchedPlaylistSongs.add(
-                        PlaylistSongEntity(
-                            playlistId = playlistId,
-                            songId = matchedSong.id,
-                            position = pos++
-                        )
+                matchedPlaylistSongs.add(
+                    PlaylistSongEntity(
+                        playlistId = playlistId,
+                        songId = matchedSong.id,
+                        position = pos++
                     )
-                }
+                )
             }
+        }
 
-            if (matchedPlaylistSongs.isNotEmpty()) {
-                playlistDao.insertPlaylistSongs(matchedPlaylistSongs)
-            }
+        if (matchedPlaylistSongs.isNotEmpty() && playlistId != -1L) {
+            playlistDao.insertPlaylistSongs(matchedPlaylistSongs)
         }
 
         return playlistId
+    }
+
+    private fun isBinaryContent(sample: ByteArray): Boolean {
+        if (sample.size >= 3 && sample[0] == 0xFF.toByte() && sample[1] == 0xD8.toByte() && sample[2] == 0xFF.toByte()) {
+            return true // JPEG
+        }
+        if (sample.size >= 4 && sample[0] == 0x89.toByte() && sample[1] == 0x50.toByte() && sample[2] == 0x4E.toByte() && sample[3] == 0x47.toByte()) {
+            return true // PNG
+        }
+        if (sample.size >= 4 && sample[0] == 0x25.toByte() && sample[1] == 0x50.toByte() && sample[2] == 0x44.toByte() && sample[3] == 0x46.toByte()) {
+            return true // PDF
+        }
+        if (sample.size >= 4 && sample[0] == 0x50.toByte() && sample[1] == 0x4B.toByte() && (sample[2] == 0x03.toByte() || sample[2] == 0x05.toByte())) {
+            return true // ZIP / APK / JAR
+        }
+        if (sample.size >= 3 && sample[0] == 'I'.code.toByte() && sample[1] == 'D'.code.toByte() && sample[2] == '3'.code.toByte()) {
+            return true // MP3 ID3 header
+        }
+
+        var nonPrintableCount = 0
+        for (b in sample) {
+            val v = b.toInt() and 0xFF
+            if (v == 0) return true // Null byte indicates binary content
+            if (v < 32 && v != 9 && v != 10 && v != 13) {
+                nonPrintableCount++
+            }
+        }
+
+        return (nonPrintableCount.toDouble() / sample.size) > 0.10
+    }
+
+    private fun findMatchingSong(
+        identifier: String,
+        allSongs: List<io.github.vinaygaykar.mp1.data.local.entities.SongEntity>
+    ): io.github.vinaygaykar.mp1.data.local.entities.SongEntity? {
+        val normalizedIdentifier = identifier.replace('\\', '/')
+        val identifierFileName = normalizedIdentifier.substringAfterLast('/')
+        val identifierNameNoExt = identifierFileName.substringBeforeLast('.')
+
+        if (identifierFileName.isBlank()) return null
+
+        return allSongs.find { song ->
+            val songFileName = song.fileName
+            val songFileNameNoExt = songFileName.substringBeforeLast('.')
+
+            // 1. Match by full or partial URI
+            song.uri.equals(identifier, ignoreCase = true) ||
+            song.uri.contains(normalizedIdentifier, ignoreCase = true) ||
+
+            // 2. Exact match on file name
+            songFileName.equals(identifierFileName, ignoreCase = true) ||
+
+            // 3. Match by filename without extension
+            (identifierNameNoExt.isNotBlank() && songFileNameNoExt.equals(identifierNameNoExt, ignoreCase = true)) ||
+
+            // 4. Relative path matching
+            (song.relativePath.isNotBlank() && (
+                normalizedIdentifier.contains(song.relativePath, ignoreCase = true) ||
+                song.relativePath.contains(normalizedIdentifier, ignoreCase = true)
+            )) ||
+
+            // 5. Exact title match (only if identifier file name matches title exactly)
+            (song.title.isNotBlank() && song.title.length >= 3 && identifierNameNoExt.equals(song.title, ignoreCase = true))
+        }
     }
 
     override suspend fun deletePlaylist(id: Long) {

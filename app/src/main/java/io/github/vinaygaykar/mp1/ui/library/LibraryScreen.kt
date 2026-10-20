@@ -181,6 +181,7 @@ fun LibraryScreen(
         playerViewModel.uiState.map { it.isScanInProgress }.distinctUntilChanged()
     }.collectAsState(initial = false)
     val currentFolder by settingsViewModel.currentScanningFolder.collectAsState()
+    val importError by viewModel.importError.collectAsState()
 
     LibraryContent(
         playlists = playlists,
@@ -194,6 +195,8 @@ fun LibraryScreen(
         miniPlayerTargetOffset = miniPlayerTargetOffset,
         isScanning = isScanning,
         currentFolder = currentFolder,
+        importError = importError,
+        onDismissImportError = { viewModel.clearImportError() },
         onBulgeMiniPlayer = onBulgeMiniPlayer,
         onSearchClick = onSearchClick,
         onSettingsClick = onSettingsClick,
@@ -227,6 +230,8 @@ fun LibraryContent(
     miniPlayerTargetOffset: Offset? = null,
     isScanning: Boolean = false,
     currentFolder: String? = null,
+    importError: String? = null,
+    onDismissImportError: () -> Unit = {},
     onBulgeMiniPlayer: () -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -253,7 +258,7 @@ fun LibraryContent(
     var showCreatePlaylistForSelectionDialog by remember { mutableStateOf(false) }
 
     val importPlaylistLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let { onImportPlaylist(it) }
     }
@@ -262,6 +267,29 @@ fun LibraryContent(
         CreatePlaylistDialog(
             onDismiss = { showCreateDialog = false },
             onCreate = { name -> onCreatePlaylist(name) }
+        )
+    }
+
+    if (importError != null) {
+        AlertDialog(
+            onDismissRequest = onDismissImportError,
+            title = {
+                Text(
+                    text = "Import Failed",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = importError,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onDismissImportError) {
+                    Text("OK")
+                }
+            }
         )
     }
 
@@ -666,7 +694,19 @@ fun LibraryContent(
                         0 -> PlaylistGrid(
                             playlists = playlists,
                             onCreateClick = { showCreateDialog = true },
-                            onImportClick = { importPlaylistLauncher.launch("*/*") },
+                            onImportClick = {
+                                importPlaylistLauncher.launch(
+                                    arrayOf(
+                                        "audio/x-mpegurl",
+                                        "audio/mpegurl",
+                                        "application/x-mpegurl",
+                                        "application/vnd.apple.mpegurl",
+                                        "audio/x-scpls",
+                                        "text/plain",
+                                        "text/x-m3u"
+                                    )
+                                )
+                            },
                             selectedPlaylistIds = selectedPlaylistIds,
                             isSelectionMode = isPlaylistSelectionMode,
                             onPlaylistClick = { playlist ->

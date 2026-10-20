@@ -27,8 +27,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.guava.await
@@ -102,9 +104,19 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    private val _importError = MutableStateFlow<String?>(null)
+    val importError: StateFlow<String?> = _importError.asStateFlow()
+
+    fun clearImportError() {
+        _importError.value = null
+    }
+
     fun importPlaylist(uri: Uri) {
         viewModelScope.launch {
-            playlistRepository.importPlaylist(uri)
+            val playlistId = playlistRepository.importPlaylist(uri)
+            if (playlistId == -1L) {
+                _importError.value = "Failed to import playlist. The selected file is invalid, unsupported, or contains no matching songs."
+            }
         }
     }
 
