@@ -22,13 +22,10 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.ui.library.formatTime
 import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.DEFAULT_WAVE_CYCLES
 import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.EnergyWaveform
-import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.FrequencyWaveform
 import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.PlaybackWaveform
-import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 
 @Composable
 fun PlayerTimestampBar(
@@ -37,20 +34,18 @@ fun PlayerTimestampBar(
     isPlaying: Boolean,
     scrubFactor: Float,
     rowWidthFraction: Float,
-    recordY: Dp,
+    recordY: Dp? = null,
     progress: Float,
     modifier: Modifier = Modifier,
     energy: Float? = null,
     energyDelta: Float = 0f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     minBarWidth: Dp = 140.dp,
-    frequencyFrame: FrequencyFrame? = null,
-    playbackWave: PlaybackWaveType = PlaybackWaveType.ENERGY,
 ) {
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth(rowWidthFraction)
-            .offset(y = recordY - 80.dp)
+            .then(if (recordY != null) Modifier.offset(y = recordY - 80.dp) else Modifier)
             .alpha(progress),
         contentAlignment = Alignment.Center
     ) {
@@ -87,73 +82,31 @@ fun PlayerTimestampBar(
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
-            when (playbackWave) {
-                PlaybackWaveType.ENERGY -> {
-                    if (energy != null) {
-                        EnergyWaveform(
-                            isPlaying = isPlaying,
-                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                            scrubFactor = scrubFactor,
-                            energy = energy,
-                            waveCycles = waveCycles,
-                            aspectRatio = selectedAspectRatio,
-                            activeColor = MaterialTheme.colorScheme.primary,
-                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp)
-                        )
-                    } else {
-                        PlaybackWaveform(
-                            isPlaying = isPlaying,
-                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                            scrubFactor = scrubFactor,
-                            activeColor = MaterialTheme.colorScheme.primary,
-                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp)
-                        )
-                    }
-                }
-                PlaybackWaveType.SIMPLICITY -> {
-                    PlaybackWaveform(
-                        isPlaying = isPlaying,
-                        progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                        scrubFactor = scrubFactor,
-                        activeColor = MaterialTheme.colorScheme.primary,
-                        inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
-                    )
-                }
-                PlaybackWaveType.FREQUENCY -> {
-                    if (frequencyFrame != null) {
-                        FrequencyWaveform(
-                            isPlaying = isPlaying,
-                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                            scrubFactor = scrubFactor,
-                            frequencyFrame = frequencyFrame,
-                            activeColor = MaterialTheme.colorScheme.primary,
-                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp)
-                        )
-                    } else {
-                        PlaybackWaveform(
-                            isPlaying = isPlaying,
-                            progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
-                            scrubFactor = scrubFactor,
-                            activeColor = MaterialTheme.colorScheme.primary,
-                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp)
-                        )
-                    }
-                }
+            if (energy != null) {
+                EnergyWaveform(
+                    isPlaying = isPlaying,
+                    progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                    scrubFactor = scrubFactor,
+                    energy = energy,
+                    waveCycles = waveCycles,
+                    aspectRatio = selectedAspectRatio,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                )
+            } else {
+                PlaybackWaveform(
+                    isPlaying = isPlaying,
+                    progress = if (durationMs > 0) displayPositionMs.toFloat() / durationMs else 0f,
+                    scrubFactor = scrubFactor,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                )
             }
             Text(
                 text = formatTime(durationMs),

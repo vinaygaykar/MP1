@@ -40,6 +40,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -128,6 +129,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
@@ -708,13 +710,33 @@ fun ExpandablePlayer(
         val startPadding = lerp(rawStartPadding, 0.dp, progress)
         val endPadding = lerp(rawEndPadding, 0.dp, progress)
 
+        val isLandscape = screenWidth > screenHeight
+
         val cornerRadius = lerp(50.dp, 0.dp, progress)
         val sheetShadowElevation = lerp(8.dp, 0.dp, progress)
         val surfaceAlpha = 1f
-        val recordSize = lerp(56.dp, screenWidth * 0.85f, progress)
+
+        val targetRecordSize = if (isLandscape) {
+            min(screenHeight * 0.72f, screenWidth * 0.35f)
+        } else {
+            screenWidth * 0.85f
+        }
+        val recordSize = lerp(56.dp, targetRecordSize, progress)
         val artworkSize = lerp(56.dp, min(210.dp, recordSize * 0.6f), progress)
-        val recordX = lerp(screenWidth - recordSize - 8.dp - horizontalPadding, (screenWidth - recordSize) / 2 - horizontalPadding, progress)
-        val recordY = lerp(8.dp, screenHeight * 0.44f, progress)
+
+        val targetRecordX = if (isLandscape) {
+            (screenWidth * 0.42f - targetRecordSize) / 2
+        } else {
+            (screenWidth - targetRecordSize) / 2 - horizontalPadding
+        }
+        val recordX = lerp(screenWidth - recordSize - 8.dp - horizontalPadding, targetRecordX, progress)
+
+        val targetRecordY = if (isLandscape) {
+            (screenHeight - targetRecordSize) / 2
+        } else {
+            screenHeight * 0.44f
+        }
+        val recordY = lerp(8.dp, targetRecordY, progress)
 
         Box(
             modifier = Modifier
@@ -827,9 +849,17 @@ fun ExpandablePlayer(
                     ) {
                         // Expanded Content
                         if (progress > 0f) {
+                            val trackInfoModifier = if (isLandscape) {
+                                Modifier
+                                    .fillMaxHeight()
+                                    .width(screenWidth * 0.58f)
+                                    .offset(x = screenWidth * 0.42f)
+                            } else {
+                                Modifier.fillMaxSize()
+                            }
                             ExpandedPlayerTrackInfo(
                                 state = state,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = trackInfoModifier,
                                 pagerState = pagerState,
                                 onArtistClick = {
                                     showArtistsDialog = true
@@ -896,30 +926,7 @@ fun ExpandablePlayer(
                             }
                         }
 
-                        // Lyrics Toggle Button
-                        if (progress > 0.8f) {
-                            FilledIconButton(
-                                onClick = { showLyrics = true },
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(start = 24.dp, bottom = 48.dp)
-                                    .alpha(controlsAlpha)
-                                    .size(48.dp),
-                                shape = CircleShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f),
-                                    contentColor = MaterialTheme.colorScheme.primary
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Lyrics,
-                                    contentDescription = "Lyrics",
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-
-                        // Repeat Mode Toggle Button
+                        // Action Buttons (Lyrics, Repeat, Queue)
                         if (progress > 0.8f) {
                             val (repeatIcon, repeatText) = when (state.repeatMode) {
                                 1 -> Icons.Rounded.RepeatOne to "Song"
@@ -927,70 +934,170 @@ fun ExpandablePlayer(
                                 else -> Icons.Rounded.Repeat to "Off"
                             }
 
-                            Surface(
-                                onClick = { actions.onRepeatToggle() },
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = 48.dp)
-                                    .alpha(controlsAlpha)
-                                    .width(110.dp)
-                                    .height(48.dp),
-                                shape = CircleShape,
-                                color = if (state.repeatMode != 0) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
-                                } else {
-                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f)
-                                },
-                                contentColor = if (state.repeatMode != 0) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                                }
-                            ) {
+                            if (isLandscape) {
                                 Row(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
+                                        .align(Alignment.BottomEnd)
+                                        .padding(end = 24.dp, bottom = 20.dp)
+                                        .alpha(controlsAlpha),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    FilledIconButton(
+                                        onClick = { showLyrics = true },
+                                        modifier = Modifier.size(48.dp),
+                                        shape = CircleShape,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f),
+                                            contentColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Lyrics,
+                                            contentDescription = "Lyrics",
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+
+                                    Surface(
+                                        onClick = { actions.onRepeatToggle() },
+                                        modifier = Modifier
+                                            .width(110.dp)
+                                            .height(48.dp),
+                                        shape = CircleShape,
+                                        color = if (state.repeatMode != 0) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f)
+                                        },
+                                        contentColor = if (state.repeatMode != 0) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                        }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = repeatIcon,
+                                                contentDescription = repeatText,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = repeatText,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+
+                                    FilledIconButton(
+                                        onClick = { showQueue = true },
+                                        modifier = Modifier.size(48.dp),
+                                        shape = CircleShape,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f),
+                                            contentColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                                            contentDescription = "Playing Queue",
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                FilledIconButton(
+                                    onClick = { showLyrics = true },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(start = 24.dp, bottom = 48.dp)
+                                        .alpha(controlsAlpha)
+                                        .size(48.dp),
+                                    shape = CircleShape,
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f),
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    )
                                 ) {
                                     Icon(
-                                        imageVector = repeatIcon,
-                                        contentDescription = repeatText,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = repeatText,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        imageVector = Icons.Rounded.Lyrics,
+                                        contentDescription = "Lyrics",
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
-                            }
-                        }
 
-                        // Queue Toggle Button
-                        if (progress > 0.8f) {
-                            FilledIconButton(
-                                onClick = { showQueue = true },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(end = 24.dp, bottom = 48.dp)
-                                    .alpha(controlsAlpha)
-                                    .size(48.dp),
-                                shape = CircleShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f),
-                                    contentColor = MaterialTheme.colorScheme.primary
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
-                                    contentDescription = "Playing Queue",
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                Surface(
+                                    onClick = { actions.onRepeatToggle() },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 48.dp)
+                                        .alpha(controlsAlpha)
+                                        .width(110.dp)
+                                        .height(48.dp),
+                                    shape = CircleShape,
+                                    color = if (state.repeatMode != 0) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f)
+                                    },
+                                    contentColor = if (state.repeatMode != 0) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = repeatIcon,
+                                            contentDescription = repeatText,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = repeatText,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                FilledIconButton(
+                                    onClick = { showQueue = true },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(end = 24.dp, bottom = 48.dp)
+                                        .alpha(controlsAlpha)
+                                        .size(48.dp),
+                                    shape = CircleShape,
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f),
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                                        contentDescription = "Playing Queue",
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -1014,33 +1121,36 @@ fun ExpandablePlayer(
                                     null to 0f
                                 }
                             }
-                            val currentFrequencyFrame = remember(visualizerState, displayPosition) {
-                                if (visualizerState is VisualizerState.Frequency) {
-                                    val curve = visualizerState.frames
-                                    val bucketIndex = (displayPosition / AudioFrequencyExtractor.FREQUENCY_INTERVAL_MS).toInt()
-                                    if (bucketIndex in curve.indices) {
-                                        curve[bucketIndex]
-                                    } else {
-                                        null
-                                    }
-                                } else {
-                                    null
-                                }
+                            if (isLandscape) {
+                                PlayerTimestampBar(
+                                    displayPositionMs = displayPosition,
+                                    durationMs = state.durationMs,
+                                    isPlaying = state.isPlaying,
+                                    scrubFactor = scrubFactor,
+                                    rowWidthFraction = 1f,
+                                    recordY = null,
+                                    progress = controlsAlpha,
+                                    energy = currentEnergy,
+                                    energyDelta = currentEnergyDelta,
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(x = screenWidth * 0.42f, y = screenHeight * 0.50f)
+                                        .padding(end = 24.dp)
+                                )
+                            } else {
+                                PlayerTimestampBar(
+                                    displayPositionMs = displayPosition,
+                                    durationMs = state.durationMs,
+                                    isPlaying = state.isPlaying,
+                                    scrubFactor = scrubFactor,
+                                    rowWidthFraction = rowWidthFraction,
+                                    recordY = recordY,
+                                    progress = controlsAlpha,
+                                    energy = currentEnergy,
+                                    energyDelta = currentEnergyDelta,
+                                    modifier = Modifier.align(Alignment.TopCenter)
+                                )
                             }
-                            PlayerTimestampBar(
-                                displayPositionMs = displayPosition,
-                                durationMs = state.durationMs,
-                                isPlaying = state.isPlaying,
-                                scrubFactor = scrubFactor,
-                                rowWidthFraction = rowWidthFraction,
-                                recordY = recordY,
-                                progress = controlsAlpha,
-                                energy = currentEnergy,
-                                energyDelta = currentEnergyDelta,
-                                frequencyFrame = currentFrequencyFrame,
-                                playbackWave = state.playbackWave,
-                                modifier = Modifier.align(Alignment.TopCenter)
-                            )
                         }
 
                         val containerSize = recordSize * 1.15f
@@ -1406,15 +1516,13 @@ private val samplePlayerState = PlayerUiState(
     hasPrevious = true
 )
 
-@Preview(showBackground = true, name = "Expandable Player - Medium Title", device = "id:pixel_7")
+@Preview(showBackground = true, name = "Portrait Phone Expanded", device = "spec:width=411dp,height=891dp,orientation=portrait")
 @Composable
-fun ExpandablePlayerMediumTitlePreview() {
+fun ExpandablePlayerPortraitExpandedPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(
-                    trackTitle = "A Desolation Song"
-                ),
+                state = samplePlayerState,
                 actions = samplePlayerActions,
                 onProgressUpdate = {},
                 initialExpanded = true
@@ -1423,7 +1531,82 @@ fun ExpandablePlayerMediumTitlePreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Expandable Player - Long Title", device = "id:pixel_7")
+@Preview(showBackground = true, name = "Landscape Phone Expanded", device = "spec:width=891dp,height=411dp,orientation=landscape")
+@Composable
+fun ExpandablePlayerLandscapeExpandedPreview() {
+    MusicPlayerTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ExpandablePlayer(
+                state = samplePlayerState,
+                actions = samplePlayerActions,
+                onProgressUpdate = {},
+                initialExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Foldable / Tablet Expanded", device = "spec:width=800dp,height=800dp")
+@Composable
+fun ExpandablePlayerFoldableExpandedPreview() {
+    MusicPlayerTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ExpandablePlayer(
+                state = samplePlayerState,
+                actions = samplePlayerActions,
+                onProgressUpdate = {},
+                initialExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Playing State", device = "id:pixel_7")
+@Composable
+fun ExpandablePlayerPlayingPreview() {
+    MusicPlayerTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ExpandablePlayer(
+                state = samplePlayerState.copy(isPlaying = true),
+                actions = samplePlayerActions,
+                onProgressUpdate = {},
+                initialExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Paused State", device = "id:pixel_7")
+@Composable
+fun ExpandablePlayerPausedStatePreview() {
+    MusicPlayerTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ExpandablePlayer(
+                state = samplePlayerState.copy(isPlaying = false),
+                actions = samplePlayerActions,
+                onProgressUpdate = {},
+                initialExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Short / Medium Title", device = "id:pixel_7")
+@Composable
+fun ExpandablePlayerShortTitlePreview() {
+    MusicPlayerTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ExpandablePlayer(
+                state = samplePlayerState.copy(trackTitle = "Midnight City"),
+                actions = samplePlayerActions,
+                onProgressUpdate = {},
+                initialExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Long Multi-line Title", device = "id:pixel_7")
 @Composable
 fun ExpandablePlayerLongTitlePreview() {
     MusicPlayerTheme {
@@ -1440,13 +1623,15 @@ fun ExpandablePlayerLongTitlePreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Expandable Player - Paused", device = "id:pixel_7")
+@Preview(showBackground = true, name = "Multiple Artists", device = "id:pixel_7")
 @Composable
-fun ExpandablePlayerPausedPreview() {
+fun ExpandablePlayerMultipleArtistsPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(isPlaying = false),
+                state = samplePlayerState.copy(
+                    artist = "M83, Anthony Gonzalez, Morgan Kibby"
+                ),
                 actions = samplePlayerActions,
                 onProgressUpdate = {},
                 initialExpanded = true
@@ -1455,15 +1640,46 @@ fun ExpandablePlayerPausedPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Expandable Player - Collapsed", heightDp = 120)
+@Preview(showBackground = true, name = "Energy Waveform", device = "id:pixel_7")
 @Composable
-fun ExpandablePlayerCollapsedPreview() {
+fun ExpandablePlayerEnergyWaveformPreview() {
     MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxWidth()) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ExpandablePlayer(
+                state = samplePlayerState.copy(playbackWave = PlaybackWaveType.ENERGY),
+                actions = samplePlayerActions,
+                onProgressUpdate = {},
+                initialExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Light Theme", device = "id:pixel_7")
+@Composable
+fun ExpandablePlayerLightThemePreview() {
+    MusicPlayerTheme(darkTheme = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
                 state = samplePlayerState,
                 actions = samplePlayerActions,
-                onProgressUpdate = {}
+                onProgressUpdate = {},
+                initialExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Dark Theme", device = "id:pixel_7")
+@Composable
+fun ExpandablePlayerDarkThemePreview() {
+    MusicPlayerTheme(darkTheme = true) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ExpandablePlayer(
+                state = samplePlayerState,
+                actions = samplePlayerActions,
+                onProgressUpdate = {},
+                initialExpanded = true
             )
         }
     }
