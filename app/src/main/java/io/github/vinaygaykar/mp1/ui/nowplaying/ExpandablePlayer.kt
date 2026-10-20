@@ -131,8 +131,9 @@ import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
-import io.github.vinaygaykar.mp1.ui.faces.VinylFace
+import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.library.DragValue
 import io.github.vinaygaykar.mp1.ui.library.calculateAngle
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
@@ -141,7 +142,13 @@ import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
 import io.github.vinaygaykar.mp1.utils.AudioFrequencyExtractor
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
+import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.toArtistId
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -663,8 +670,6 @@ fun ExpandablePlayer(
             currentActions.onUpdateVisualizerVisibility(isPlayerVisible)
         }
 
-        val vinylFace = remember { VinylFace() }
-
         val prevItem = remember(state.queue, state.currentIndex, hasPrevPage) {
             if (!hasPrevPage || state.queue.isEmpty()) null
             else {
@@ -822,11 +827,9 @@ fun ExpandablePlayer(
                     ) {
                         // Expanded Content
                         if (progress > 0f) {
-                            vinylFace.Render(
+                            ExpandedPlayerTrackInfo(
                                 state = state,
-                                actions = actions,
                                 modifier = Modifier.fillMaxSize(),
-                                showRecord = false,
                                 pagerState = pagerState,
                                 onArtistClick = {
                                     showArtistsDialog = true
