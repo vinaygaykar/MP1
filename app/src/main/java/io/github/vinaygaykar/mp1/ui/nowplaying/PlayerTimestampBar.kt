@@ -1,4 +1,4 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,6 +23,12 @@ import androidx.compose.ui.unit.sp
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
+import io.github.vinaygaykar.mp1.ui.library.formatTime
+import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.DEFAULT_WAVE_CYCLES
+import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.EnergyWaveform
+import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.FrequencyWaveform
+import io.github.vinaygaykar.mp1.ui.nowplaying.waveforms.PlaybackWaveform
+import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 
 @Composable
 fun PlayerTimestampBar(
@@ -38,7 +44,7 @@ fun PlayerTimestampBar(
     energyDelta: Float = 0f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     minBarWidth: Dp = 140.dp,
-    frequencyFrame: io.github.vinaygaykar.mp1.utils.FrequencyFrame? = null,
+    frequencyFrame: FrequencyFrame? = null,
     playbackWave: PlaybackWaveType = PlaybackWaveType.ENERGY,
 ) {
     BoxWithConstraints(

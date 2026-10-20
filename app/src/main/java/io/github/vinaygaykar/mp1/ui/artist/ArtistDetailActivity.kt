@@ -1,7 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.artist
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -58,8 +57,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -101,8 +98,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -112,7 +107,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -123,19 +117,17 @@ import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.album.SongCardItem
-import io.github.vinaygaykar.mp1.ui.library.CreatePlaylistDialog
-import io.github.vinaygaykar.mp1.ui.library.ExpandablePlayer
+import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
+import io.github.vinaygaykar.mp1.ui.nowplaying.ExpandablePlayer
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
-import io.github.vinaygaykar.mp1.ui.library.FlyingArtworkItem
-import io.github.vinaygaykar.mp1.ui.library.FlyingArtworkOverlay
+import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
+import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
 import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
-import io.github.vinaygaykar.mp1.ui.library.PlaylistSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
-import io.github.vinaygaykar.mp1.ui.library.SelectionCountPill
+import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.ui.theme.isArtistMatchingPlayingTrack
-import io.github.vinaygaykar.mp1.ui.theme.rememberArtistShape
 import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -794,7 +786,7 @@ fun ArtistDetailScreen(
 
         // Playlist Selection Bottom Sheet
         if (showPlaylistSelectionSheet) {
-            PlaylistSelectionBottomSheet(
+            PlaylistPickerBottomSheet(
                 playlists = playlists,
                 onDismiss = { showPlaylistSelectionSheet = false },
                 onSelectPlaylist = { playlist ->

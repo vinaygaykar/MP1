@@ -1,4 +1,7 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.ui.nowplaying
+
+import io.github.vinaygaykar.mp1.data.repo.LyricsParser
+import io.github.vinaygaykar.mp1.data.repo.isInstrumental
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode

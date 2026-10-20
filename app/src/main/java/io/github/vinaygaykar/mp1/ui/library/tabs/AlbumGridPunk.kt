@@ -1,4 +1,4 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.ui.library.tabs
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState

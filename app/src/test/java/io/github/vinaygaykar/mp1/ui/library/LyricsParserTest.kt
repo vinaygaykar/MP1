@@ -1,5 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.library
 
+import io.github.vinaygaykar.mp1.data.repo.LyricsParser
+import io.github.vinaygaykar.mp1.data.repo.isInstrumental
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

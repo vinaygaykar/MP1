@@ -60,7 +60,7 @@ import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
-import io.github.vinaygaykar.mp1.ui.library.SongListItem
+import io.github.vinaygaykar.mp1.ui.library.tabs.SongListItem
 import io.github.vinaygaykar.mp1.ui.theme.rememberArtistShape
 
 @Composable

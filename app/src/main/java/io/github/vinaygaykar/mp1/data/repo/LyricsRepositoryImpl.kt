@@ -4,7 +4,6 @@ import io.github.vinaygaykar.mp1.data.network.LrcLibService
 import io.github.vinaygaykar.mp1.domain.models.Lyrics
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
-import io.github.vinaygaykar.mp1.ui.library.LyricsParser
 import javax.inject.Inject
 
 class LyricsRepositoryImpl @Inject constructor(

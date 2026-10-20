@@ -1,4 +1,4 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.ui.nowplaying.waveforms
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas

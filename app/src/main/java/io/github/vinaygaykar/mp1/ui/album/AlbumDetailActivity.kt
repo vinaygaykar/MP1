@@ -1,13 +1,11 @@
 package io.github.vinaygaykar.mp1.ui.album
 
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,7 +32,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -97,38 +94,30 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
-import coil.imageLoader
 import coil.request.ImageRequest
-import coil.request.SuccessResult
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.artist.CollaboratorArtistCard
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
-import io.github.vinaygaykar.mp1.ui.library.CreatePlaylistDialog
-import io.github.vinaygaykar.mp1.ui.library.FlyingArtworkItem
-import io.github.vinaygaykar.mp1.ui.library.FlyingArtworkOverlay
-import io.github.vinaygaykar.mp1.ui.library.ExpandablePlayer
+import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
+import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
 import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
-import io.github.vinaygaykar.mp1.ui.library.PlaylistSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
-import io.github.vinaygaykar.mp1.ui.library.SelectionCountPill
+import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
+import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
+import io.github.vinaygaykar.mp1.ui.nowplaying.ExpandablePlayer
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 
 @AndroidEntryPoint
@@ -700,7 +689,7 @@ fun AlbumDetailScreen(
 
             // Playlist Selection Bottom Sheet
             if (showPlaylistSelectionSheet) {
-                PlaylistSelectionBottomSheet(
+                PlaylistPickerBottomSheet(
                     playlists = playlists,
                     onDismiss = { showPlaylistSelectionSheet = false },
                     onSelectPlaylist = { playlist ->

@@ -8,8 +8,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -56,27 +54,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.core.graphics.ColorUtils
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.album.SongCardItem
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
-import io.github.vinaygaykar.mp1.ui.library.CreatePlaylistDialog
-import io.github.vinaygaykar.mp1.ui.library.ExpandablePlayer
-import io.github.vinaygaykar.mp1.ui.library.FlyingArtworkItem
+import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
+import io.github.vinaygaykar.mp1.ui.nowplaying.ExpandablePlayer
+import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
-import io.github.vinaygaykar.mp1.ui.library.PlaylistSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
-import io.github.vinaygaykar.mp1.ui.library.SelectionCountPill
+import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -414,7 +408,7 @@ fun GenreDetailScreen(
 
             // Playlist Selection Bottom Sheet
             if (showPlaylistSelectionSheet) {
-                PlaylistSelectionBottomSheet(
+                PlaylistPickerBottomSheet(
                     playlists = playlists,
                     onDismiss = { showPlaylistSelectionSheet = false },
                     onSelectPlaylist = { playlist ->

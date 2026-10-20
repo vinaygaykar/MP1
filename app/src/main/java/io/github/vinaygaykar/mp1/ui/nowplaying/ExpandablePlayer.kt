@@ -1,7 +1,6 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import android.view.HapticFeedbackConstants
-import android.view.View
 import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -19,7 +18,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -31,20 +29,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
-import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -96,7 +88,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -112,7 +103,6 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.min
 import androidx.media3.common.MediaItem
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -136,25 +126,26 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.Player
 import coil.compose.AsyncImage
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.faces.VinylFace
+import io.github.vinaygaykar.mp1.ui.library.DragValue
+import io.github.vinaygaykar.mp1.ui.library.calculateAngle
+import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
 import io.github.vinaygaykar.mp1.utils.AudioFrequencyExtractor
-import io.github.vinaygaykar.mp1.utils.FrequencyFrame
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.toArtistId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
 private data class ColorStep(
@@ -337,9 +328,9 @@ fun ExpandablePlayer(
     val scale = remember { Animatable(1f) }
     val hasPrevPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
         if (state.queue.size <= 1) {
-            state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+            state.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL) {
+            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
                 state.currentIndex > 0
@@ -349,9 +340,9 @@ fun ExpandablePlayer(
 
     val hasNextPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
         if (state.queue.size <= 1) {
-            state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+            state.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL) {
+            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
                 state.currentIndex in 0 until state.queue.size - 1
@@ -1104,7 +1095,10 @@ fun ExpandablePlayer(
                                                             val pointerId = down.id
                                                             var isDragging = false
                                                             var wasPlayingOnDragStart = false
-                                                            var lastAngle = calculateAngle(down.position, localCenter)
+                                                            var lastAngle = calculateAngle(
+                                                                down.position,
+                                                                localCenter
+                                                            )
 
                                                             while (true) {
                                                                 val event = awaitPointerEvent(pass = PointerEventPass.Initial)
@@ -1123,7 +1117,11 @@ fun ExpandablePlayer(
                                                                                 draggedPosition = currentState.positionMs
                                                                                 hapticAccumulator = 0f
                                                                                 invalidHapticAccumulator = 0f
-                                                                                lastAngle = calculateAngle(change.position, localCenter)
+                                                                                lastAngle =
+                                                                                    calculateAngle(
+                                                                                        change.position,
+                                                                                        localCenter
+                                                                                    )
                                                                                 if (wasPlayingOnDragStart) currentActions.pause()
                                                                             }
                                                                         }
@@ -1131,7 +1129,11 @@ fun ExpandablePlayer(
                                                                         change.consume()
                                                                         if (isVinylRing) {
                                                                             val currentCenter = Offset(size.width / 2f, size.height / 2f)
-                                                                            val currentAngle = calculateAngle(change.position, currentCenter)
+                                                                            val currentAngle =
+                                                                                calculateAngle(
+                                                                                    change.position,
+                                                                                    currentCenter
+                                                                                )
                                                                             var delta = currentAngle - lastAngle
                                                                             if (delta > 180f) delta -= 360f
                                                                             if (delta < -180f) delta += 360f
@@ -1459,154 +1461,6 @@ fun ExpandablePlayerCollapsedPreview() {
                 state = samplePlayerState,
                 actions = samplePlayerActions,
                 onProgressUpdate = {}
-            )
-        }
-    }
-}
-
-@Composable
-fun SongArtistsDialog(
-    trackTitle: String,
-    artistNames: List<String>,
-    onDismissRequest: () -> Unit,
-    onArtistClick: (String) -> Unit,
-    libraryViewModel: LibraryViewModel = hiltViewModel()
-) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxWidth()
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Artists",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (trackTitle.isNotBlank()) {
-                            Text(
-                                text = trackTitle,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    IconButton(onClick = onDismissRequest) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Artist List
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(artistNames, key = { it }) { name ->
-                        SongArtistDialogItem(
-                            artistName = name,
-                            onClick = { onArtistClick(name) },
-                            onFetchImageUrl = { artistName, artistId ->
-                                libraryViewModel.getArtistImageUrl(artistName, artistId)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SongArtistDialogItem(
-    artistName: String,
-    onClick: () -> Unit,
-    onFetchImageUrl: suspend (String, String) -> String?
-) {
-    val artistId = remember(artistName) { artistName.toArtistId() }
-    var imageUrl by remember(artistName) { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(artistName, artistId) {
-        val fetchedUrl = onFetchImageUrl(artistName, artistId)
-        if (!fetchedUrl.isNullOrEmpty()) {
-            imageUrl = fetchedUrl
-        }
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() },
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!imageUrl.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = artistName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Text(
-                text = artistName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
             )
         }
     }

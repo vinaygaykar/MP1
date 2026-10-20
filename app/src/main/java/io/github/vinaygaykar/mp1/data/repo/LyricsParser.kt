@@ -1,4 +1,4 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.data.repo
 
 import io.github.vinaygaykar.mp1.domain.models.Lyrics
 import io.github.vinaygaykar.mp1.domain.models.LyricsLine

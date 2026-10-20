@@ -1,4 +1,4 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import android.net.Uri
 import android.view.HapticFeedbackConstants
@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.playback.PlayerActions
 import io.github.vinaygaykar.mp1.playback.PlayerUiState
@@ -88,9 +89,9 @@ fun MiniPlayer(
 
     val hasPrevPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
         if (state.queue.size <= 1) {
-            state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+            state.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL) {
+            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
                 state.currentIndex > 0
@@ -100,9 +101,9 @@ fun MiniPlayer(
 
     val hasNextPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
         if (state.queue.size <= 1) {
-            state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL
+            state.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ALL) {
+            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
                 state.currentIndex in 0 until state.queue.size - 1

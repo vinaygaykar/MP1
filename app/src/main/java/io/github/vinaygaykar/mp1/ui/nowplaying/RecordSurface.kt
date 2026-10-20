@@ -1,4 +1,4 @@
-package io.github.vinaygaykar.mp1.ui.library
+package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import android.net.Uri
 import androidx.compose.animation.core.Spring
