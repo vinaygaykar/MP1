@@ -104,7 +104,7 @@ class PlayerViewModel @Inject constructor(
 
                 override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
                     updateState()
-                    controller?.currentTimeline?.let { updateQueueFromTimeline(it) }
+                    controller?.currentTimeline?.let { updateQueueFromTimeline(it, forceRebuild = true) }
                 }
 
                 override fun onRepeatModeChanged(repeatMode: Int) {
@@ -116,11 +116,12 @@ class PlayerViewModel @Inject constructor(
                     reason: Int
                 ) {
                     updateState()
-                    updateQueueFromTimeline(timeline)
+                    val isPlaylistChanged = reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
+                    updateQueueFromTimeline(timeline, forceRebuild = isPlaylistChanged)
                 }
             })
             updateState()
-            controller?.currentTimeline?.let { updateQueueFromTimeline(it) }
+            controller?.currentTimeline?.let { updateQueueFromTimeline(it, forceRebuild = true) }
             if (controller?.isPlaying == true) {
                 startPositionUpdates()
             }
@@ -251,7 +252,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun updateQueueFromTimeline(timeline: Timeline) {
+    private fun updateQueueFromTimeline(timeline: Timeline, forceRebuild: Boolean = false) {
         if (timeline.isEmpty) {
             queueUpdateJob?.cancel()
             currentWindowIndices = emptyList()
@@ -274,75 +275,96 @@ class PlayerViewModel @Inject constructor(
                 (p?.shuffleModeEnabled ?: false) to (p?.currentMediaItemIndex ?: -1)
             }
 
-            val window = Timeline.Window()
-            val newQueue = ArrayList<MediaItem>(count)
-            val newWindowIndices = ArrayList<Int>(count)
+            val shouldRebuild = forceRebuild ||
+                    currentWindowIndices.size != count ||
+                    currentWindowIndices.any { it !in 0 until count } ||
+                    _uiState.value.isShuffleOn != isShuffleOn
 
-            if (isShuffleOn && count > 1) {
-                val visited = BooleanArray(count)
-                var visitedCount = 0
+            if (shouldRebuild) {
+                val window = Timeline.Window()
+                val newQueue = ArrayList<MediaItem>(count)
+                val newWindowIndices = ArrayList<Int>(count)
 
-                // Anchor shuffle queue at currentWindowIndex so the playing track is always first
-                var index = if (currentWindowIndex in 0 until count) {
-                    currentWindowIndex
+                if (isShuffleOn && count > 1) {
+                    val visited = BooleanArray(count)
+                    var visitedCount = 0
+
+                    // Anchor shuffle queue at currentWindowIndex so the playing track is always first
+                    var index = if (currentWindowIndex in 0 until count) {
+                        currentWindowIndex
+                    } else {
+                        timeline.getFirstWindowIndex(true)
+                    }
+
+                    while (index in 0 until count && !visited[index] && visitedCount < count) {
+                        visited[index] = true
+                        timeline.getWindow(index, window)
+                        newQueue.add(window.mediaItem)
+                        newWindowIndices.add(index)
+                        visitedCount++
+                        index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, true)
+                    }
+
+                    if (visitedCount < count) {
+                        var fallbackIndex = timeline.getFirstWindowIndex(true)
+                        while (fallbackIndex in 0 until count && visitedCount < count) {
+                            if (!visited[fallbackIndex]) {
+                                visited[fallbackIndex] = true
+                                timeline.getWindow(fallbackIndex, window)
+                                newQueue.add(window.mediaItem)
+                                newWindowIndices.add(fallbackIndex)
+                                visitedCount++
+                            }
+                            fallbackIndex = timeline.getNextWindowIndex(fallbackIndex, Player.REPEAT_MODE_OFF, true)
+                        }
+                    }
+
+                    if (visitedCount < count) {
+                        for (i in 0 until count) {
+                            if (!visited[i]) {
+                                timeline.getWindow(i, window)
+                                newQueue.add(window.mediaItem)
+                                newWindowIndices.add(i)
+                            }
+                        }
+                    }
                 } else {
-                    timeline.getFirstWindowIndex(true)
-                }
-
-                while (index in 0 until count && !visited[index] && visitedCount < count) {
-                    visited[index] = true
-                    timeline.getWindow(index, window)
-                    newQueue.add(window.mediaItem)
-                    newWindowIndices.add(index)
-                    visitedCount++
-                    index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, true)
-                }
-
-                if (visitedCount < count) {
-                    var fallbackIndex = timeline.getFirstWindowIndex(true)
-                    while (fallbackIndex in 0 until count && visitedCount < count) {
-                        if (!visited[fallbackIndex]) {
-                            visited[fallbackIndex] = true
-                            timeline.getWindow(fallbackIndex, window)
-                            newQueue.add(window.mediaItem)
-                            newWindowIndices.add(fallbackIndex)
-                            visitedCount++
-                        }
-                        fallbackIndex = timeline.getNextWindowIndex(fallbackIndex, Player.REPEAT_MODE_OFF, true)
-                    }
-                }
-
-                if (visitedCount < count) {
                     for (i in 0 until count) {
-                        if (!visited[i]) {
-                            timeline.getWindow(i, window)
-                            newQueue.add(window.mediaItem)
-                            newWindowIndices.add(i)
-                        }
+                        timeline.getWindow(i, window)
+                        newQueue.add(window.mediaItem)
+                        newWindowIndices.add(i)
                     }
                 }
-            } else {
-                for (i in 0 until count) {
-                    timeline.getWindow(i, window)
-                    newQueue.add(window.mediaItem)
-                    newWindowIndices.add(i)
+
+                currentWindowIndices = newWindowIndices
+                val uiCurrentIndex = if (currentWindowIndex >= 0 && newWindowIndices.isNotEmpty()) {
+                    val found = newWindowIndices.indexOf(currentWindowIndex)
+                    if (found != -1) found else currentWindowIndex.coerceIn(0, newWindowIndices.size - 1)
+                } else {
+                    currentWindowIndex
                 }
-            }
 
-            currentWindowIndices = newWindowIndices
-            val uiCurrentIndex = if (currentWindowIndex >= 0 && newWindowIndices.isNotEmpty()) {
-                val found = newWindowIndices.indexOf(currentWindowIndex)
-                if (found != -1) found else currentWindowIndex.coerceIn(0, newWindowIndices.size - 1)
+                _uiState.update {
+                    it.copy(
+                        queue = newQueue.toPersistentList(),
+                        currentIndex = uiCurrentIndex,
+                        isShuffleOn = isShuffleOn
+                    )
+                }
             } else {
-                currentWindowIndex
-            }
+                val uiCurrentIndex = if (currentWindowIndex >= 0 && currentWindowIndices.isNotEmpty()) {
+                    val found = currentWindowIndices.indexOf(currentWindowIndex)
+                    if (found != -1) found else currentWindowIndex.coerceIn(0, currentWindowIndices.size - 1)
+                } else {
+                    currentWindowIndex
+                }
 
-            _uiState.update {
-                it.copy(
-                    queue = newQueue.toPersistentList(),
-                    currentIndex = uiCurrentIndex,
-                    isShuffleOn = isShuffleOn
-                )
+                _uiState.update {
+                    it.copy(
+                        currentIndex = uiCurrentIndex,
+                        isShuffleOn = isShuffleOn
+                    )
+                }
             }
         }
     }
