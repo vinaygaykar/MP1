@@ -114,7 +114,10 @@ fun GenreDetailScreen(
 ) {
     val genre by viewModel.genre.collectAsState()
     val songs by viewModel.songs.collectAsState()
-    val playerState by playerViewModel.uiState.collectAsState()
+    val playbackState by playerViewModel.playbackState.collectAsState()
+    val progressState by playerViewModel.progressState.collectAsState()
+    val queueState by playerViewModel.queueState.collectAsState()
+    val lyricsState by playerViewModel.lyricsState.collectAsState()
     val visualizerState by playerViewModel.visualizerState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
@@ -154,7 +157,7 @@ fun GenreDetailScreen(
     }
 
     MaterialTheme(colorScheme = themeColorScheme) {
-        val isPlayerActive = playerState.trackTitle.isNotEmpty()
+        val isPlayerActive = playbackState.trackTitle.isNotEmpty()
         val expansionProgress = remember { mutableFloatStateOf(0f) }
         val lazyListState = rememberLazyListState()
 
@@ -171,9 +174,9 @@ fun GenreDetailScreen(
             Color.Transparent
         }
 
-        val currentPlayingMediaId = remember(playerState.queue, playerState.currentIndex) {
-            if (playerState.currentIndex in playerState.queue.indices) {
-                playerState.queue[playerState.currentIndex].mediaId
+        val currentPlayingMediaId = remember(queueState.items, queueState.currentIndex) {
+            if (queueState.currentIndex in queueState.items.indices) {
+                queueState.items[queueState.currentIndex].mediaId
             } else null
         }
 
@@ -350,7 +353,7 @@ fun GenreDetailScreen(
                     } else {
                         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
                             val isCurrentSong = (currentPlayingMediaId == song.id) ||
-                                    (currentPlayingMediaId.isNullOrEmpty() && playerState.trackTitle == song.title)
+                                    (currentPlayingMediaId.isNullOrEmpty() && playbackState.trackTitle == song.title)
                             SongCardItem(
                                 song = song,
                                 trackIndex = index + 1,
@@ -374,8 +377,13 @@ fun GenreDetailScreen(
 
             // Expandable Player
             ExpandablePlayer(
-                state = playerState,
-                actions = playerViewModel,
+                playbackState = playbackState,
+                progressState = progressState,
+                queueState = queueState,
+                lyricsState = lyricsState,
+                playbackControls = playerViewModel,
+                queueControls = playerViewModel,
+                lyricsControls = playerViewModel,
                 visualizerState = visualizerState,
                 onProgressUpdate = { expansionProgress.floatValue = it },
                 peekHeight = 72.dp,

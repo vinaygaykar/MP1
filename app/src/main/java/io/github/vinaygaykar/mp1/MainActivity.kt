@@ -72,7 +72,10 @@ fun MainScreen(
     settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
-    val playerState by playerViewModel.uiState.collectAsState()
+    val playbackState by playerViewModel.playbackState.collectAsState()
+    val progressState by playerViewModel.progressState.collectAsState()
+    val queueState by playerViewModel.queueState.collectAsState()
+    val lyricsState by playerViewModel.lyricsState.collectAsState()
     val visualizerState by playerViewModel.visualizerState.collectAsState()
     val hasScanFoldersState by settingsViewModel.hasScanFolders.collectAsState()
 
@@ -86,7 +89,7 @@ fun MainScreen(
     val startDestination = if (initialHasFolders) Screen.Library.route else "onboarding_scan_locations"
 
     val isPlayerActive by remember(playerViewModel) {
-        playerViewModel.uiState.map { it.trackTitle.isNotEmpty() }.distinctUntilChanged()
+        playerViewModel.playbackState.map { it.trackTitle.isNotEmpty() }.distinctUntilChanged()
     }.collectAsState(initial = false)
 
     val expansionProgress = remember { mutableFloatStateOf(0f) }
@@ -167,8 +170,13 @@ fun MainScreen(
 
         // Expandable Player - Sits on top
         ExpandablePlayer(
-            state = playerState,
-            actions = playerViewModel,
+            playbackState = playbackState,
+            progressState = progressState,
+            queueState = queueState,
+            lyricsState = lyricsState,
+            playbackControls = playerViewModel,
+            queueControls = playerViewModel,
+            lyricsControls = playerViewModel,
             visualizerState = visualizerState,
             onProgressUpdate = { expansionProgress.floatValue = it },
             peekHeight = 72.dp,

@@ -49,11 +49,22 @@ class PlayerViewModel @Inject constructor(
     private val scannerRepository: ScannerRepository,
     private val settingsRepository: SettingsRepository,
     private val audioVisualizerRepository: AudioVisualizerRepository
-) : ViewModel(), PlayerActions {
+) : ViewModel(), PlaybackControls, QueueControls, LyricsControls {
 
     private var controller: MediaController? = null
-    private val _uiState = MutableStateFlow(PlayerUiState())
-    val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    // Domain state flows
+    private val _playbackState = MutableStateFlow(PlaybackUiState())
+    val playbackState: StateFlow<PlaybackUiState> = _playbackState.asStateFlow()
+
+    private val _progressState = MutableStateFlow(PlaybackProgressState())
+    val progressState: StateFlow<PlaybackProgressState> = _progressState.asStateFlow()
+
+    private val _queueState = MutableStateFlow(QueueUiState())
+    val queueState: StateFlow<QueueUiState> = _queueState.asStateFlow()
+
+    private val _lyricsState = MutableStateFlow<LyricsUiState>(LyricsUiState.None)
+    val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
 
     private val _visualizerState = MutableStateFlow<VisualizerState>(VisualizerState.None)
     val visualizerState: StateFlow<VisualizerState> = _visualizerState.asStateFlow()
@@ -74,12 +85,12 @@ class PlayerViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             scannerRepository.isScanning.collect { isScanning ->
-                _uiState.update { it.copy(isScanInProgress = isScanning) }
+                _playbackState.update { it.copy(isScanInProgress = isScanning) }
             }
         }
         viewModelScope.launch {
             settingsRepository.playbackWave.collect { wave ->
-                _uiState.update { it.copy(playbackWave = wave) }
+                _playbackState.update { it.copy(playbackWave = wave) }
                 triggerVisualizerExtractionIfNeeded()
             }
         }
@@ -136,7 +147,9 @@ class PlayerViewModel @Inject constructor(
             activeArtworkUri = null
             activeMediaId = null
             currentArtworkJob?.cancel()
-            _uiState.update { PlayerUiState(isScanInProgress = it.isScanInProgress, playbackWave = it.playbackWave) }
+            _playbackState.update { PlaybackUiState(isScanInProgress = it.isScanInProgress, playbackWave = it.playbackWave) }
+            _progressState.update { PlaybackProgressState() }
+            _lyricsState.update { LyricsUiState.None }
             return
         }
 
@@ -150,7 +163,7 @@ class PlayerViewModel @Inject constructor(
         }
 
         val albumIdToUse =
-            if (isNewMediaItem) albumIdFromExtras else (_uiState.value.albumId ?: albumIdFromExtras)
+            if (isNewMediaItem) albumIdFromExtras else (_playbackState.value.albumId ?: albumIdFromExtras)
 
         val artworkUri = currentItem.mediaMetadata.artworkUri
         val isNewArtwork = artworkUri != activeArtworkUri
@@ -164,13 +177,7 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
-        val seedColorToUse = if (isNewArtwork) null else _uiState.value.seedColor
-
-        val lyricsToUse: String?
-        val isSyncedToUse: Boolean
-        val isLocalToUse: Boolean
-        val lyricsLoadingToUse: Boolean
-        val lyricsErrorToUse: String?
+        val seedColorToUse = if (isNewArtwork) null else _playbackState.value.seedColor
 
         if (isNewMediaItem) {
             if (mediaId != activeVisualizerSongId) {
@@ -180,20 +187,10 @@ class PlayerViewModel @Inject constructor(
                 _visualizerState.value = VisualizerState.None
                 activeVisualizerSongId = null
             }
-            lyricsToUse = null
-            isSyncedToUse = false
-            isLocalToUse = false
-            lyricsLoadingToUse = false
-            lyricsErrorToUse = null
+            _lyricsState.update { LyricsUiState.None }
             if (isVisualizerPlayerVisible) {
                 triggerVisualizerExtractionIfNeeded()
             }
-        } else {
-            lyricsToUse = _uiState.value.lyrics
-            isSyncedToUse = _uiState.value.isLyricsSynced
-            isLocalToUse = _uiState.value.isLyricsLocal
-            lyricsLoadingToUse = _uiState.value.lyricsLoading
-            lyricsErrorToUse = _uiState.value.lyricsError
         }
 
         val currentWindowIndex = player.currentMediaItemIndex
@@ -205,7 +202,7 @@ class PlayerViewModel @Inject constructor(
             currentWindowIndex
         }
 
-        _uiState.update {
+        _playbackState.update {
             it.copy(
                 trackTitle = currentItem.mediaMetadata.title?.toString() ?: "Unknown",
                 artist = currentItem.mediaMetadata.artist?.toString() ?: "Unknown Artist",
@@ -213,21 +210,23 @@ class PlayerViewModel @Inject constructor(
                 albumId = albumIdToUse,
                 artworkUri = artworkUri,
                 seedColor = seedColorToUse,
-                positionMs = player.currentPosition,
-                durationMs = player.duration.coerceAtLeast(0L),
                 isPlaying = player.isPlaying,
                 isShuffleOn = player.shuffleModeEnabled,
                 repeatMode = player.repeatMode,
                 hasNext = player.hasNextMediaItem(),
-                hasPrevious = player.hasPreviousMediaItem(),
-                lyrics = lyricsToUse,
-                isLyricsSynced = isSyncedToUse,
-                isLyricsLocal = isLocalToUse,
-                lyricsLoading = lyricsLoadingToUse,
-                lyricsError = lyricsErrorToUse,
-                queue = _uiState.value.queue,
-                currentIndex = uiCurrentIndex
+                hasPrevious = player.hasPreviousMediaItem()
             )
+        }
+
+        _progressState.update {
+            it.copy(
+                positionMs = player.currentPosition,
+                durationMs = player.duration.coerceAtLeast(0L)
+            )
+        }
+
+        _queueState.update {
+            it.copy(currentIndex = uiCurrentIndex)
         }
 
         if (albumIdToUse.isNullOrEmpty() && mediaId.isNotEmpty()) {
@@ -242,12 +241,12 @@ class PlayerViewModel @Inject constructor(
                     } else null
                 }
                 if (!resolvedAlbumId.isNullOrEmpty()) {
-                    _uiState.update { it.copy(albumId = resolvedAlbumId) }
+                    _playbackState.update { it.copy(albumId = resolvedAlbumId) }
                 }
             }
         }
 
-        if (lyricsToUse == null && !lyricsLoadingToUse && lyricsErrorToUse == null) {
+        if (_lyricsState.value is LyricsUiState.None) {
             fetchLyrics(mediaId)
         }
     }
@@ -256,17 +255,16 @@ class PlayerViewModel @Inject constructor(
         if (timeline.isEmpty) {
             queueUpdateJob?.cancel()
             currentWindowIndices = emptyList()
-            _uiState.update { it.copy(queue = persistentListOf(), currentIndex = -1) }
+            _queueState.update { QueueUiState(items = persistentListOf(), currentIndex = -1) }
             return
         }
         queueUpdateJob?.cancel()
         queueUpdateJob = viewModelScope.launch(Dispatchers.Default) {
-            // Debounce rapid consecutive timeline changes during chunk loading
             delay(200)
             val count = timeline.windowCount
             if (count == 0) {
                 currentWindowIndices = emptyList()
-                _uiState.update { it.copy(queue = persistentListOf(), currentIndex = -1) }
+                _queueState.update { QueueUiState(items = persistentListOf(), currentIndex = -1) }
                 return@launch
             }
 
@@ -278,7 +276,7 @@ class PlayerViewModel @Inject constructor(
             val shouldRebuild = forceRebuild ||
                     currentWindowIndices.size != count ||
                     currentWindowIndices.any { it !in 0 until count } ||
-                    _uiState.value.isShuffleOn != isShuffleOn
+                    _playbackState.value.isShuffleOn != isShuffleOn
 
             if (shouldRebuild) {
                 val window = Timeline.Window()
@@ -289,7 +287,6 @@ class PlayerViewModel @Inject constructor(
                     val visited = BooleanArray(count)
                     var visitedCount = 0
 
-                    // Anchor shuffle queue at currentWindowIndex so the playing track is always first
                     var index = if (currentWindowIndex in 0 until count) {
                         currentWindowIndex
                     } else {
@@ -344,11 +341,11 @@ class PlayerViewModel @Inject constructor(
                     currentWindowIndex
                 }
 
-                _uiState.update {
-                    it.copy(
-                        queue = newQueue.toPersistentList(),
-                        currentIndex = uiCurrentIndex,
-                        isShuffleOn = isShuffleOn
+                _playbackState.update { it.copy(isShuffleOn = isShuffleOn) }
+                _queueState.update {
+                    QueueUiState(
+                        items = newQueue.toPersistentList(),
+                        currentIndex = uiCurrentIndex
                     )
                 }
             } else {
@@ -359,12 +356,8 @@ class PlayerViewModel @Inject constructor(
                     currentWindowIndex
                 }
 
-                _uiState.update {
-                    it.copy(
-                        currentIndex = uiCurrentIndex,
-                        isShuffleOn = isShuffleOn
-                    )
-                }
+                _playbackState.update { it.copy(isShuffleOn = isShuffleOn) }
+                _queueState.update { it.copy(currentIndex = uiCurrentIndex) }
             }
         }
     }
@@ -375,7 +368,7 @@ class PlayerViewModel @Inject constructor(
             delay(200)
             val extractedColor = DynamicThemeHelper.extractSeedColor(context, uri)
             if (activeArtworkUri == uri) {
-                _uiState.update { it.copy(seedColor = extractedColor) }
+                _playbackState.update { it.copy(seedColor = extractedColor) }
             }
         }
     }
@@ -384,33 +377,26 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val song = musicRepository.getSongById(songId) ?: return@launch
 
-            // Avoid refetching if already loading or if we have lyrics
-            if (_uiState.value.lyrics != null || _uiState.value.lyricsLoading) return@launch
+            if (_lyricsState.value !is LyricsUiState.None) return@launch
 
-            _uiState.update { it.copy(lyricsLoading = true, lyricsError = null) }
+            _lyricsState.update { LyricsUiState.Loading }
 
             lyricsRepository.getLyrics(song)
                 .onSuccess { lyrics ->
                     if (controller?.currentMediaItem?.mediaId == songId) {
                         val isLocal = isLocalOrEmbeddedLyrics(context, song.uri.toString(), song.fileName, lyrics.content)
-                        _uiState.update {
-                            it.copy(
+                        _lyricsState.update {
+                            LyricsUiState.Success(
                                 lyrics = lyrics.content,
-                                isLyricsSynced = lyrics.isSynced,
-                                isLyricsLocal = isLocal,
-                                lyricsLoading = false
+                                isSynced = lyrics.isSynced,
+                                isLocal = isLocal
                             )
                         }
                     }
                 }
                 .onFailure { error ->
                     if (controller?.currentMediaItem?.mediaId == songId) {
-                        _uiState.update {
-                            it.copy(
-                                lyricsLoading = false,
-                                lyricsError = error.message
-                            )
-                        }
+                        _lyricsState.update { LyricsUiState.Error(error.message ?: "Failed to load lyrics") }
                     }
                 }
         }
@@ -433,7 +419,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun updatePosition() {
         val player = controller ?: return
-        _uiState.update { it.copy(positionMs = player.currentPosition) }
+        _progressState.update { it.copy(positionMs = player.currentPosition) }
     }
 
     override fun onPlayPause() {
@@ -459,32 +445,32 @@ class PlayerViewModel @Inject constructor(
 
     override fun onNext() {
         val player = controller ?: return
-        val queue = _uiState.value.queue
-        val currentIdx = _uiState.value.currentIndex
+        val items = _queueState.value.items
+        val currentIdx = _queueState.value.currentIndex
         val repeatMode = player.repeatMode
 
-        if (queue.isEmpty() || currentIdx < 0) {
+        if (items.isEmpty() || currentIdx < 0) {
             player.seekToNextMediaItem()
             return
         }
 
         if (repeatMode == Player.REPEAT_MODE_ONE) {
-            if (queue.size > 1 && currentIdx < queue.size - 1) {
+            if (items.size > 1 && currentIdx < items.size - 1) {
                 onSkipToQueueItem(currentIdx + 1)
             } else {
                 player.seekTo(0, 0L)
                 player.play()
             }
         } else if (repeatMode == Player.REPEAT_MODE_ALL) {
-            if (queue.size > 1) {
-                val nextIdx = (currentIdx + 1) % queue.size
+            if (items.size > 1) {
+                val nextIdx = (currentIdx + 1) % items.size
                 onSkipToQueueItem(nextIdx)
             } else {
                 player.seekTo(0, 0L)
                 player.play()
             }
         } else {
-            if (currentIdx < queue.size - 1) {
+            if (currentIdx < items.size - 1) {
                 onSkipToQueueItem(currentIdx + 1)
             } else {
                 player.seekToNextMediaItem()
@@ -494,25 +480,25 @@ class PlayerViewModel @Inject constructor(
 
     override fun onPrevious() {
         val player = controller ?: return
-        val queue = _uiState.value.queue
-        val currentIdx = _uiState.value.currentIndex
+        val items = _queueState.value.items
+        val currentIdx = _queueState.value.currentIndex
         val repeatMode = player.repeatMode
 
-        if (queue.isEmpty() || currentIdx < 0) {
+        if (items.isEmpty() || currentIdx < 0) {
             player.seekToPreviousMediaItem()
             return
         }
 
         if (repeatMode == Player.REPEAT_MODE_ONE) {
-            if (queue.size > 1 && currentIdx > 0) {
+            if (items.size > 1 && currentIdx > 0) {
                 onSkipToQueueItem(currentIdx - 1)
             } else {
                 player.seekTo(0, 0L)
                 player.play()
             }
         } else if (repeatMode == Player.REPEAT_MODE_ALL) {
-            if (queue.size > 1) {
-                val prevIdx = if (currentIdx > 0) currentIdx - 1 else queue.size - 1
+            if (items.size > 1) {
+                val prevIdx = if (currentIdx > 0) currentIdx - 1 else items.size - 1
                 onSkipToQueueItem(prevIdx)
             } else {
                 player.seekTo(0, 0L)
@@ -548,7 +534,7 @@ class PlayerViewModel @Inject constructor(
         val songId = currentItem.mediaId
 
         viewModelScope.launch {
-            _uiState.update { it.copy(lyricsLoading = true, lyricsError = null) }
+            _lyricsState.update { LyricsUiState.Loading }
 
             lyricsRepository.searchLyrics(query, songId)
                 .onSuccess { lyrics ->
@@ -557,24 +543,18 @@ class PlayerViewModel @Inject constructor(
                         val isLocal = if (song != null) {
                             isLocalOrEmbeddedLyrics(context, song.uri.toString(), song.fileName, lyrics.content)
                         } else false
-                        _uiState.update {
-                            it.copy(
+                        _lyricsState.update {
+                            LyricsUiState.Success(
                                 lyrics = lyrics.content,
-                                isLyricsSynced = lyrics.isSynced,
-                                isLyricsLocal = isLocal,
-                                lyricsLoading = false
+                                isSynced = lyrics.isSynced,
+                                isLocal = isLocal
                             )
                         }
                     }
                 }
                 .onFailure { error ->
                     if (controller?.currentMediaItem?.mediaId == songId) {
-                        _uiState.update {
-                            it.copy(
-                                lyricsLoading = false,
-                                lyricsError = error.message
-                            )
-                        }
+                        _lyricsState.update { LyricsUiState.Error(error.message ?: "Lyrics search failed") }
                     }
                 }
         }
@@ -659,14 +639,17 @@ class PlayerViewModel @Inject constructor(
     override fun onSaveLyrics() {
         val currentItem = controller?.currentMediaItem ?: return
         val songId = currentItem.mediaId
-        val lyricsContent = _uiState.value.lyrics ?: return
+        val currentLyricsState = _lyricsState.value
+        val lyricsContent = (currentLyricsState as? LyricsUiState.Success)?.lyrics ?: return
 
         viewModelScope.launch {
             val song = musicRepository.getSongById(songId)
             if (song != null) {
                 saveLrcFileToStorage(context, song.uri.toString(), song.fileName, lyricsContent)
             }
-            _uiState.update { it.copy(isLyricsLocal = true) }
+            _lyricsState.update {
+                if (it is LyricsUiState.Success) it.copy(isLocal = true) else it
+            }
         }
     }
 
@@ -861,7 +844,7 @@ class PlayerViewModel @Inject constructor(
     private fun triggerVisualizerExtractionIfNeeded() {
         val activeItem = controller?.currentMediaItem
         val activeId = activeItem?.mediaId?.takeIf { it.isNotEmpty() } ?: activeMediaId ?: ""
-        val waveMode = _uiState.value.playbackWave
+        val waveMode = _playbackState.value.playbackWave
 
         if (activeId.isEmpty() || waveMode == PlaybackWaveType.SIMPLICITY) {
             if (activeVisualizerSongId != null) {

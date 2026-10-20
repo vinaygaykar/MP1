@@ -44,8 +44,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import io.github.vinaygaykar.mp1.playback.PlayerActions
-import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.playback.QueueControls
+import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -57,8 +57,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QueueBottomSheet(
-    state: PlayerUiState,
-    actions: PlayerActions,
+    queueState: QueueUiState,
+    actions: QueueControls,
+    isShuffleOn: Boolean = false,
+    onShuffleToggle: () -> Unit = {},
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -68,7 +70,13 @@ fun QueueBottomSheet(
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = modifier.fillMaxSize()
         ) {
-            QueueBottomSheetContent(state = state, actions = actions, onDismiss = onDismissRequest)
+            QueueBottomSheetContent(
+                queueState = queueState,
+                actions = actions,
+                isShuffleOn = isShuffleOn,
+                onShuffleToggle = onShuffleToggle,
+                onDismiss = onDismissRequest
+            )
         }
     } else {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -81,16 +89,26 @@ fun QueueBottomSheet(
             scrimColor = Color.Black.copy(alpha = 0.5f),
             modifier = modifier.fillMaxHeight()
         ) {
-            QueueBottomSheetContent(state = state, actions = actions, onDismiss = onDismissRequest)
+            QueueBottomSheetContent(
+                queueState = queueState,
+                actions = actions,
+                isShuffleOn = isShuffleOn,
+                onShuffleToggle = onShuffleToggle,
+                onDismiss = onDismissRequest
+            )
         }
     }
 }
 
+
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QueueBottomSheetContent(
-    state: PlayerUiState,
-    actions: PlayerActions,
+    queueState: QueueUiState,
+    actions: QueueControls,
+    isShuffleOn: Boolean = false,
+    onShuffleToggle: () -> Unit = {},
     modifier: Modifier = Modifier,
     onDismiss: () -> Unit = {}
 ) {
@@ -110,8 +128,8 @@ fun QueueBottomSheetContent(
         selectedIndices = emptySet()
     }
 
-    LaunchedEffect(state.queue.size) {
-        selectedIndices = selectedIndices.filter { it in state.queue.indices }.toSet()
+    LaunchedEffect(queueState.items.size) {
+        selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
     }
 
     Column(
@@ -167,7 +185,7 @@ fun QueueBottomSheetContent(
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         ) {
                             Text(
-                                text = "${state.queue.size}",
+                                text = "${queueState.items.size}",
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
@@ -179,12 +197,12 @@ fun QueueBottomSheetContent(
                 if (isSelectionMode) {
                     SelectionActionRow(
                         selectedCount = selectedIndices.size,
-                        onSelectAll = { selectedIndices = state.queue.indices.toSet() },
+                        onSelectAll = { selectedIndices = queueState.items.indices.toSet() },
                         onDeselect = { selectedIndices = emptySet() },
                         onOptionsClick = { showQueueMultiSelectionSheet = true },
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
-                } else if (state.queue.isNotEmpty()) {
+                } else if (queueState.items.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -192,9 +210,9 @@ fun QueueBottomSheetContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        val isShuffleEnabled = state.queue.size > 1
+                        val isShuffleEnabled = queueState.items.size > 1
                         val shuffleContainerColor by animateColorAsState(
-                            targetValue = if (state.isShuffleOn) {
+                            targetValue = if (isShuffleOn) {
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
                                 MaterialTheme.colorScheme.surfaceContainerLowest
@@ -202,7 +220,7 @@ fun QueueBottomSheetContent(
                             label = "shuffle_btn_bg"
                         )
                         val shuffleContentColor by animateColorAsState(
-                            targetValue = if (state.isShuffleOn) {
+                            targetValue = if (isShuffleOn) {
                                 MaterialTheme.colorScheme.onPrimaryContainer
                             } else {
                                 MaterialTheme.colorScheme.onSurface
@@ -213,7 +231,7 @@ fun QueueBottomSheetContent(
                         // Clear All Button (Left)
                         OutlinedButton(
                             onClick = { actions.clearQueue() },
-                            enabled = state.queue.size > 1,
+                            enabled = queueState.items.size > 1,
                             shape = CircleShape,
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                         ) {
@@ -232,7 +250,7 @@ fun QueueBottomSheetContent(
 
                         // Shuffle Button (Right)
                         FilledTonalButton(
-                            onClick = { actions.onShuffleToggle() },
+                            onClick = { onShuffleToggle() },
                             enabled = isShuffleEnabled,
                             shape = CircleShape,
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -244,13 +262,13 @@ fun QueueBottomSheetContent(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Icon(
-                                imageVector = if (state.isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                                imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (state.isShuffleOn) "Shuffle On" else "Shuffle Off",
+                                text = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -261,7 +279,7 @@ fun QueueBottomSheetContent(
         }
 
         // Queue Body: Songs List or Empty State
-        if (state.queue.isEmpty()) {
+        if (queueState.items.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -283,16 +301,16 @@ fun QueueBottomSheetContent(
             var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
 
             // Scroll to current playing song ONCE when sheet opens
-            LaunchedEffect(state.currentIndex, state.queue.size) {
-                if (!hasScrolledToInitialPosition && state.currentIndex in state.queue.indices) {
-                    lazyListState.scrollToItem(index = state.currentIndex)
+            LaunchedEffect(queueState.currentIndex, queueState.items.size) {
+                if (!hasScrolledToInitialPosition && queueState.currentIndex in queueState.items.indices) {
+                    lazyListState.scrollToItem(index = queueState.currentIndex)
                     hasScrolledToInitialPosition = true
                 }
             }
 
-            val itemKeys = remember(state.queue) {
+            val itemKeys = remember(queueState.items) {
                 val counts = mutableMapOf<Int, Int>()
-                state.queue.map { item ->
+                queueState.items.map { item ->
                     val identity = System.identityHashCode(item)
                     val count = counts.getOrDefault(identity, 0)
                     counts[identity] = count + 1
@@ -310,16 +328,16 @@ fun QueueBottomSheetContent(
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)
                 ) {
                     itemsIndexed(
-                        items = state.queue,
+                        items = queueState.items,
                         key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
                     ) { index, item ->
-                        val isCurrent = index == state.currentIndex
-                        val key = itemKeys.getOrElse(index) { "item_$index" }
-                        val isBeingDragged = draggedKey == key
+                        val itemKey = itemKeys.getOrElse(index) { "item_$index" }
+                        val isCurrent = index == queueState.currentIndex
+                        val isSelected = selectedIndices.contains(index)
+                        val isBeingDragged = draggedKey == itemKey
 
                         QueueItemRow(
                             item = item,
@@ -333,41 +351,49 @@ fun QueueBottomSheetContent(
                                     actions.onSkipToQueueItem(index)
                                 }
                             },
-                            onRemove = { actions.removeFromQueue(index) },
+                            onRemove = {
+                                actions.removeFromQueue(index)
+                            },
                             onDragStart = {
-                                draggedKey = key
+                                draggedKey = itemKey
                                 dragOffsetY = 0f
                             },
-                            onDrag = { dragAmount ->
-                                val currentKey = draggedKey ?: return@QueueItemRow
-                                dragOffsetY += dragAmount
+                            onDrag = { deltaY ->
+                                dragOffsetY += deltaY
+                                val layoutInfo = lazyListState.layoutInfo
+                                val visibleItems = layoutInfo.visibleItemsInfo
+                                val currentItemInfo = visibleItems.find { it.key == draggedKey }
 
-                                val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-                                val listIndex = itemKeys.indexOf(currentKey)
-                                if (listIndex == -1) return@QueueItemRow
+                                if (currentItemInfo != null) {
+                                    val threshold = currentItemInfo.size / 2f
+                                    val currentIndex = visibleItems.indexOf(currentItemInfo)
 
-                                val draggedItemInfo = visibleItems.firstOrNull { it.index == listIndex }
-                                if (draggedItemInfo != null) {
-                                    val draggedItemTop = draggedItemInfo.offset + dragOffsetY
-                                    val draggedItemCenter = draggedItemTop + draggedItemInfo.size / 2f
-
-                                    val targetItem = visibleItems.firstOrNull { itemInfo ->
-                                        itemInfo.index != listIndex &&
-                                                draggedItemCenter >= itemInfo.offset &&
-                                                draggedItemCenter <= (itemInfo.offset + itemInfo.size)
+                                    if (dragOffsetY > threshold && currentIndex < visibleItems.size - 1) {
+                                        val targetItem = visibleItems[currentIndex + 1]
+                                        val fromIdx = currentItemInfo.index
+                                        val toIdx = targetItem.index
+                                        if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
+                                            actions.moveQueueItem(fromIdx, toIdx)
+                                            dragOffsetY -= currentItemInfo.size
+                                        }
+                                    } else if (dragOffsetY < -threshold && currentIndex > 0) {
+                                        val targetItem = visibleItems[currentIndex - 1]
+                                        val fromIdx = currentItemInfo.index
+                                        val toIdx = targetItem.index
+                                        if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
+                                            actions.moveQueueItem(fromIdx, toIdx)
+                                            dragOffsetY += currentItemInfo.size
+                                        }
                                     }
 
-                                    if (targetItem != null) {
-                                        val targetQueueIndex = targetItem.index
-                                        actions.moveQueueItem(listIndex, targetQueueIndex)
-                                        dragOffsetY += (draggedItemInfo.offset - targetItem.offset)
-                                    }
+                                    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                                    val topBounds = currentItemInfo.offset + dragOffsetY
+                                    val bottomBounds = topBounds + currentItemInfo.size
 
-                                    val viewportHeight = lazyListState.layoutInfo.viewportSize.height
-                                    if (draggedItemTop < 100f) {
-                                        coroutineScope.launch { lazyListState.scrollBy(-20f) }
-                                    } else if (draggedItemTop > viewportHeight - 100f) {
-                                        coroutineScope.launch { lazyListState.scrollBy(20f) }
+                                    if (bottomBounds > viewportHeight - 50) {
+                                        coroutineScope.launch { lazyListState.scrollBy(15f) }
+                                    } else if (topBounds < 50) {
+                                        coroutineScope.launch { lazyListState.scrollBy(-15f) }
                                     }
                                 }
                             },
@@ -375,47 +401,42 @@ fun QueueBottomSheetContent(
                                 draggedKey = null
                                 dragOffsetY = 0f
                             },
-                            isSelected = selectedIndices.contains(index),
+                            isSelected = isSelected,
                             isSelectionMode = isSelectionMode,
                             onLongClick = { toggleSelection(index) }
                         )
                     }
                 }
 
-                if (state.queue.size > 50) {
-                    SimpleScrollBar(
-                        listState = lazyListState,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
-                            .zIndex(100f)
-                    )
-                }
-            }
-
-            val selectedItems = remember(state.queue, selectedIndices) {
-                selectedIndices.mapNotNull { state.queue.getOrNull(it) }
-            }
-
-            if (showQueueMultiSelectionSheet) {
-                QueueMultiSelectionBottomSheet(
-                    selectedItems = selectedItems,
-                    onDismiss = { showQueueMultiSelectionSheet = false },
-                    onRemoveFromQueue = {
-                        actions.removeIndicesFromQueue(selectedIndices)
-                        selectedIndices = emptySet()
-                    },
-                    onRemoveOthersFromQueue = {
-                        actions.removeOthersFromQueue(selectedIndices)
-                        selectedIndices = emptySet()
-                    },
-                    onPlayNext = {
-                        actions.playNextInQueue(selectedIndices)
-                        selectedIndices = emptySet()
-                    }
+                SimpleScrollBar(
+                    listState = lazyListState,
+                    modifier = Modifier.align(Alignment.CenterEnd)
                 )
             }
         }
+    }
+
+    if (showQueueMultiSelectionSheet) {
+        val selectedItems = remember(selectedIndices, queueState.items) {
+            selectedIndices.mapNotNull { queueState.items.getOrNull(it) }
+        }
+
+        QueueMultiSelectionBottomSheet(
+            selectedItems = selectedItems,
+            onDismiss = { showQueueMultiSelectionSheet = false },
+            onRemoveFromQueue = {
+                actions.removeIndicesFromQueue(selectedIndices)
+                selectedIndices = emptySet()
+            },
+            onRemoveOthersFromQueue = {
+                actions.removeOthersFromQueue(selectedIndices)
+                selectedIndices = emptySet()
+            },
+            onPlayNext = {
+                actions.playNextInQueue(selectedIndices)
+                selectedIndices = emptySet()
+            }
+        )
     }
 
     Spacer(modifier = Modifier.navigationBarsPadding())
@@ -539,7 +560,10 @@ private fun QueueItemRow(
                 ) {
                     val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
                     AsyncImage(
-                        model = item.mediaMetadata.artworkUri,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(item.mediaMetadata.artworkUri)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = null,
                         error = musicPlaceholder,
                         placeholder = musicPlaceholder,
@@ -767,7 +791,7 @@ fun QueueMultiSelectionBottomSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Row 2: Play next (Bigger and square shaped with rounded corners)
+            // Row 2: Play next
             Button(
                 onClick = {
                     onPlayNext()
@@ -850,68 +874,5 @@ private fun OverlappingMediaItemArtworksRow(
                 }
             }
         }
-    }
-}
-
-private object PreviewPlayerActions : PlayerActions {
-    override fun onPlayPause() {}
-    override fun play() {}
-    override fun pause() {}
-    override fun onNext() {}
-    override fun onPrevious() {}
-    override fun onSeek(positionMs: Long) {}
-    override fun onShuffleToggle() {}
-    override fun onRepeatToggle() {}
-    override fun addToQueue(mediaItem: MediaItem) {}
-    override fun onSkipToQueueItem(index: Int) {}
-    override fun removeFromQueue(index: Int) {}
-    override fun moveQueueItem(fromIndex: Int, toIndex: Int) {}
-    override fun clearQueue() {}
-    override fun onLyricsSearch(query: String) {}
-}
-
-@Preview(showBackground = true)
-@Composable
-fun QueueBottomSheetPreview() {
-    val sampleState = PlayerUiState(
-        queue = persistentListOf(
-            MediaItem.Builder()
-                .setMediaId("1")
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle("Bohemian Rhapsody")
-                        .setArtist("Queen")
-                        .build()
-                )
-                .build(),
-            MediaItem.Builder()
-                .setMediaId("2")
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle("Hotel California")
-                        .setArtist("Eagles")
-                        .build()
-                )
-                .build(),
-            MediaItem.Builder()
-                .setMediaId("3")
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle("Stairway to Heaven")
-                        .setArtist("Led Zeppelin")
-                        .build()
-                )
-                .build()
-        ),
-        currentIndex = 0,
-        isShuffleOn = false
-    )
-
-    MusicPlayerTheme {
-        QueueBottomSheet(
-            state = sampleState,
-            actions = PreviewPlayerActions,
-            onDismissRequest = {}
-        )
     }
 }

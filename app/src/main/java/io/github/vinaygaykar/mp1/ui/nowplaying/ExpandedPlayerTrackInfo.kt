@@ -30,7 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
-import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.playback.PlaybackUiState
+import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
@@ -46,7 +47,8 @@ private data class TrackInfo(
 
 @Composable
 internal fun ExpandedPlayerTrackInfo(
-    state: PlayerUiState,
+    playbackState: PlaybackUiState,
+    queueState: QueueUiState = QueueUiState(),
     modifier: Modifier = Modifier,
     pagerState: PagerState? = null,
     onArtistClick: (() -> Unit)? = null
@@ -56,10 +58,10 @@ internal fun ExpandedPlayerTrackInfo(
 
     if (pagerState == null) {
         TrackTextContent(
-            title = state.trackTitle,
-            artist = state.artist,
-            album = state.album,
-            albumId = state.albumId,
+            title = playbackState.trackTitle,
+            artist = playbackState.artist,
+            album = playbackState.album,
+            albumId = playbackState.albumId,
             onArtistClick = onArtistClick,
             context = context,
             view = view,
@@ -73,43 +75,46 @@ internal fun ExpandedPlayerTrackInfo(
         val density = LocalDensity.current
         val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
 
-        val currentTrackInfo = remember(state.trackTitle, state.artist, state.album, state.albumId) {
-            TrackInfo(state.trackTitle, state.artist, state.album, state.albumId)
+        val currentTrackInfo = remember(playbackState.trackTitle, playbackState.artist, playbackState.album, playbackState.albumId) {
+            TrackInfo(playbackState.trackTitle, playbackState.artist, playbackState.album, playbackState.albumId)
         }
 
-        val hasPrevPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
-            if (state.queue.size <= 1) {
-                state.repeatMode == Player.REPEAT_MODE_ALL
+        val items = queueState.items
+        val currentIndex = queueState.currentIndex
+
+        val hasPrevPage = remember(items.size, currentIndex, playbackState.repeatMode) {
+            if (items.size <= 1) {
+                playbackState.repeatMode == Player.REPEAT_MODE_ALL
             } else {
-                if (state.repeatMode == Player.REPEAT_MODE_ALL) {
+                if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
                     true
                 } else {
-                    state.currentIndex > 0
+                    currentIndex > 0
                 }
             }
         }
 
-        val hasNextPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
-            if (state.queue.size <= 1) {
-                state.repeatMode == Player.REPEAT_MODE_ALL
+        val hasNextPage = remember(items.size, currentIndex, playbackState.repeatMode) {
+            if (items.size <= 1) {
+                playbackState.repeatMode == Player.REPEAT_MODE_ALL
             } else {
-                if (state.repeatMode == Player.REPEAT_MODE_ALL) {
+                if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
                     true
                 } else {
-                    state.currentIndex in 0 until state.queue.size - 1
+                    currentIndex in 0 until items.size - 1
                 }
             }
         }
 
-        val prevItem = remember(state.queue, state.currentIndex, hasPrevPage) {
-            if (!hasPrevPage || state.queue.isEmpty()) null
+        val prevItem = remember(items, currentIndex, hasPrevPage) {
+            if (!hasPrevPage || items.isEmpty()) null
             else {
-                val prevIndex = if (state.currentIndex > 0) {
-                    state.currentIndex - 1
+                val prevIndex = if (currentIndex > 0) {
+                    currentIndex - 1
                 } else {
-                    state.queue.size - 1
+                    items.size - 1
                 }
-                state.queue.getOrNull(prevIndex)
+                items.getOrNull(prevIndex)
             }
         }
         val prevTrackInfo = remember(prevItem) {
@@ -123,15 +128,15 @@ internal fun ExpandedPlayerTrackInfo(
             }
         }
 
-        val nextItem = remember(state.queue, state.currentIndex, hasNextPage) {
-            if (!hasNextPage || state.queue.isEmpty()) null
+        val nextItem = remember(items, currentIndex, hasNextPage) {
+            if (!hasNextPage || items.isEmpty()) null
             else {
-                val nextIndex = if (state.currentIndex in 0 until state.queue.size - 1) {
-                    state.currentIndex + 1
+                val nextIndex = if (currentIndex in 0 until items.size - 1) {
+                    currentIndex + 1
                 } else {
                     0
                 }
-                state.queue.getOrNull(nextIndex)
+                items.getOrNull(nextIndex)
             }
         }
         val nextTrackInfo = remember(nextItem) {
@@ -184,6 +189,8 @@ internal fun ExpandedPlayerTrackInfo(
         }
     }
 }
+
+
 
 @Composable
 private fun TrackTextContent(

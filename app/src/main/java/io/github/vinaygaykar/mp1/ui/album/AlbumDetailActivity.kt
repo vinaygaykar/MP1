@@ -149,7 +149,10 @@ fun AlbumDetailScreen(
     val primaryArtist by viewModel.primaryArtist.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val featuredArtists by viewModel.featuredArtists.collectAsState()
-    val playerState by playerViewModel.uiState.collectAsState()
+    val playbackState by playerViewModel.playbackState.collectAsState()
+    val progressState by playerViewModel.progressState.collectAsState()
+    val queueState by playerViewModel.queueState.collectAsState()
+    val lyricsState by playerViewModel.lyricsState.collectAsState()
     val visualizerState by playerViewModel.visualizerState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
@@ -193,7 +196,7 @@ fun AlbumDetailScreen(
     val currentColorScheme = themeColorScheme ?: MaterialTheme.colorScheme
 
     MaterialTheme(colorScheme = currentColorScheme) {
-        val isPlayerActive = playerState.trackTitle.isNotEmpty()
+        val isPlayerActive = playbackState.trackTitle.isNotEmpty()
         val expansionProgress = remember { mutableFloatStateOf(0f) }
 
         val lazyListState = rememberLazyListState()
@@ -213,9 +216,9 @@ fun AlbumDetailScreen(
 
         val cardColor = Color.Transparent
 
-        val currentPlayingMediaId = remember(playerState.queue, playerState.currentIndex) {
-            if (playerState.currentIndex in playerState.queue.indices) {
-                playerState.queue[playerState.currentIndex].mediaId
+        val currentPlayingMediaId = remember(queueState.items, queueState.currentIndex) {
+            if (queueState.currentIndex in queueState.items.indices) {
+                queueState.items[queueState.currentIndex].mediaId
             } else null
         }
 
@@ -555,7 +558,7 @@ fun AlbumDetailScreen(
                             }
                             itemsIndexed(discSongs, key = { _, song -> song.id }) { index, song ->
                                 val isCurrentSong = (currentPlayingMediaId == song.id) ||
-                                        (currentPlayingMediaId.isNullOrEmpty() && playerState.trackTitle == song.title)
+                                        (currentPlayingMediaId.isNullOrEmpty() && playbackState.trackTitle == song.title)
                                 SongCardItem(
                                     song = song,
                                     trackIndex = index + 1,
@@ -578,7 +581,7 @@ fun AlbumDetailScreen(
                     } else {
                         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
                             val isCurrentSong = (currentPlayingMediaId == song.id) ||
-                                    (currentPlayingMediaId.isNullOrEmpty() && playerState.trackTitle == song.title)
+                                    (currentPlayingMediaId.isNullOrEmpty() && playbackState.trackTitle == song.title)
                             SongCardItem(
                                 song = song,
                                 trackIndex = index + 1,
@@ -626,9 +629,9 @@ fun AlbumDetailScreen(
                                     items(featuredArtists, key = { it.id }) { artist ->
                                         CollaboratorArtistCard(
                                             artist = artist,
-                                            playingArtist = playerState.artist,
-                                            playingAlbum = playerState.album,
-                                            isPlaying = playerState.isPlaying,
+                                            playingArtist = playbackState.artist,
+                                            playingAlbum = playbackState.album,
+                                            isPlaying = playbackState.isPlaying,
                                             onClick = { offset, size ->
                                                 val intent = Intent(context, ArtistDetailActivity::class.java).apply {
                                                     putExtra(ArtistDetailActivity.EXTRA_ARTIST_ID, artist.id)
@@ -654,8 +657,13 @@ fun AlbumDetailScreen(
 
             // Expandable Player on top
             ExpandablePlayer(
-                state = playerState,
-                actions = playerViewModel,
+                playbackState = playbackState,
+                progressState = progressState,
+                queueState = queueState,
+                lyricsState = lyricsState,
+                playbackControls = playerViewModel,
+                queueControls = playerViewModel,
+                lyricsControls = playerViewModel,
                 visualizerState = visualizerState,
                 onProgressUpdate = { expansionProgress.floatValue = it },
                 peekHeight = 72.dp,

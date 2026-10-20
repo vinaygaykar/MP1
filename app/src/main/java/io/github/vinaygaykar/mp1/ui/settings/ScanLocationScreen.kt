@@ -76,9 +76,10 @@ fun ScanLocationScreen(
     val folders by viewModel.scanFolders.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     val currentFolder by viewModel.currentScanningFolder.collectAsState()
-    val playerState by playerViewModel.uiState.collectAsState()
+    val playbackState by playerViewModel.playbackState.collectAsState()
+    val queueState by playerViewModel.queueState.collectAsState()
 
-    val showNotice = playerState.isPlaying || playerState.queue.isNotEmpty()
+    val showNotice = playbackState.isPlaying || queueState.items.isNotEmpty()
 
     BackHandler {
         if (isOnboarding) {

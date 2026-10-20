@@ -54,8 +54,10 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
-import io.github.vinaygaykar.mp1.playback.PlayerActions
-import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.playback.PlaybackControls
+import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
+import io.github.vinaygaykar.mp1.playback.PlaybackUiState
+import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import kotlinx.coroutines.launch
@@ -64,21 +66,23 @@ import kotlin.math.abs
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MiniPlayer(
-    state: PlayerUiState,
-    actions: PlayerActions,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    queueState: QueueUiState,
+    actions: PlaybackControls,
     showRecord: Boolean = true,
     rotation: Float? = null,
     textAlpha: Float = 1f,
     onClick: (() -> Unit)? = null,
     onPositioned: ((Offset) -> Unit)? = null,
 ) {
-    if (state.trackTitle.isEmpty()) return
+    if (playbackState.trackTitle.isEmpty()) return
 
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
 
     val internalRotation = if (rotation == null) {
-        val targetRotation = state.positionMs * 0.12f
+        val targetRotation = progressState.positionMs * 0.12f
         val animRotation by animateFloatAsState(
             targetValue = targetRotation,
             animationSpec = tween(durationMillis = 200, easing = LinearEasing),
@@ -87,51 +91,51 @@ fun MiniPlayer(
         animRotation
     } else rotation
 
-    val hasPrevPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
-        if (state.queue.size <= 1) {
-            state.repeatMode == Player.REPEAT_MODE_ALL
+    val hasPrevPage = remember(queueState.items.size, queueState.currentIndex, playbackState.repeatMode) {
+        if (queueState.items.size <= 1) {
+            playbackState.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
+            if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
-                state.currentIndex > 0
+                queueState.currentIndex > 0
             }
         }
     }
 
-    val hasNextPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
-        if (state.queue.size <= 1) {
-            state.repeatMode == Player.REPEAT_MODE_ALL
+    val hasNextPage = remember(queueState.items.size, queueState.currentIndex, playbackState.repeatMode) {
+        if (queueState.items.size <= 1) {
+            playbackState.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
+            if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
-                state.currentIndex in 0 until state.queue.size - 1
+                queueState.currentIndex in 0 until queueState.items.size - 1
             }
         }
     }
 
-    val prevItem = remember(state.queue, state.currentIndex, hasPrevPage) {
-        if (!hasPrevPage || state.queue.isEmpty()) null
+    val prevItem = remember(queueState.items, queueState.currentIndex, hasPrevPage) {
+        if (!hasPrevPage || queueState.items.isEmpty()) null
         else {
-            val prevIndex = if (state.currentIndex > 0) {
-                state.currentIndex - 1
+            val prevIndex = if (queueState.currentIndex > 0) {
+                queueState.currentIndex - 1
             } else {
-                state.queue.size - 1
+                queueState.items.size - 1
             }
-            state.queue.getOrNull(prevIndex)
+            queueState.items.getOrNull(prevIndex)
         }
     }
 
-    val nextItem = remember(state.queue, state.currentIndex, hasNextPage) {
-        if (!hasNextPage || state.queue.isEmpty()) null
+    val nextItem = remember(queueState.items, queueState.currentIndex, hasNextPage) {
+        if (!hasNextPage || queueState.items.isEmpty()) null
         else {
-            val nextIndex = if (state.currentIndex in 0 until state.queue.size - 1) {
-                state.currentIndex + 1
+            val nextIndex = if (queueState.currentIndex in 0 until queueState.items.size - 1) {
+                queueState.currentIndex + 1
             } else {
                 0
             }
-            state.queue.getOrNull(nextIndex)
+            queueState.items.getOrNull(nextIndex)
         }
     }
 
@@ -155,7 +159,7 @@ fun MiniPlayer(
 
     val boundaryOffsetAnimatable = remember { Animatable(0f) }
 
-    LaunchedEffect(state.currentIndex, state.trackTitle, hasPrevPage, hasNextPage) {
+    LaunchedEffect(queueState.currentIndex, playbackState.trackTitle, hasPrevPage, hasNextPage) {
         if (pagerState.currentPage != currentTrackPageIndex) {
             pagerState.scrollToPage(currentTrackPageIndex)
         }
@@ -269,12 +273,12 @@ fun MiniPlayer(
     val effectiveBoundaryOffset = calculateEffectiveOffset(
         rawOffset = rawBoundaryOffset,
         width = width,
-        hasPrevious = state.hasPrevious,
-        hasNext = state.hasNext
+        hasPrevious = playbackState.hasPrevious,
+        hasNext = playbackState.hasNext
     )
 
-    val isStretchingNext = effectiveBoundaryOffset < 0f && !state.hasNext
-    val isStretchingPrev = effectiveBoundaryOffset > 0f && !state.hasPrevious
+    val isStretchingNext = effectiveBoundaryOffset < 0f && !playbackState.hasNext
+    val isStretchingPrev = effectiveBoundaryOffset > 0f && !playbackState.hasPrevious
 
     val stretchFactor = if (isStretchingNext || isStretchingPrev) {
         (abs(effectiveBoundaryOffset) / width).coerceIn(0f, 0.4f)
@@ -323,7 +327,7 @@ fun MiniPlayer(
                         }
                 ) { page ->
                     val (title, artist, artworkUri) = when {
-                        page == currentTrackPageIndex -> Triple(state.trackTitle, state.artist, state.artworkUri)
+                        page == currentTrackPageIndex -> Triple(playbackState.trackTitle, playbackState.artist, playbackState.artworkUri)
                         page < currentTrackPageIndex -> Triple(prevTitle, prevArtist, prevArtworkUri)
                         else -> Triple(nextTitle, nextArtist, nextArtworkUri)
                     }
@@ -341,7 +345,7 @@ fun MiniPlayer(
             }
 
             // Bottom Progress Bar (Stationary)
-            val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
+            val progress = if (progressState.durationMs > 0) progressState.positionMs.toFloat() / progressState.durationMs else 0f
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -430,6 +434,8 @@ private fun MiniPlayerItemContent(
         }
     }
 }
+
+
 
 private fun calculateEffectiveOffset(
     rawOffset: Float,

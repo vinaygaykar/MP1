@@ -63,9 +63,9 @@ fun ArtistGrid(
     libraryViewModel: LibraryViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
-    val playingArtist by remember(playerViewModel) { playerViewModel.uiState.map { it.artist }.distinctUntilChanged() }.collectAsState(initial = "")
-    val playingAlbum by remember(playerViewModel) { playerViewModel.uiState.map { it.album }.distinctUntilChanged() }.collectAsState(initial = "")
-    val isPlaying by remember(playerViewModel) { playerViewModel.uiState.map { it.isPlaying }.distinctUntilChanged() }.collectAsState(initial = false)
+    val playingArtist by remember(playerViewModel) { playerViewModel.playbackState.map { it.artist }.distinctUntilChanged() }.collectAsState(initial = "")
+    val playingAlbum by remember(playerViewModel) { playerViewModel.playbackState.map { it.album }.distinctUntilChanged() }.collectAsState(initial = "")
+    val isPlaying by remember(playerViewModel) { playerViewModel.playbackState.map { it.isPlaying }.distinctUntilChanged() }.collectAsState(initial = false)
 
     if (artists.isEmpty()) {
         Box(

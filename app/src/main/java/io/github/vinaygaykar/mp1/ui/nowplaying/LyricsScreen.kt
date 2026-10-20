@@ -40,8 +40,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Lyrics
-import io.github.vinaygaykar.mp1.playback.PlayerActions
-import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.playback.LyricsControls
+import io.github.vinaygaykar.mp1.playback.LyricsUiState
+import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
+import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import kotlinx.coroutines.launch
@@ -49,22 +51,25 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LyricsScreen(
-    state: PlayerUiState,
-    actions: PlayerActions,
-    onSeek: (Long) -> Unit,
-    onSearch: (String) -> Unit
+    lyricsState: LyricsUiState,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    actions: LyricsControls,
+    onSeek: (Long) -> Unit
 ) {
-    val lyrics = remember(state.lyrics, state.isLyricsSynced) {
-        state.lyrics?.let { LyricsParser.parse(it, state.isLyricsSynced) }
+    val lyrics = remember(lyricsState) {
+        if (lyricsState is LyricsUiState.Success) {
+            LyricsParser.parse(lyricsState.lyrics, lyricsState.isSynced)
+        } else null
     }
 
     var showSearchDialog by remember { mutableStateOf(false) }
 
     if (showSearchDialog) {
         LyricsSearchDialog(
-            initialQuery = "${state.trackTitle} ${state.artist}",
+            initialQuery = "${playbackState.trackTitle} ${playbackState.artist}",
             onSearch = { query ->
-                onSearch(query)
+                actions.onLyricsSearch(query)
                 showSearchDialog = false
             },
             onDismiss = { showSearchDialog = false }
@@ -84,7 +89,7 @@ fun LyricsScreen(
             color = MaterialTheme.colorScheme.surfaceContainer
         ) {
             when {
-                state.lyricsLoading -> {
+                lyricsState is LyricsUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
@@ -97,7 +102,7 @@ fun LyricsScreen(
                 lyrics.isSynced -> {
                     SyncedLyrics(
                         lyrics = lyrics,
-                        currentPositionMs = state.positionMs,
+                        currentPositionMs = progressState.positionMs,
                         onSeek = onSeek,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -131,7 +136,7 @@ fun LyricsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     AsyncImage(
-                        model = state.artworkUri,
+                        model = playbackState.artworkUri,
                         contentDescription = null,
                         modifier = Modifier
                             .size(56.dp)
@@ -145,12 +150,12 @@ fun LyricsScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.Center
                     ) {
-                        val displayArtist = remember(state.artist, state.trackTitle) {
-                            collectArtistNames(state.artist, state.trackTitle).joinArtistsForDisplay()
+                        val displayArtist = remember(playbackState.artist, playbackState.trackTitle) {
+                            collectArtistNames(playbackState.artist, playbackState.trackTitle).joinArtistsForDisplay()
                         }
 
                         Text(
-                            text = state.trackTitle,
+                            text = playbackState.trackTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -196,8 +201,8 @@ fun LyricsScreen(
 
                     // Right: Offline Badge or Save Button
                     Box {
-                        if (!state.lyrics.isNullOrBlank()) {
-                            if (state.isLyricsLocal) {
+                        if (lyricsState is LyricsUiState.Success && lyricsState.lyrics.isNotBlank()) {
+                            if (lyricsState.isLocal) {
                                 AssistChip(
                                     onClick = {},
                                     label = { Text("Offline") },
@@ -243,6 +248,8 @@ fun LyricsScreen(
         }
     }
 }
+
+
 
 @Composable
 fun LyricsSearchDialog(

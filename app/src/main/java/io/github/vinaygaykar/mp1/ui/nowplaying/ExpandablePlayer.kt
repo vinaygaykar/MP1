@@ -131,8 +131,13 @@ import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.domain.models.VisualizerState
-import io.github.vinaygaykar.mp1.playback.PlayerActions
-import io.github.vinaygaykar.mp1.playback.PlayerUiState
+import io.github.vinaygaykar.mp1.playback.LyricsControls
+import io.github.vinaygaykar.mp1.playback.LyricsUiState
+import io.github.vinaygaykar.mp1.playback.PlaybackControls
+import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
+import io.github.vinaygaykar.mp1.playback.PlaybackUiState
+import io.github.vinaygaykar.mp1.playback.QueueControls
+import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
@@ -162,11 +167,16 @@ private data class ColorStep(
     val isReverse: Boolean
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ExpandablePlayer(
-    state: PlayerUiState,
-    actions: PlayerActions,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    queueState: QueueUiState,
+    lyricsState: LyricsUiState = LyricsUiState.None,
+    playbackControls: PlaybackControls,
+    queueControls: QueueControls,
+    lyricsControls: LyricsControls,
     onProgressUpdate: (Float) -> Unit,
     modifier: Modifier = Modifier,
     visualizerState: VisualizerState = VisualizerState.None,
@@ -177,23 +187,23 @@ fun ExpandablePlayer(
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
     val expandAnimProgress = remember { Animatable(1f) }
-    var lastTrackTitle by remember { mutableStateOf(if (initialExpanded) state.trackTitle else "") }
+    var lastTrackTitle by remember { mutableStateOf(if (initialExpanded) playbackState.trackTitle else "") }
 
-    LaunchedEffect(state.trackTitle) {
-        if (lastTrackTitle.isEmpty() && state.trackTitle.isNotEmpty()) {
+    LaunchedEffect(playbackState.trackTitle) {
+        if (lastTrackTitle.isEmpty() && playbackState.trackTitle.isNotEmpty()) {
             expandAnimProgress.snapTo(0f)
             delay(1000L)
             expandAnimProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
             )
-        } else if (state.trackTitle.isEmpty()) {
+        } else if (playbackState.trackTitle.isEmpty()) {
             expandAnimProgress.snapTo(0f)
         }
-        lastTrackTitle = state.trackTitle
+        lastTrackTitle = playbackState.trackTitle
     }
 
-    if (state.trackTitle.isEmpty()) return
+    if (playbackState.trackTitle.isEmpty()) return
 
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -217,8 +227,9 @@ fun ExpandablePlayer(
         }
     }
 
-    val currentActions by rememberUpdatedState(actions)
-    val currentState by rememberUpdatedState(state)
+    val currentPlaybackControls by rememberUpdatedState(playbackControls)
+    val currentPlaybackState by rememberUpdatedState(playbackState)
+    val currentProgressState by rememberUpdatedState(progressState)
 
     val lifecycleOwner = LocalLifecycleOwner.current
     var isScreenActive by remember { mutableStateOf(true) }
@@ -234,8 +245,8 @@ fun ExpandablePlayer(
     }
 
     val isDark = isSystemInDarkTheme()
-    val playerColorScheme: ColorScheme? = remember(state.seedColor, isDark) {
-        state.seedColor?.let { color ->
+    val playerColorScheme: ColorScheme? = remember(playbackState.seedColor, isDark) {
+        playbackState.seedColor?.let { color ->
             DynamicThemeHelper.createDynamicColorScheme(color, isDark = isDark)
         }
     }
@@ -253,15 +264,15 @@ fun ExpandablePlayer(
 
     val pendingColorQueue = remember { mutableStateListOf<ColorStep>() }
 
-    val currentTrackKey = remember(state.currentIndex, state.trackTitle) {
-        "${state.currentIndex}_${state.trackTitle}"
+    val currentTrackKey = remember(queueState.currentIndex, playbackState.trackTitle) {
+        "${queueState.currentIndex}_${playbackState.trackTitle}"
     }
 
     // Producer: Enqueues transitions on actual track changes
     LaunchedEffect(currentTrackKey, targetBgColor) {
-        val newIndex = state.currentIndex
+        val newIndex = queueState.currentIndex
         val prevIndex = displayedIndexState
-        val newQueue = state.queue
+        val newQueue = queueState.items
         val prevQueue = prevQueueState
 
         val isSameQueue = prevQueue != null &&
@@ -278,7 +289,7 @@ fun ExpandablePlayer(
 
         val isInitialLoad = lastAnimatedTrackKey == null || displayedColorState == null
         val isSongChanged = lastAnimatedTrackKey != null && lastAnimatedTrackKey != currentTrackKey
-        val isArtworkLoading = state.artworkUri != null && state.seedColor == null
+        val isArtworkLoading = playbackState.artworkUri != null && playbackState.seedColor == null
 
         if (isInitialLoad) {
             displayedColorState = targetBgColor
@@ -335,26 +346,26 @@ fun ExpandablePlayer(
     )
 
     val scale = remember { Animatable(1f) }
-    val hasPrevPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
-        if (state.queue.size <= 1) {
-            state.repeatMode == Player.REPEAT_MODE_ALL
+    val hasPrevPage = remember(queueState.items.size, queueState.currentIndex, playbackState.repeatMode) {
+        if (queueState.items.size <= 1) {
+            playbackState.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
+            if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
-                state.currentIndex > 0
+                queueState.currentIndex > 0
             }
         }
     }
 
-    val hasNextPage = remember(state.queue.size, state.currentIndex, state.repeatMode) {
-        if (state.queue.size <= 1) {
-            state.repeatMode == Player.REPEAT_MODE_ALL
+    val hasNextPage = remember(queueState.items.size, queueState.currentIndex, playbackState.repeatMode) {
+        if (queueState.items.size <= 1) {
+            playbackState.repeatMode == Player.REPEAT_MODE_ALL
         } else {
-            if (state.repeatMode == Player.REPEAT_MODE_ALL) {
+            if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
                 true
             } else {
-                state.currentIndex in 0 until state.queue.size - 1
+                queueState.currentIndex in 0 until queueState.items.size - 1
             }
         }
     }
@@ -370,7 +381,7 @@ fun ExpandablePlayer(
     val maxSlidePx = with(density) { 24.dp.toPx() }
     val boundaryOffsetAnimatable = remember { Animatable(0f) }
 
-    LaunchedEffect(state.currentIndex, state.trackTitle, hasPrevPage, hasNextPage) {
+    LaunchedEffect(queueState.currentIndex, playbackState.trackTitle, hasPrevPage, hasNextPage) {
         if (pagerState.currentPage != currentTrackPageIndex) {
             pagerState.scrollToPage(currentTrackPageIndex)
         }
@@ -381,13 +392,13 @@ fun ExpandablePlayer(
     LaunchedEffect(pagerState.settledPage) {
         if (pagerState.settledPage < targetTrackPageIndex) {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            actions.onPrevious()
+            playbackControls.onPrevious()
             if (pagerState.currentPage != targetTrackPageIndex) {
                 pagerState.scrollToPage(targetTrackPageIndex)
             }
         } else if (pagerState.settledPage > targetTrackPageIndex) {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            actions.onNext()
+            playbackControls.onNext()
             if (pagerState.currentPage != targetTrackPageIndex) {
                 pagerState.scrollToPage(targetTrackPageIndex)
             }
@@ -481,7 +492,6 @@ fun ExpandablePlayer(
     var isDraggingScrub by remember { mutableStateOf(false) }
     var isDraggingArtwork by remember { mutableStateOf(false) }
     var draggedPosition by remember { mutableLongStateOf(0L) }
-    var lastAngle by remember { mutableFloatStateOf(0f) }
     var hapticAccumulator by remember { mutableFloatStateOf(0f) }
     var invalidHapticAccumulator by remember { mutableFloatStateOf(0f) }
 
@@ -507,8 +517,8 @@ fun ExpandablePlayer(
         label = "row_width_fraction"
     )
 
-    LaunchedEffect(state.isPlaying) {
-        if (state.isPlaying) {
+    LaunchedEffect(playbackState.isPlaying) {
+        if (playbackState.isPlaying) {
             var lastFrameTime = withFrameNanos { it }
             while (true) {
                 withFrameNanos { frameTime ->
@@ -520,7 +530,7 @@ fun ExpandablePlayer(
         }
     }
 
-    LaunchedEffect(state.trackTitle, state.artist) {
+    LaunchedEffect(playbackState.trackTitle, playbackState.artist) {
         visualRotation = 0f
     }
 
@@ -530,7 +540,6 @@ fun ExpandablePlayer(
 
         val peekHeightPx = with(density) { peekHeight.toPx() }
         val screenHeightPx = with(density) { screenHeight.toPx() }
-        val screenWidthPx = with(density) { screenWidth.toPx() }
         val bottomOffsetPx = with(density) { bottomOffset.toPx() }
         val floatOffsetPx = with(density) { 16.dp.toPx() }
         val navBarBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
@@ -660,40 +669,40 @@ fun ExpandablePlayer(
         }
 
         val isPlayerVisible = progress > 0.8f && isScreenActive
-        val activeSongId = remember(state.queue, state.currentIndex, currentTrackKey) {
-            if (state.currentIndex in state.queue.indices) {
-                state.queue[state.currentIndex].mediaId
+        val activeSongId = remember(queueState.items, queueState.currentIndex, currentTrackKey) {
+            if (queueState.currentIndex in queueState.items.indices) {
+                queueState.items[queueState.currentIndex].mediaId
             } else {
                 currentTrackKey
             }
         }
 
-        LaunchedEffect(activeSongId, isPlayerVisible, state.playbackWave) {
-            currentActions.onUpdateVisualizerVisibility(isPlayerVisible)
+        LaunchedEffect(activeSongId, isPlayerVisible, playbackState.playbackWave) {
+            currentPlaybackControls.onUpdateVisualizerVisibility(isPlayerVisible)
         }
 
-        val prevItem = remember(state.queue, state.currentIndex, hasPrevPage) {
-            if (!hasPrevPage || state.queue.isEmpty()) null
+        val prevItem = remember(queueState.items, queueState.currentIndex, hasPrevPage) {
+            if (!hasPrevPage || queueState.items.isEmpty()) null
             else {
-                val prevIndex = if (state.currentIndex > 0) {
-                    state.currentIndex - 1
+                val prevIndex = if (queueState.currentIndex > 0) {
+                    queueState.currentIndex - 1
                 } else {
-                    state.queue.size - 1
+                    queueState.items.size - 1
                 }
-                state.queue.getOrNull(prevIndex)
+                queueState.items.getOrNull(prevIndex)
             }
         }
         val prevArtworkUri = remember(prevItem) { prevItem?.mediaMetadata?.artworkUri }
 
-        val nextItem = remember(state.queue, state.currentIndex, hasNextPage) {
-            if (!hasNextPage || state.queue.isEmpty()) null
+        val nextItem = remember(queueState.items, queueState.currentIndex, hasNextPage) {
+            if (!hasNextPage || queueState.items.isEmpty()) null
             else {
-                val nextIndex = if (state.currentIndex in 0 until state.queue.size - 1) {
-                    state.currentIndex + 1
+                val nextIndex = if (queueState.currentIndex in 0 until queueState.items.size - 1) {
+                    queueState.currentIndex + 1
                 } else {
                     0
                 }
-                state.queue.getOrNull(nextIndex)
+                queueState.items.getOrNull(nextIndex)
             }
         }
         val nextArtworkUri = remember(nextItem) { nextItem?.mediaMetadata?.artworkUri }
@@ -702,7 +711,7 @@ fun ExpandablePlayer(
         val horizontalPadding = lerp(20.dp, 0.dp, progress)
 
         val isPreview = LocalInspectionMode.current
-        val effectiveExpandProgress = if (!isPreview && lastTrackTitle.isEmpty() && state.trackTitle.isNotEmpty() && expandAnimProgress.value == 1f) 0f else expandAnimProgress.value
+        val effectiveExpandProgress = if (!isPreview && lastTrackTitle.isEmpty() && playbackState.trackTitle.isNotEmpty() && expandAnimProgress.value == 1f) 0f else expandAnimProgress.value
 
         val rawStartPadding = lerp(screenWidth - 92.dp, 20.dp, effectiveExpandProgress)
         val rawEndPadding = 20.dp
@@ -858,7 +867,8 @@ fun ExpandablePlayer(
                                 Modifier.fillMaxSize()
                             }
                             ExpandedPlayerTrackInfo(
-                                state = state,
+                                playbackState = playbackState,
+                                queueState = queueState,
                                 modifier = trackInfoModifier,
                                 pagerState = pagerState,
                                 onArtistClick = {
@@ -882,8 +892,10 @@ fun ExpandablePlayer(
                                     }
                             ) {
                                 MiniPlayer(
-                                    state = state,
-                                    actions = actions,
+                                    playbackState = playbackState,
+                                    progressState = progressState,
+                                    queueState = queueState,
+                                    actions = playbackControls,
                                     showRecord = false,
                                     rotation = visualRotation,
                                     textAlpha = ((effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f),
@@ -928,7 +940,7 @@ fun ExpandablePlayer(
 
                         // Action Buttons (Lyrics, Repeat, Queue)
                         if (progress > 0.8f) {
-                            val (repeatIcon, repeatText) = when (state.repeatMode) {
+                            val (repeatIcon, repeatText) = when (playbackState.repeatMode) {
                                 1 -> Icons.Rounded.RepeatOne to "Song"
                                 2 -> Icons.Rounded.RepeatOn to "List"
                                 else -> Icons.Rounded.Repeat to "Off"
@@ -960,17 +972,17 @@ fun ExpandablePlayer(
                                     }
 
                                     Surface(
-                                        onClick = { actions.onRepeatToggle() },
+                                        onClick = { playbackControls.onRepeatToggle() },
                                         modifier = Modifier
                                             .width(110.dp)
                                             .height(48.dp),
                                         shape = CircleShape,
-                                        color = if (state.repeatMode != 0) {
+                                        color = if (playbackState.repeatMode != 0) {
                                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
                                         } else {
                                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f)
                                         },
-                                        contentColor = if (state.repeatMode != 0) {
+                                        contentColor = if (playbackState.repeatMode != 0) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
                                             MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
@@ -1037,7 +1049,7 @@ fun ExpandablePlayer(
                                 }
 
                                 Surface(
-                                    onClick = { actions.onRepeatToggle() },
+                                    onClick = { playbackControls.onRepeatToggle() },
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 48.dp)
@@ -1045,12 +1057,12 @@ fun ExpandablePlayer(
                                         .width(110.dp)
                                         .height(48.dp),
                                     shape = CircleShape,
-                                    color = if (state.repeatMode != 0) {
+                                    color = if (playbackState.repeatMode != 0) {
                                         MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
                                     } else {
                                         MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f)
                                     },
-                                    contentColor = if (state.repeatMode != 0) {
+                                    contentColor = if (playbackState.repeatMode != 0) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
@@ -1104,7 +1116,7 @@ fun ExpandablePlayer(
                         // Timestamp display
                         if (progress > 0.8f) {
                             val displayPosition =
-                                if (isDraggingScrub) draggedPosition else state.positionMs
+                                if (isDraggingScrub) draggedPosition else progressState.positionMs
                             val (currentEnergy, currentEnergyDelta) = remember(visualizerState, displayPosition) {
                                 if (visualizerState is VisualizerState.Energy) {
                                     val curve = visualizerState.curve
@@ -1124,8 +1136,8 @@ fun ExpandablePlayer(
                             if (isLandscape) {
                                 PlayerTimestampBar(
                                     displayPositionMs = displayPosition,
-                                    durationMs = state.durationMs,
-                                    isPlaying = state.isPlaying,
+                                    durationMs = progressState.durationMs,
+                                    isPlaying = playbackState.isPlaying,
                                     scrubFactor = scrubFactor,
                                     rowWidthFraction = 1f,
                                     recordY = null,
@@ -1140,8 +1152,8 @@ fun ExpandablePlayer(
                             } else {
                                 PlayerTimestampBar(
                                     displayPositionMs = displayPosition,
-                                    durationMs = state.durationMs,
-                                    isPlaying = state.isPlaying,
+                                    durationMs = progressState.durationMs,
+                                    isPlaying = playbackState.isPlaying,
                                     scrubFactor = scrubFactor,
                                     rowWidthFraction = rowWidthFraction,
                                     recordY = recordY,
@@ -1226,8 +1238,8 @@ fun ExpandablePlayer(
                                                                             isDragging = true
                                                                             change.consume()
                                                                             if (isVinylRing) {
-                                                                                wasPlayingOnDragStart = currentState.isPlaying
-                                                                                draggedPosition = currentState.positionMs
+                                                                                wasPlayingOnDragStart = currentPlaybackState.isPlaying
+                                                                                draggedPosition = currentProgressState.positionMs
                                                                                 hapticAccumulator = 0f
                                                                                 invalidHapticAccumulator = 0f
                                                                                 lastAngle =
@@ -1235,7 +1247,7 @@ fun ExpandablePlayer(
                                                                                         change.position,
                                                                                         localCenter
                                                                                     )
-                                                                                if (wasPlayingOnDragStart) currentActions.pause()
+                                                                                if (wasPlayingOnDragStart) currentPlaybackControls.pause()
                                                                             }
                                                                         }
                                                                     } else {
@@ -1254,7 +1266,7 @@ fun ExpandablePlayer(
                                                                             val positionDelta = (delta / 360f) * 60000f
                                                                             val unconstrainedPosition = draggedPosition + positionDelta.toLong()
                                                                             val minPos = 0L
-                                                                            val maxPos = currentState.durationMs
+                                                                            val maxPos = currentProgressState.durationMs
 
                                                                             if (unconstrainedPosition in minPos..maxPos) {
                                                                                 visualRotation += delta
@@ -1300,8 +1312,8 @@ fun ExpandablePlayer(
                                                                     // Released
                                                                     if (isDragging && isVinylRing) {
                                                                         isDraggingScrub = false
-                                                                        currentActions.onSeek(draggedPosition)
-                                                                        if (wasPlayingOnDragStart) currentActions.play()
+                                                                        currentPlaybackControls.onSeek(draggedPosition)
+                                                                        if (wasPlayingOnDragStart) currentPlaybackControls.play()
                                                                     }
                                                                     break
                                                                 }
@@ -1312,7 +1324,7 @@ fun ExpandablePlayer(
                                             }
                                     ) { page ->
                                         val pageArtworkUri = when {
-                                            page == currentTrackPageIndex -> state.artworkUri
+                                            page == currentTrackPageIndex -> playbackState.artworkUri
                                             hasPrevPage && page == currentTrackPageIndex - 1 -> prevArtworkUri
                                             hasNextPage && page == currentTrackPageIndex + 1 -> nextArtworkUri
                                             else -> null
@@ -1346,7 +1358,7 @@ fun ExpandablePlayer(
                                                                     scale.animateTo(0.96f, animationSpec = tween(100))
                                                                     try {
                                                                         awaitRelease()
-                                                                        currentActions.onPlayPause()
+                                                                        currentPlaybackControls.onPlayPause()
                                                                     } finally {
                                                                         scale.animateTo(
                                                                             1.0f,
@@ -1376,7 +1388,7 @@ fun ExpandablePlayer(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     RecordSurface(
-                                        artworkUri = state.artworkUri,
+                                        artworkUri = playbackState.artworkUri,
                                         recordSize = recordSize,
                                         artworkSize = artworkSize,
                                         rotation = visualRotation,
@@ -1390,7 +1402,7 @@ fun ExpandablePlayer(
                                                         val distFromCenter = (pressOffset - localCenter).getDistance()
                                                         val artworkRadiusPx = with(density) { (artworkSize / 2).toPx() }
                                                         if (distFromCenter <= artworkRadiusPx) {
-                                                            currentActions.onPlayPause()
+                                                            currentPlaybackControls.onPlayPause()
                                                         }
                                                     }
                                                 )
@@ -1410,10 +1422,11 @@ fun ExpandablePlayer(
                             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
                         ) {
                             LyricsScreen(
-                                state = state,
-                                actions = actions,
-                                onSeek = { actions.onSeek(it) },
-                                onSearch = { actions.onLyricsSearch(it) }
+                                lyricsState = lyricsState,
+                                playbackState = playbackState,
+                                progressState = progressState,
+                                actions = lyricsControls,
+                                onSeek = { playbackControls.onSeek(it) }
                             )
                         }
 
@@ -1446,8 +1459,10 @@ fun ExpandablePlayer(
                                 tonalElevation = 8.dp
                             ) {
                                 QueueBottomSheetContent(
-                                    state = state,
-                                    actions = actions,
+                                    queueState = queueState,
+                                    actions = queueControls,
+                                    isShuffleOn = playbackState.isShuffleOn,
+                                    onShuffleToggle = { playbackControls.onShuffleToggle() },
                                     onDismiss = {
                                         scope.launch {
                                             queueAnchoredDraggableState.animateTo(DragValue.COLLAPSED)
@@ -1459,11 +1474,11 @@ fun ExpandablePlayer(
 
                         // Song Artists Dialog
                         if (showArtistsDialog) {
-                            val artistNames = remember(state.artist, state.trackTitle) {
-                                collectArtistNames(state.artist, state.trackTitle)
+                            val artistNames = remember(playbackState.artist, playbackState.trackTitle) {
+                                collectArtistNames(playbackState.artist, playbackState.trackTitle)
                             }
                             SongArtistsDialog(
-                                trackTitle = state.trackTitle,
+                                trackTitle = playbackState.trackTitle,
                                 artistNames = artistNames,
                                 onDismissRequest = { showArtistsDialog = false },
                                 onArtistClick = { selectedArtistName ->
@@ -1487,7 +1502,7 @@ fun ExpandablePlayer(
 
 
 
-private val samplePlayerActions = object : PlayerActions {
+private val samplePlaybackControls = object : PlaybackControls {
     override fun onPlayPause() {}
     override fun play() {}
     override fun pause() {}
@@ -1496,25 +1511,36 @@ private val samplePlayerActions = object : PlayerActions {
     override fun onSeek(positionMs: Long) {}
     override fun onShuffleToggle() {}
     override fun onRepeatToggle() {}
+}
+
+private val sampleQueueControls = object : QueueControls {
     override fun addToQueue(mediaItem: MediaItem) {}
     override fun onSkipToQueueItem(index: Int) {}
     override fun removeFromQueue(index: Int) {}
     override fun moveQueueItem(fromIndex: Int, toIndex: Int) {}
     override fun clearQueue() {}
+}
+
+private val sampleLyricsControls = object : LyricsControls {
     override fun onLyricsSearch(query: String) {}
 }
 
-private val samplePlayerState = PlayerUiState(
+private val samplePlaybackState = PlaybackUiState(
     trackTitle = "Midnight City",
     artist = "M83",
     album = "Hurry Up, We're Dreaming",
     albumId = "sample_album_1",
-    positionMs = 125000L,
-    durationMs = 243000L,
     isPlaying = true,
     hasNext = true,
     hasPrevious = true
 )
+
+private val sampleProgressState = PlaybackProgressState(
+    positionMs = 125000L,
+    durationMs = 243000L
+)
+
+private val sampleQueueState = QueueUiState()
 
 @Preview(showBackground = true, name = "Portrait Phone Expanded", device = "spec:width=411dp,height=891dp,orientation=portrait")
 @Composable
@@ -1522,8 +1548,12 @@ fun ExpandablePlayerPortraitExpandedPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState,
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState,
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1537,8 +1567,12 @@ fun ExpandablePlayerLandscapeExpandedPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState,
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState,
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1552,8 +1586,12 @@ fun ExpandablePlayerFoldableExpandedPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState,
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState,
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1567,8 +1605,12 @@ fun ExpandablePlayerPlayingPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(isPlaying = true),
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState.copy(isPlaying = true),
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1582,8 +1624,12 @@ fun ExpandablePlayerPausedStatePreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(isPlaying = false),
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState.copy(isPlaying = false),
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1597,8 +1643,12 @@ fun ExpandablePlayerShortTitlePreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(trackTitle = "Midnight City"),
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState.copy(trackTitle = "Midnight City"),
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1612,10 +1662,14 @@ fun ExpandablePlayerLongTitlePreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(
+                playbackState = samplePlaybackState.copy(
                     trackTitle = "Supercalifragilisticexpialidocious Long Track Title That Needs Auto Resizing To Fit On Two Lines"
                 ),
-                actions = samplePlayerActions,
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1629,10 +1683,14 @@ fun ExpandablePlayerMultipleArtistsPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(
+                playbackState = samplePlaybackState.copy(
                     artist = "M83, Anthony Gonzalez, Morgan Kibby"
                 ),
-                actions = samplePlayerActions,
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1646,8 +1704,12 @@ fun ExpandablePlayerEnergyWaveformPreview() {
     MusicPlayerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState.copy(playbackWave = PlaybackWaveType.ENERGY),
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState.copy(playbackWave = PlaybackWaveType.ENERGY),
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1661,8 +1723,12 @@ fun ExpandablePlayerLightThemePreview() {
     MusicPlayerTheme(darkTheme = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState,
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState,
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )
@@ -1676,8 +1742,12 @@ fun ExpandablePlayerDarkThemePreview() {
     MusicPlayerTheme(darkTheme = true) {
         Surface(modifier = Modifier.fillMaxSize()) {
             ExpandablePlayer(
-                state = samplePlayerState,
-                actions = samplePlayerActions,
+                playbackState = samplePlaybackState,
+                progressState = sampleProgressState,
+                queueState = sampleQueueState,
+                playbackControls = samplePlaybackControls,
+                queueControls = sampleQueueControls,
+                lyricsControls = sampleLyricsControls,
                 onProgressUpdate = {},
                 initialExpanded = true
             )

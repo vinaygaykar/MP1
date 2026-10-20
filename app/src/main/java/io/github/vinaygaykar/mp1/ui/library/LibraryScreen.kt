@@ -150,7 +150,7 @@ fun LibraryScreen(
     val useCleanAlbumGrid by viewModel.useCleanAlbumGrid.collectAsState()
 
     val isScanning by remember(playerViewModel) {
-        playerViewModel.uiState.map { it.isScanInProgress }.distinctUntilChanged()
+        playerViewModel.playbackState.map { it.isScanInProgress }.distinctUntilChanged()
     }.collectAsState(initial = false)
     val currentFolder by settingsViewModel.currentScanningFolder.collectAsState()
     val importError by viewModel.importError.collectAsState()
