@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import io.github.vinaygaykar.mp1.data.repo.ArtistImageRepository
 import io.github.vinaygaykar.mp1.data.repo.SettingsRepository
@@ -138,45 +139,21 @@ class LibraryViewModel @Inject constructor(
     fun playSong(song: Song, songList: List<Song> = songs.value) {
         playSongJob?.cancel()
         playSongJob = viewModelScope.launch {
-            val player = controller ?: return@launch
+            val activeController = controller ?: return@launch
             val currentSongs = songList.ifEmpty { songs.value }
             if (currentSongs.isEmpty()) return@launch
 
             val startIndex = currentSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+            val songIds = ArrayList(currentSongs.map { it.id })
 
-            // 1. Immediately play the clicked song with minimal IPC overhead
-            val targetMediaItem = withContext(Dispatchers.Default) {
-                traceSection("Song.toMediaItem_single") {
-                    currentSongs[startIndex].toMediaItem()
-                }
+            val args = Bundle().apply {
+                putStringArrayList("song_ids", songIds)
+                putInt("start_index", startIndex)
             }
-            traceSection("player.setMediaItem_single") {
-                player.setMediaItem(targetMediaItem)
-            }
-            player.prepare()
-            player.play()
-
-            if (currentSongs.size <= 1) return@launch
-
-            // 2. Asynchronously load the full queue in natural order (0..N-1) after UI animation window
-            launch(Dispatchers.Default) {
-                val allMediaItems = traceSection("Song.toMediaItem_batch_${currentSongs.size}") {
-                    currentSongs.map { it.toMediaItem() }
-                }
-                // Yield briefly to let initial click animation & miniplayer transition render smoothly
-                delay(150)
-
-                withContext(Dispatchers.Main) {
-                    val activePlayer = controller ?: return@withContext
-                    traceSection("controller.setMediaItems_batch_${allMediaItems.size}") {
-                        activePlayer.setMediaItems(
-                            allMediaItems,
-                            startIndex,
-                            activePlayer.currentPosition
-                        )
-                    }
-                }
-            }
+            activeController.sendCustomCommand(
+                SessionCommand("ACTION_PLAY_LIST", Bundle.EMPTY),
+                args
+            )
         }
     }
 

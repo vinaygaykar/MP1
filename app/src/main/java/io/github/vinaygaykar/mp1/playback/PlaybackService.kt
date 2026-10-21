@@ -30,9 +30,12 @@ import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.utils.traceSection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @OptIn(UnstableApi::class)
@@ -42,7 +45,11 @@ class PlaybackService : MediaSessionService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var isRestoringState = true
 
+    private var playListJob: Job? = null
+    private var saveQueueJob: Job? = null
+
     private val repeatCommand = SessionCommand("ACTION_TOGGLE_REPEAT", Bundle.EMPTY)
+    private val playListCommand = SessionCommand("ACTION_PLAY_LIST", Bundle.EMPTY)
 
     @Inject
     lateinit var playbackStateDao: PlaybackStateDao
@@ -73,7 +80,7 @@ class PlaybackService : MediaSessionService() {
             val restoredMediaItems = savedSongs.map { it.toMediaItem() }
 
             launch(Dispatchers.Main) {
-                if (restoredMediaItems.isNotEmpty()) {
+                if (isRestoringState && restoredMediaItems.isNotEmpty()) {
                     val currentSongId = savedState?.currentQueueItemId
                     val startIndex = restoredMediaItems.indexOfFirst { it.mediaId == currentSongId }
                         .takeIf { it >= 0 } ?: 0
@@ -83,7 +90,7 @@ class PlaybackService : MediaSessionService() {
                     player.prepare()
                 }
 
-                if (savedState != null) {
+                if (isRestoringState && savedState != null) {
                     player.repeatMode = savedState.repeatMode
                     player.shuffleModeEnabled = savedState.isShuffleOn
                 }
@@ -109,8 +116,10 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-                traceSection("Service_onTimelineChanged") {
-                    if (!isRestoringState) saveQueueAndPlaybackState(player)
+                if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
+                    traceSection("Service_onTimelineChanged") {
+                        if (!isRestoringState) scheduleQueueAndPlaybackStateSave(player)
+                    }
                 }
             }
 
@@ -137,6 +146,7 @@ class PlaybackService : MediaSessionService() {
                 val connectionResult = super.onConnect(session, controller)
                 val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
                     .add(repeatCommand)
+                    .add(playListCommand)
                     .build()
                 return MediaSession.ConnectionResult.accept(
                     availableSessionCommands,
@@ -152,6 +162,12 @@ class PlaybackService : MediaSessionService() {
             ): ListenableFuture<SessionResult> {
                 if (customCommand.customAction == "ACTION_TOGGLE_REPEAT") {
                     session.player.repeatMode = (session.player.repeatMode + 1) % 3
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+                if (customCommand.customAction == "ACTION_PLAY_LIST") {
+                    val songIds = args.getStringArrayList("song_ids") ?: emptyList()
+                    val startIndex = args.getInt("start_index", 0)
+                    playList(songIds, startIndex)
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
                 return super.onCustomCommand(session, controller, customCommand, args)
@@ -182,8 +198,64 @@ class PlaybackService : MediaSessionService() {
         return listOf(repeatButton)
     }
 
-    private fun saveQueueAndPlaybackState(player: Player) {
+    private fun playList(songIds: List<String>, startIndex: Int) {
+        if (songIds.isEmpty()) return
+        playListJob?.cancel()
+        isRestoringState = false
+
+        val player = mediaSession?.player ?: return
+
+        playListJob = serviceScope.launch(Dispatchers.IO) {
+            val validStartIndex = startIndex.coerceIn(0, songIds.size - 1)
+            val targetId = songIds[validStartIndex]
+            val targetSong = musicRepository.getSongById(targetId) ?: return@launch
+
+            withContext(Dispatchers.Main) {
+                player.setMediaItem(targetSong.toMediaItem())
+                player.prepare()
+                player.play()
+            }
+
+            if (songIds.size <= 1) return@launch
+
+            val allSongs = musicRepository.getSongsByIdsSync(songIds)
+            if (allSongs.isEmpty()) return@launch
+
+            val allMediaItems = allSongs.map { it.toMediaItem() }
+
+            delay(100)
+
+            val chunkSize = 150
+            val itemsAfter = if (validStartIndex + 1 < allMediaItems.size) {
+                allMediaItems.subList(validStartIndex + 1, allMediaItems.size)
+            } else emptyList()
+
+            val itemsBefore = if (validStartIndex > 0) {
+                allMediaItems.subList(0, validStartIndex)
+            } else emptyList()
+
+            for (chunk in itemsAfter.chunked(chunkSize)) {
+                withContext(Dispatchers.Main) {
+                    player.addMediaItems(chunk)
+                }
+                delay(50)
+            }
+
+            var insertPos = 0
+            for (chunk in itemsBefore.chunked(chunkSize)) {
+                val currentPos = insertPos
+                withContext(Dispatchers.Main) {
+                    player.addMediaItems(currentPos, chunk)
+                }
+                insertPos += chunk.size
+                delay(50)
+            }
+        }
+    }
+
+    private fun scheduleQueueAndPlaybackStateSave(player: Player) {
         if (isRestoringState) return
+        saveQueueJob?.cancel()
 
         val currentTimeline = player.currentTimeline
         val count = currentTimeline.windowCount
@@ -210,7 +282,8 @@ class PlaybackService : MediaSessionService() {
         val repeatMode = player.repeatMode
         val isShuffleOn = player.shuffleModeEnabled
 
-        serviceScope.launch(Dispatchers.IO) {
+        saveQueueJob = serviceScope.launch(Dispatchers.IO) {
+            delay(500)
             traceSection("Room_replaceQueue_${queueEntities.size}") {
                 queueDao.replaceQueue(queueEntities)
             }

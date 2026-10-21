@@ -16,6 +16,9 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun getSongById(id: String): SongEntity?
 
+    @Query("SELECT * FROM songs WHERE id IN (:songIds)")
+    suspend fun getSongsByIdsSync(songIds: List<String>): List<SongEntity>
+
     @Query("SELECT * FROM songs WHERE albumId = :albumId ORDER BY COALESCE(discNumber, 1) ASC, COALESCE(trackNumber, 999) ASC, title ASC")
     fun getSongsByAlbum(albumId: String): Flow<List<SongEntity>>
 
