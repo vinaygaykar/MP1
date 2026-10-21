@@ -17,6 +17,7 @@ import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.domain.repository.PlaylistRepository
 import io.github.vinaygaykar.mp1.playback.PlaybackService
+import io.github.vinaygaykar.mp1.utils.traceSection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -173,13 +174,19 @@ class ArtistDetailViewModel @Inject constructor(
             val player = controller ?: return@launch
             val currentSongs = songs.value
             if (currentSongs.isEmpty()) {
-                player.setMediaItem(song.toMediaItem())
+                traceSection("player.setMediaItem_single") {
+                    player.setMediaItem(song.toMediaItem())
+                }
             } else {
                 val mediaItems = withContext(Dispatchers.Default) {
-                    currentSongs.map { it.toMediaItem() }
+                    traceSection("Song.toMediaItem_batch_${currentSongs.size}") {
+                        currentSongs.map { it.toMediaItem() }
+                    }
                 }
                 val startIndex = currentSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-                player.setMediaItems(mediaItems, startIndex, 0L)
+                traceSection("player.setMediaItems_batch_${mediaItems.size}") {
+                    player.setMediaItems(mediaItems, startIndex, 0L)
+                }
             }
             player.prepare()
             player.play()
@@ -193,18 +200,24 @@ class ArtistDetailViewModel @Inject constructor(
             if (currentSongs.isEmpty()) return@launch
 
             val mediaItems = withContext(Dispatchers.Default) {
-                currentSongs.map { it.toMediaItem() }
+                traceSection("Song.toMediaItem_batch_${currentSongs.size}") {
+                    currentSongs.map { it.toMediaItem() }
+                }
             }
             player.shuffleModeEnabled = shuffle
             val startIndex = if (shuffle) mediaItems.indices.random() else 0
-            player.setMediaItems(mediaItems, startIndex, 0L)
+            traceSection("player.setMediaItems_batch_${mediaItems.size}") {
+                player.setMediaItems(mediaItems, startIndex, 0L)
+            }
             player.prepare()
             player.play()
         }
     }
 
     fun addToQueue(song: Song) {
-        controller?.addMediaItem(song.toMediaItem())
+        traceSection("controller.addMediaItem") {
+            controller?.addMediaItem(song.toMediaItem())
+        }
     }
 
     override fun onCleared() {
