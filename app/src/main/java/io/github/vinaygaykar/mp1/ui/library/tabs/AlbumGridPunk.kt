@@ -71,8 +71,7 @@ import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
-import io.github.vinaygaykar.mp1.ui.components.ExpressiveScrollBar
-import io.github.vinaygaykar.mp1.ui.components.extractFastScrollGlyph
+import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
 import kotlinx.coroutines.delay
@@ -387,21 +386,16 @@ fun AlbumGridPunk(
             }
         }
 
-        // Expressive ScrollBar Overlay
-        ExpressiveScrollBar(
+        // ScrollBar Overlay
+        SimpleScrollBar(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .zIndex(100f)
                 .padding(bottom = contentPadding.calculateBottomPadding()),
-            listState = if (USE_NEW_FAST_GRID) fastLazyListState else if (!isFastModeActive) lazyListState else null,
-            gridState = if (!USE_NEW_FAST_GRID && isFastModeActive) lazyGridState else null,
+            listState = if (isFastModeActive && USE_NEW_FAST_GRID) fastLazyListState else if (!isFastModeActive) lazyListState else null,
+            gridState = if (isFastModeActive && !USE_NEW_FAST_GRID) lazyGridState else null,
             onInteractingChanged = { interacting ->
                 isScrollbarInteracting = interacting
-            },
-            dragLabelProvider = { index ->
-                if (index in albums.indices) {
-                    extractFastScrollGlyph(albums[index].name)
-                } else null
             }
         )
     }

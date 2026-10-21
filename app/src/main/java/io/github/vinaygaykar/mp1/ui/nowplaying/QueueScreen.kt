@@ -410,7 +410,8 @@ fun QueueBottomSheetContent(
 
                 SimpleScrollBar(
                     listState = lazyListState,
-                    modifier = Modifier.align(Alignment.CenterEnd)
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    paddingEnd = 8.dp
                 )
             }
         }

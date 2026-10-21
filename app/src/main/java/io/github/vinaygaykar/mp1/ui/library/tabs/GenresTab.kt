@@ -21,8 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Genre
-import io.github.vinaygaykar.mp1.ui.components.ExpressiveScrollBar
-import io.github.vinaygaykar.mp1.ui.components.extractFastScrollGlyph
+import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 
 @Composable
 fun GenreList(
@@ -55,17 +54,12 @@ fun GenreList(
                     )
                 }
             }
-            ExpressiveScrollBar(
+            SimpleScrollBar(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .zIndex(100f)
                     .padding(bottom = contentPadding.calculateBottomPadding()),
-                listState = listState,
-                dragLabelProvider = { index ->
-                    if (index in genres.indices) {
-                        extractFastScrollGlyph(genres[index].name)
-                    } else null
-                }
+                listState = listState
             )
         }
     }

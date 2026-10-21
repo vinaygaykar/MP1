@@ -50,8 +50,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
 import io.github.vinaygaykar.mp1.domain.models.Song
-import io.github.vinaygaykar.mp1.ui.components.ExpressiveScrollBar
-import io.github.vinaygaykar.mp1.ui.components.extractFastScrollGlyph
+import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 
 private class Ref<T>(var value: T)
 
@@ -116,17 +115,12 @@ fun SongList(
                     )
                 }
             }
-            ExpressiveScrollBar(
+            SimpleScrollBar(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .zIndex(100f)
                     .padding(bottom = contentPadding.calculateBottomPadding()),
-                listState = listState,
-                dragLabelProvider = { index ->
-                    if (index in songs.indices) {
-                        extractFastScrollGlyph(songs[index].title)
-                    } else null
-                }
+                listState = listState
             )
         }
     }

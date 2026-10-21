@@ -41,8 +41,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Album
-import io.github.vinaygaykar.mp1.ui.components.ExpressiveScrollBar
-import io.github.vinaygaykar.mp1.ui.components.extractFastScrollGlyph
+import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 
 /**
  * AlbumGridClean renders a 2-column grid layout of square album art with sharp corners.
@@ -72,7 +71,6 @@ fun AlbumGridClean(
     }
 
     val lazyGridState = rememberLazyGridState()
-    var isScrollbarInteracting by remember { mutableStateOf(value = false) }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyVerticalGrid(
@@ -98,20 +96,12 @@ fun AlbumGridClean(
         }
 
         // Fast Scrollbar overlay
-        ExpressiveScrollBar(
+        SimpleScrollBar(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .zIndex(100f)
                 .padding(bottom = contentPadding.calculateBottomPadding()),
             gridState = lazyGridState,
-            onInteractingChanged = { interacting ->
-                isScrollbarInteracting = interacting
-            },
-            dragLabelProvider = { index ->
-                if (index in albums.indices) {
-                    extractFastScrollGlyph(albums[index].name)
-                } else null
-            },
         )
     }
 }

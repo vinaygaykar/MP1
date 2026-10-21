@@ -6,10 +6,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,15 +32,19 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SimpleScrollBar(
-    listState: LazyListState,
+    listState: LazyListState? = null,
+    gridState: LazyGridState? = null,
     modifier: Modifier = Modifier,
     thumbColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
     thumbWidth: Dp = 4.dp,
-    touchTargetWidth: Dp = 24.dp
+    touchTargetWidth: Dp = 24.dp,
+    paddingEnd: Dp = 6.dp,
+    onInteractingChanged: ((Boolean) -> Unit)? = null
 ) {
-    val needsScrollbar by remember {
+    val needsScrollbar by remember(listState, gridState) {
         derivedStateOf {
-            listState.canScrollForward || listState.canScrollBackward
+            (listState?.canScrollForward == true || listState?.canScrollBackward == true) ||
+            (gridState?.canScrollForward == true || gridState?.canScrollBackward == true)
         }
     }
 
@@ -45,6 +52,10 @@ fun SimpleScrollBar(
 
     val coroutineScope = rememberCoroutineScope()
     var isDragging by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isDragging) {
+        onInteractingChanged?.invoke(isDragging)
+    }
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val activeThumbColor = if (isDragging) primaryColor else thumbColor
@@ -55,11 +66,14 @@ fun SimpleScrollBar(
     )
 
     fun scrollToFraction(fraction: Float) {
-        val totalItems = listState.layoutInfo.totalItemsCount
+        val totalItems = listState?.layoutInfo?.totalItemsCount
+            ?: gridState?.layoutInfo?.totalItemsCount
+            ?: 0
         if (totalItems > 0) {
             val targetIndex = (fraction.coerceIn(0f, 1f) * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
             coroutineScope.launch {
-                listState.scrollToItem(targetIndex)
+                listState?.scrollToItem(targetIndex)
+                gridState?.scrollToItem(targetIndex)
             }
         }
     }
@@ -67,15 +81,16 @@ fun SimpleScrollBar(
     Box(
         modifier = modifier
             .fillMaxHeight()
+            .padding(end = paddingEnd)
             .width(touchTargetWidth)
-            .pointerInput(listState) {
+            .pointerInput(listState, gridState) {
                 detectTapGestures { offset ->
                     if (size.height > 0) {
                         scrollToFraction(offset.y / size.height)
                     }
                 }
             }
-            .pointerInput(listState) {
+            .pointerInput(listState, gridState) {
                 detectVerticalDragGestures(
                     onDragStart = { offset ->
                         isDragging = true
@@ -100,40 +115,64 @@ fun SimpleScrollBar(
                 .fillMaxHeight()
                 .width(animatedWidth)
         ) {
-            val firstVisibleIndex = listState.firstVisibleItemIndex
-            val firstVisibleScrollOffset = listState.firstVisibleItemScrollOffset
+            val totalItems: Int
+            val firstVisibleIndex: Int
+            val firstVisibleScrollOffset: Int
+            val estimatedTotalHeight: Float
+            val currentScrollPx: Float
 
-            val layoutInfo = listState.layoutInfo
-            val totalItems = layoutInfo.totalItemsCount
-            val visibleItems = layoutInfo.visibleItemsInfo
+            if (listState != null) {
+                val layoutInfo = listState.layoutInfo
+                totalItems = layoutInfo.totalItemsCount
+                val visibleItems = layoutInfo.visibleItemsInfo
+                if (totalItems == 0 || visibleItems.isEmpty()) return@Canvas
 
-            if (totalItems > 0 && visibleItems.isNotEmpty()) {
-                val visibleItemsCount = visibleItems.size
-                val viewportHeight = size.height
-                if (viewportHeight <= 0f) return@Canvas
+                firstVisibleIndex = listState.firstVisibleItemIndex
+                firstVisibleScrollOffset = listState.firstVisibleItemScrollOffset
 
-                val averageItemSize = visibleItems.sumOf { it.size }.toFloat() / visibleItemsCount.coerceAtLeast(1)
-                val estimatedTotalHeight = averageItemSize * totalItems
-                val currentScrollPx = (firstVisibleIndex * averageItemSize) + firstVisibleScrollOffset
-                val maxScrollPx = (estimatedTotalHeight - viewportHeight).coerceAtLeast(1f)
+                val averageItemSize = visibleItems.sumOf { it.size }.toFloat() / visibleItems.size.coerceAtLeast(1)
+                estimatedTotalHeight = averageItemSize * totalItems
+                currentScrollPx = (firstVisibleIndex * averageItemSize) + firstVisibleScrollOffset
+            } else if (gridState != null) {
+                val layoutInfo = gridState.layoutInfo
+                totalItems = layoutInfo.totalItemsCount
+                val visibleItems = layoutInfo.visibleItemsInfo
+                if (totalItems == 0 || visibleItems.isEmpty()) return@Canvas
 
-                val scrollProgress = (currentScrollPx / maxScrollPx).coerceIn(0f, 1f)
+                firstVisibleIndex = gridState.firstVisibleItemIndex
+                firstVisibleScrollOffset = gridState.firstVisibleItemScrollOffset
 
-                val minThumbHeight = 32.dp.toPx().coerceAtMost(viewportHeight)
-                val maxThumbHeight = viewportHeight
+                val numColumns = visibleItems.maxOfOrNull { it.column + 1 }?.coerceAtLeast(1) ?: 1
+                val totalRows = (totalItems + numColumns - 1) / numColumns
+                val currentRow = firstVisibleIndex / numColumns
+                val averageRowSize = visibleItems.sumOf { it.size.height }.toFloat() / visibleItems.size.coerceAtLeast(1)
 
-                val thumbHeight = (viewportHeight * (viewportHeight / estimatedTotalHeight.coerceAtLeast(viewportHeight)))
-                    .coerceIn(minThumbHeight, maxThumbHeight)
-
-                val thumbOffsetY = (viewportHeight - thumbHeight) * scrollProgress
-
-                drawRoundRect(
-                    color = activeThumbColor,
-                    topLeft = Offset(0f, thumbOffsetY),
-                    size = Size(animatedWidth.toPx(), thumbHeight),
-                    cornerRadius = CornerRadius(animatedWidth.toPx() / 2f)
-                )
+                estimatedTotalHeight = averageRowSize * totalRows
+                currentScrollPx = (currentRow * averageRowSize) + firstVisibleScrollOffset
+            } else {
+                return@Canvas
             }
+
+            val viewportHeight = size.height
+            if (viewportHeight <= 0f) return@Canvas
+
+            val maxScrollPx = (estimatedTotalHeight - viewportHeight).coerceAtLeast(1f)
+            val scrollProgress = (currentScrollPx / maxScrollPx).coerceIn(0f, 1f)
+
+            val minThumbHeight = 32.dp.toPx().coerceAtMost(viewportHeight)
+            val maxThumbHeight = viewportHeight
+
+            val thumbHeight = (viewportHeight * (viewportHeight / estimatedTotalHeight.coerceAtLeast(viewportHeight)))
+                .coerceIn(minThumbHeight, maxThumbHeight)
+
+            val thumbOffsetY = (viewportHeight - thumbHeight) * scrollProgress
+
+            drawRoundRect(
+                color = activeThumbColor,
+                topLeft = Offset(0f, thumbOffsetY),
+                size = Size(animatedWidth.toPx(), thumbHeight),
+                cornerRadius = CornerRadius(animatedWidth.toPx() / 2f)
+            )
         }
     }
 }

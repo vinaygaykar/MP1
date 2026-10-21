@@ -47,8 +47,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
-import io.github.vinaygaykar.mp1.ui.components.ExpressiveScrollBar
-import io.github.vinaygaykar.mp1.ui.components.extractFastScrollGlyph
+import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.library.LibraryViewModel
 import io.github.vinaygaykar.mp1.ui.theme.isArtistMatchingPlayingTrack
 import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
@@ -104,17 +103,12 @@ fun ArtistGrid(
                     )
                 }
             }
-            ExpressiveScrollBar(
+            SimpleScrollBar(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .zIndex(100f)
                     .padding(bottom = contentPadding.calculateBottomPadding()),
-                gridState = gridState,
-                dragLabelProvider = { index ->
-                    if (index in artists.indices) {
-                        extractFastScrollGlyph(artists[index].name)
-                    } else null
-                }
+                gridState = gridState
             )
         }
     }
