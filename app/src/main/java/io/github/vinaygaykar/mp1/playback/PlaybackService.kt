@@ -27,6 +27,7 @@ import io.github.vinaygaykar.mp1.data.local.entities.PlaybackStateEntity
 import io.github.vinaygaykar.mp1.data.local.entities.QueueItemEntity
 import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
+import io.github.vinaygaykar.mp1.utils.traceSection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -108,7 +109,9 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-                if (!isRestoringState) saveQueueAndPlaybackState(player)
+                traceSection("Service_onTimelineChanged") {
+                    if (!isRestoringState) saveQueueAndPlaybackState(player)
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -187,17 +190,19 @@ class PlaybackService : MediaSessionService() {
         val window = Timeline.Window()
         val queueEntities = ArrayList<QueueItemEntity>(count)
 
-        for (i in 0 until count) {
-            currentTimeline.getWindow(i, window)
-            val songId = window.mediaItem.mediaId
-            queueEntities.add(
-                QueueItemEntity(
-                    queueItemId = "$i-$songId",
-                    position = i,
-                    songId = songId,
-                    sourceContext = null
+        traceSection("Service_buildQueueEntities_$count") {
+            for (i in 0 until count) {
+                currentTimeline.getWindow(i, window)
+                val songId = window.mediaItem.mediaId
+                queueEntities.add(
+                    QueueItemEntity(
+                        queueItemId = "$i-$songId",
+                        position = i,
+                        songId = songId,
+                        sourceContext = null
+                    )
                 )
-            )
+            }
         }
 
         val currentSongId = player.currentMediaItem?.mediaId
@@ -206,7 +211,9 @@ class PlaybackService : MediaSessionService() {
         val isShuffleOn = player.shuffleModeEnabled
 
         serviceScope.launch(Dispatchers.IO) {
-            queueDao.replaceQueue(queueEntities)
+            traceSection("Room_replaceQueue_${queueEntities.size}") {
+                queueDao.replaceQueue(queueEntities)
+            }
             playbackStateDao.upsertPlaybackState(
                 PlaybackStateEntity(
                     id = 0,

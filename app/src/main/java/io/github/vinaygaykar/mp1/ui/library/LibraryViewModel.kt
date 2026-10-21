@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.github.vinaygaykar.mp1.utils.traceSection
 import javax.inject.Inject
 
 @HiltViewModel
@@ -145,9 +146,13 @@ class LibraryViewModel @Inject constructor(
 
             // 1. Immediately play the clicked song with minimal IPC overhead
             val targetMediaItem = withContext(Dispatchers.Default) {
-                currentSongs[startIndex].toMediaItem()
+                traceSection("Song.toMediaItem_single") {
+                    currentSongs[startIndex].toMediaItem()
+                }
             }
-            player.setMediaItem(targetMediaItem)
+            traceSection("player.setMediaItem_single") {
+                player.setMediaItem(targetMediaItem)
+            }
             player.prepare()
             player.play()
 
@@ -155,24 +160,30 @@ class LibraryViewModel @Inject constructor(
 
             // 2. Asynchronously load the full queue in natural order (0..N-1) after UI animation window
             launch(Dispatchers.Default) {
-                val allMediaItems = currentSongs.map { it.toMediaItem() }
+                val allMediaItems = traceSection("Song.toMediaItem_batch_${currentSongs.size}") {
+                    currentSongs.map { it.toMediaItem() }
+                }
                 // Yield briefly to let initial click animation & miniplayer transition render smoothly
                 delay(150)
 
                 withContext(Dispatchers.Main) {
                     val activePlayer = controller ?: return@withContext
-                    activePlayer.setMediaItems(
-                        allMediaItems,
-                        startIndex,
-                        activePlayer.currentPosition
-                    )
+                    traceSection("controller.setMediaItems_batch_${allMediaItems.size}") {
+                        activePlayer.setMediaItems(
+                            allMediaItems,
+                            startIndex,
+                            activePlayer.currentPosition
+                        )
+                    }
                 }
             }
         }
     }
 
     fun addToQueue(song: Song) {
-        controller?.addMediaItem(song.toMediaItem())
+        traceSection("controller.addMediaItem") {
+            controller?.addMediaItem(song.toMediaItem())
+        }
     }
 
     override fun onCleared() {
