@@ -48,7 +48,6 @@ import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LyricsScreen(
     lyricsState: LyricsUiState,
