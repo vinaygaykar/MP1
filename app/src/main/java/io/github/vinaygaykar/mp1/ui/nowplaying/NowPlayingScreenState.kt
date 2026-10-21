@@ -102,7 +102,11 @@ class NowPlayingScreenState(
         }
 
     val progress: Float
-        get() = if (totalRange > 0) ((totalRange - dragOffset.coerceAtLeast(0f)) / totalRange).coerceIn(0f, 1f) else 0f
+        get() {
+            if (totalRange <= 0f) return 0f
+            val raw = (totalRange - dragOffset.coerceAtLeast(0f)) / totalRange
+            return if (raw < 0.005f) 0f else raw.coerceIn(0f, 1f)
+        }
 
     val queueOffset: Float
         get() = try {

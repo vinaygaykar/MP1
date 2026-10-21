@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -208,6 +209,7 @@ fun NowPlayingScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(screenHeight)
+                        .clipToBounds()
                         .pointerInput(state.progress, state.showQueue, state.showLyrics, state.showArtistsDialog, state.totalRange) {
                             if (state.progress > 0.8f && !state.showQueue && !state.showLyrics && !state.showArtistsDialog) {
                                 detectVerticalDragGestures(
@@ -259,15 +261,17 @@ fun NowPlayingScreen(
                         }
                 ) {
                     // Expanded Content
-                    if (state.progress > 0f) {
-                        val trackInfoModifier = if (isLandscape) {
+                    if (state.progress > 0.05f) {
+                        val expandedAlpha = ((state.progress - 0.05f) / 0.15f).coerceIn(0f, 1f)
+                        val trackInfoModifier = (if (isLandscape) {
                             Modifier
                                 .fillMaxHeight()
                                 .width(screenWidth * 0.58f)
                                 .offset(x = screenWidth * 0.42f)
                         } else {
                             Modifier.fillMaxSize()
-                        }
+                        }).alpha(expandedAlpha)
+
                         ExpandedPlayerTrackInfo(
                             modifier = trackInfoModifier,
                             playbackState = playbackState,
