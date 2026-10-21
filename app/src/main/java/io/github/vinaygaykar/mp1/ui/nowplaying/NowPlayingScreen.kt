@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
@@ -48,13 +47,12 @@ import io.github.vinaygaykar.mp1.playback.QueueControls
 import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.ui.library.DragValue
 import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NowPlayingScreen(
+    modifier: Modifier = Modifier,
     playbackState: PlaybackUiState,
     progressState: PlaybackProgressState,
     queueState: QueueUiState,
@@ -63,7 +61,6 @@ fun NowPlayingScreen(
     queueControls: QueueControls,
     lyricsControls: LyricsControls,
     onProgressUpdate: (Float) -> Unit,
-    modifier: Modifier = Modifier,
     visualizerState: VisualizerState = VisualizerState.None,
     peekHeight: Dp = 72.dp,
     bottomOffset: Dp = 0.dp,
@@ -91,7 +88,6 @@ fun NowPlayingScreen(
 
         val state = rememberNowPlayingScreenState(
             playbackState = playbackState,
-            progressState = progressState,
             queueState = queueState,
             playbackControls = playbackControls,
             peekHeight = peekHeight,
@@ -273,14 +269,13 @@ fun NowPlayingScreen(
                             Modifier.fillMaxSize()
                         }
                         ExpandedPlayerTrackInfo(
+                            modifier = trackInfoModifier,
                             playbackState = playbackState,
                             queueState = queueState,
-                            modifier = trackInfoModifier,
-                            pagerState = state.pagerState,
-                            onArtistClick = {
-                                state.showArtistsDialog = true
-                            }
-                        )
+                            pagerState = state.pagerState
+                        ) {
+                            state.showArtistsDialog = true
+                        }
                     }
 
                     // Collapsed View Content
@@ -408,51 +403,4 @@ fun NowPlayingScreen(
             }
         }
     }
-}
-
-/**
- * Backward compatibility alias for [NowPlayingScreen].
- */
-@Deprecated(
-    message = "Use NowPlayingScreen instead",
-    replaceWith = ReplaceWith(
-        "NowPlayingScreen(playbackState, progressState, queueState, lyricsState, playbackControls, queueControls, lyricsControls, onProgressUpdate, modifier, visualizerState, peekHeight, bottomOffset, initialExpanded, bulgeTrigger, onMiniPlayerPositioned)",
-        "io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen"
-    )
-)
-@Composable
-fun ExpandablePlayer(
-    playbackState: PlaybackUiState,
-    progressState: PlaybackProgressState,
-    queueState: QueueUiState,
-    lyricsState: LyricsUiState = LyricsUiState.None,
-    playbackControls: PlaybackControls,
-    queueControls: QueueControls,
-    lyricsControls: LyricsControls,
-    onProgressUpdate: (Float) -> Unit,
-    modifier: Modifier = Modifier,
-    visualizerState: VisualizerState = VisualizerState.None,
-    peekHeight: Dp = 72.dp,
-    bottomOffset: Dp = 0.dp,
-    initialExpanded: Boolean = false,
-    bulgeTrigger: Long = 0L,
-    onMiniPlayerPositioned: ((Offset) -> Unit)? = null
-) {
-    NowPlayingScreen(
-        playbackState = playbackState,
-        progressState = progressState,
-        queueState = queueState,
-        lyricsState = lyricsState,
-        playbackControls = playbackControls,
-        queueControls = queueControls,
-        lyricsControls = lyricsControls,
-        onProgressUpdate = onProgressUpdate,
-        modifier = modifier,
-        visualizerState = visualizerState,
-        peekHeight = peekHeight,
-        bottomOffset = bottomOffset,
-        initialExpanded = initialExpanded,
-        bulgeTrigger = bulgeTrigger,
-        onMiniPlayerPositioned = onMiniPlayerPositioned
-    )
 }

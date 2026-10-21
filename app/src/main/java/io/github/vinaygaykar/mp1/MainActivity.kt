@@ -170,6 +170,7 @@ fun MainScreen(
 
         // Now Playing Screen - Sits on top
         NowPlayingScreen(
+            modifier = Modifier.fillMaxSize(),
             playbackState = playbackState,
             progressState = progressState,
             queueState = queueState,
@@ -177,13 +178,9 @@ fun MainScreen(
             playbackControls = playerViewModel,
             queueControls = playerViewModel,
             lyricsControls = playerViewModel,
-            visualizerState = visualizerState,
             onProgressUpdate = { expansionProgress.floatValue = it },
-            peekHeight = 72.dp,
-            bottomOffset = 0.dp,
-            bulgeTrigger = miniPlayerBulgeTrigger,
-            onMiniPlayerPositioned = { offset -> miniPlayerTargetOffset = offset },
-            modifier = Modifier.fillMaxSize()
-        )
+            visualizerState = visualizerState,
+            bulgeTrigger = miniPlayerBulgeTrigger
+        ) { offset -> miniPlayerTargetOffset = offset }
     }
 }

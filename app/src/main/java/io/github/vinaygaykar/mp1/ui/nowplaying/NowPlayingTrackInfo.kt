@@ -47,9 +47,9 @@ private data class TrackInfo(
 
 @Composable
 internal fun ExpandedPlayerTrackInfo(
+    modifier: Modifier = Modifier,
     playbackState: PlaybackUiState,
     queueState: QueueUiState = QueueUiState(),
-    modifier: Modifier = Modifier,
     pagerState: PagerState? = null,
     onArtistClick: (() -> Unit)? = null
 ) {
@@ -75,8 +75,18 @@ internal fun ExpandedPlayerTrackInfo(
         val density = LocalDensity.current
         val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
 
-        val currentTrackInfo = remember(playbackState.trackTitle, playbackState.artist, playbackState.album, playbackState.albumId) {
-            TrackInfo(playbackState.trackTitle, playbackState.artist, playbackState.album, playbackState.albumId)
+        val currentTrackInfo = remember(
+            playbackState.trackTitle,
+            playbackState.artist,
+            playbackState.album,
+            playbackState.albumId
+        ) {
+            TrackInfo(
+                playbackState.trackTitle,
+                playbackState.artist,
+                playbackState.album,
+                playbackState.albumId
+            )
         }
 
         val items = queueState.items
@@ -180,7 +190,8 @@ internal fun ExpandedPlayerTrackInfo(
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp)
                             .graphicsLayer {
-                                val pageOffset = (page - pagerState.currentPage) - pagerState.currentPageOffsetFraction
+                                val pageOffset =
+                                    (page - pagerState.currentPage) - pagerState.currentPageOffsetFraction
                                 translationX = pageOffset * screenWidthPx
                             }
                     )
@@ -189,7 +200,6 @@ internal fun ExpandedPlayerTrackInfo(
         }
     }
 }
-
 
 
 @Composable
@@ -241,27 +251,25 @@ private fun TrackTextContent(
                     } else Modifier
                 ),
         )
-        if (album.isNotBlank()) {
-            Text(
-                text = album,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Start,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-                    .clickable {
-                        if (!albumId.isNullOrEmpty()) {
-                            val intent = Intent(context, AlbumDetailActivity::class.java).apply {
-                                putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, albumId)
-                            }
-                            launchActivityWithScaleUp(context, intent, view)
+        Text(
+            text = album,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Start,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+                .clickable {
+                    if (!albumId.isNullOrEmpty()) {
+                        val intent = Intent(context, AlbumDetailActivity::class.java).apply {
+                            putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, albumId)
                         }
-                    },
-            )
-        }
+                        launchActivityWithScaleUp(context, intent, view)
+                    }
+                },
+        )
     }
 }

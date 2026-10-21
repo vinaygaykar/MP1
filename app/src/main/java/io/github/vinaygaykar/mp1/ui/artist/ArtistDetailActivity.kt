@@ -754,6 +754,7 @@ fun ArtistDetailScreen(
 
         // Now Playing Screen
         NowPlayingScreen(
+            modifier = Modifier.fillMaxSize(),
             playbackState = playbackState,
             progressState = progressState,
             queueState = queueState,
@@ -761,15 +762,12 @@ fun ArtistDetailScreen(
             playbackControls = playerViewModel,
             queueControls = playerViewModel,
             lyricsControls = playerViewModel,
-            visualizerState = visualizerState,
             onProgressUpdate = { expansionProgress.floatValue = it },
-            peekHeight = 72.dp,
-            bulgeTrigger = miniPlayerBulgeTrigger,
-            onMiniPlayerPositioned = { miniPlayerTargetOffset = it },
-            modifier = Modifier.fillMaxSize()
-        )
+            visualizerState = visualizerState,
+            bulgeTrigger = miniPlayerBulgeTrigger
+        ) { miniPlayerTargetOffset = it }
 
-        // Multi-selection Bottom Sheet
+            // Multi-selection Bottom Sheet
         if (showMultiSelectionSheet) {
             MultiSelectionBottomSheet(
                 selectedSongs = selectedSongs,

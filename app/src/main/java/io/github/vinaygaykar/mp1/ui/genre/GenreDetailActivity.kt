@@ -377,6 +377,7 @@ fun GenreDetailScreen(
 
             // Now Playing Screen
             NowPlayingScreen(
+                modifier = Modifier.fillMaxSize(),
                 playbackState = playbackState,
                 progressState = progressState,
                 queueState = queueState,
@@ -384,12 +385,9 @@ fun GenreDetailScreen(
                 playbackControls = playerViewModel,
                 queueControls = playerViewModel,
                 lyricsControls = playerViewModel,
-                visualizerState = visualizerState,
                 onProgressUpdate = { expansionProgress.floatValue = it },
-                peekHeight = 72.dp,
-                onMiniPlayerPositioned = { miniPlayerTargetOffset = it },
-                modifier = Modifier.fillMaxSize()
-            )
+                visualizerState = visualizerState
+            ) { miniPlayerTargetOffset = it }
 
             // Multi-selection Bottom Sheet
             if (showMultiSelectionSheet) {

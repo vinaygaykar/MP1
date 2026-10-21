@@ -14,7 +14,6 @@ import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.pager.PagerState
@@ -55,7 +54,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import io.github.vinaygaykar.mp1.playback.PlaybackControls
-import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.ui.library.DragValue
@@ -185,11 +183,9 @@ class NowPlayingScreenState(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun rememberNowPlayingScreenState(
     playbackState: PlaybackUiState,
-    progressState: PlaybackProgressState,
     queueState: QueueUiState,
     playbackControls: PlaybackControls,
     peekHeight: Dp,
