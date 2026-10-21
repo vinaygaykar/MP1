@@ -7,7 +7,6 @@ import androidx.media3.common.MediaMetadata
 import io.github.vinaygaykar.mp1.utils.DEFAULT_ARTIST_DELIMITERS
 import io.github.vinaygaykar.mp1.utils.DEFAULT_WORD_DELIMITERS
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
-import io.github.vinaygaykar.mp1.utils.traceSection
 
 data class Song(
     val id: String,
@@ -46,16 +45,11 @@ fun Song.getArtists(
     )
 }
 
-fun Song.toMediaItem(): MediaItem = traceSection("Song.toMediaItem") {
-    val extras = Bundle().apply {
-        if (albumId != null) {
-            putString("album_id", albumId)
-        }
-    }
-
+fun Song.toMediaItem(): MediaItem {
+    val extras = albumId?.let { Bundle(1).apply { putString("album_id", it) } }
     val displayArtist = artistsDisplayString.ifBlank { artist.ifBlank { "Unknown Artist" } }
 
-    MediaItem.Builder()
+    return MediaItem.Builder()
         .setMediaId(id)
         .setUri(uri)
         .setMediaMetadata(

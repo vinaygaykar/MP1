@@ -16,3 +16,5 @@ todos/
 *.jks
 keystore_base64.txt
 
+*.trace
+*.pftrace
