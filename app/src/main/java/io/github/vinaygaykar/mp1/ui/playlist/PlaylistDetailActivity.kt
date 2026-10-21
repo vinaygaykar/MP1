@@ -81,7 +81,7 @@ import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.genre.getDeterministicVibrantSeedColor
-import io.github.vinaygaykar.mp1.ui.nowplaying.ExpandablePlayer
+import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -342,8 +342,8 @@ fun PlaylistDetailScreen(
                 }
             }
 
-            // Expandable Player
-            ExpandablePlayer(
+            // Now Playing Screen
+            NowPlayingScreen(
                 playbackState = playbackState,
                 progressState = progressState,
                 queueState = queueState,

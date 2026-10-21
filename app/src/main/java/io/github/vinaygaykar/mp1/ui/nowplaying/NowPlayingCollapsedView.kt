@@ -29,7 +29,14 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -65,7 +72,7 @@ import kotlin.math.abs
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MiniPlayer(
+fun NowPlayingCollapsedView(
     playbackState: PlaybackUiState,
     progressState: PlaybackProgressState,
     queueState: QueueUiState,
@@ -332,7 +339,7 @@ fun MiniPlayer(
                         else -> Triple(nextTitle, nextArtist, nextArtworkUri)
                     }
 
-                    MiniPlayerItemContent(
+                    NowPlayingCollapsedItemContent(
                         title = title,
                         artist = artist,
                         artworkUri = artworkUri,
@@ -363,7 +370,7 @@ fun MiniPlayer(
 }
 
 @Composable
-private fun MiniPlayerItemContent(
+private fun NowPlayingCollapsedItemContent(
     title: String,
     artist: String,
     artworkUri: Uri?,
@@ -435,8 +442,6 @@ private fun MiniPlayerItemContent(
     }
 }
 
-
-
 private fun calculateEffectiveOffset(
     rawOffset: Float,
     width: Float,
@@ -459,4 +464,36 @@ private fun rubberBandDistance(distance: Float, maxDistance: Float): Float {
     if (distance <= 0f || maxDistance <= 0f) return 0f
     val limit = maxDistance * 0.4f
     return limit * (1f - (1f / (1f + distance * 0.55f / limit)))
+}
+
+@Deprecated(
+    message = "Use NowPlayingCollapsedView instead",
+    replaceWith = ReplaceWith(
+        "NowPlayingCollapsedView(playbackState, progressState, queueState, actions, showRecord, rotation, textAlpha, onClick, onPositioned)",
+        "io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingCollapsedView"
+    )
+)
+@Composable
+fun MiniPlayer(
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    queueState: QueueUiState,
+    actions: PlaybackControls,
+    showRecord: Boolean = true,
+    rotation: Float? = null,
+    textAlpha: Float = 1f,
+    onClick: (() -> Unit)? = null,
+    onPositioned: ((Offset) -> Unit)? = null,
+) {
+    NowPlayingCollapsedView(
+        playbackState = playbackState,
+        progressState = progressState,
+        queueState = queueState,
+        actions = actions,
+        showRecord = showRecord,
+        rotation = rotation,
+        textAlpha = textAlpha,
+        onClick = onClick,
+        onPositioned = onPositioned
+    )
 }

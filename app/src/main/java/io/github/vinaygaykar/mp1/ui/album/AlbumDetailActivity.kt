@@ -111,7 +111,7 @@ import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
-import io.github.vinaygaykar.mp1.ui.nowplaying.ExpandablePlayer
+import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -655,8 +655,8 @@ fun AlbumDetailScreen(
                 }
             }
 
-            // Expandable Player on top
-            ExpandablePlayer(
+            // Now Playing Screen on top
+            NowPlayingScreen(
                 playbackState = playbackState,
                 progressState = progressState,
                 queueState = queueState,

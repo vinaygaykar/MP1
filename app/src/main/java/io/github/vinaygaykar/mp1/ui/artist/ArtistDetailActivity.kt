@@ -118,7 +118,7 @@ import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.album.SongCardItem
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
-import io.github.vinaygaykar.mp1.ui.nowplaying.ExpandablePlayer
+import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
@@ -752,8 +752,8 @@ fun ArtistDetailScreen(
             }
         }
 
-        // Expandable Player
-        ExpandablePlayer(
+        // Now Playing Screen
+        NowPlayingScreen(
             playbackState = playbackState,
             progressState = progressState,
             queueState = queueState,

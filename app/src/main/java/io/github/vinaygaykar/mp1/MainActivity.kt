@@ -36,7 +36,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
-import io.github.vinaygaykar.mp1.ui.nowplaying.ExpandablePlayer
+import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.library.LibraryScreen
 import io.github.vinaygaykar.mp1.ui.search.SearchScreen
 import io.github.vinaygaykar.mp1.ui.settings.ScanLocationScreen
@@ -168,8 +168,8 @@ fun MainScreen(
             }
         }
 
-        // Expandable Player - Sits on top
-        ExpandablePlayer(
+        // Now Playing Screen - Sits on top
+        NowPlayingScreen(
             playbackState = playbackState,
             progressState = progressState,
             queueState = queueState,
