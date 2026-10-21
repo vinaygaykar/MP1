@@ -3,6 +3,7 @@ package io.github.vinaygaykar.mp1.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
+import android.os.Debug
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -28,6 +29,7 @@ import io.github.vinaygaykar.mp1.data.local.entities.QueueItemEntity
 import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.utils.traceSection
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -234,21 +236,34 @@ class PlaybackService : MediaSessionService() {
                 allMediaItems.subList(0, validStartIndex)
             } else emptyList()
 
-            for (chunk in itemsAfter.chunked(chunkSize)) {
-                withContext(Dispatchers.Main) {
-                    player.addMediaItems(chunk)
-                }
-                delay(50)
-            }
+            val traceFile = File(getExternalFilesDir(null), "chunk_phase.trace")
+            Debug.startMethodTracingSampling(traceFile.absolutePath, 8 * 1024 * 1024, 1000)
 
-            var insertPos = 0
-            for (chunk in itemsBefore.chunked(chunkSize)) {
-                val currentPos = insertPos
-                withContext(Dispatchers.Main) {
-                    player.addMediaItems(currentPos, chunk)
+            try {
+                for (chunk in itemsAfter.chunked(chunkSize)) {
+                    withContext(Dispatchers.Main) {
+                        val currentCount = player.mediaItemCount
+                        traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
+                            player.addMediaItems(chunk)
+                        }
+                    }
+                    delay(50)
                 }
-                insertPos += chunk.size
-                delay(50)
+
+                var insertPos = 0
+                for (chunk in itemsBefore.chunked(chunkSize)) {
+                    val currentPos = insertPos
+                    withContext(Dispatchers.Main) {
+                        val currentCount = player.mediaItemCount
+                        traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
+                            player.addMediaItems(currentPos, chunk)
+                        }
+                    }
+                    insertPos += chunk.size
+                    delay(50)
+                }
+            } finally {
+                Debug.stopMethodTracing()
             }
         }
     }
