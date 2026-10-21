@@ -19,6 +19,7 @@ class MusicRepositoryImpl @Inject constructor(
     override fun getAllArtists(): Flow<List<Artist>> = localMusicSource.getAllArtists()
     override fun getAllGenres(): Flow<List<Genre>> = localMusicSource.getAllGenres()
     override suspend fun getSongById(id: String): Song? = localMusicSource.getSongById(id)
+    override suspend fun getSongsByIdsSync(songIds: List<String>): List<Song> = localMusicSource.getSongsByIdsSync(songIds)
     override fun searchSongs(query: String): Flow<List<Song>> = localMusicSource.searchSongs(query)
     override fun searchAlbums(query: String): Flow<List<Album>> = localMusicSource.searchAlbums(query)
     override fun searchArtists(query: String): Flow<List<Artist>> = localMusicSource.searchArtists(query)

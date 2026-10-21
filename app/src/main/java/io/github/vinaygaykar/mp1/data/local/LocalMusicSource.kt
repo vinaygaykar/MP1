@@ -63,6 +63,11 @@ class LocalMusicSource @Inject constructor(
         return songDao.getSongById(id)?.toDomain()
     }
 
+    suspend fun getSongsByIdsSync(songIds: List<String>): List<Song> {
+        val songMap = songDao.getSongsByIdsSync(songIds).associateBy { it.id }
+        return songIds.mapNotNull { songMap[it]?.toDomain() }
+    }
+
     fun searchSongs(query: String): Flow<List<Song>> {
         val trimmed = query.trim()
         val ftsQuery = buildFtsQuery(trimmed)

@@ -14,6 +14,7 @@ interface MusicRepository {
     fun getAllArtists(): Flow<List<Artist>>
     fun getAllGenres(): Flow<List<Genre>>
     suspend fun getSongById(id: String): Song?
+    suspend fun getSongsByIdsSync(songIds: List<String>): List<Song>
     fun searchSongs(query: String): Flow<List<Song>>
     fun searchAlbums(query: String): Flow<List<Album>>
     fun searchArtists(query: String): Flow<List<Artist>>
