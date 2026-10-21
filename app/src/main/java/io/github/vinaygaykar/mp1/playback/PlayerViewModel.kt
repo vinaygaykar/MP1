@@ -2,11 +2,7 @@ package io.github.vinaygaykar.mp1.playback
 
 import android.content.ComponentName
 import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Build
-import android.provider.DocumentsContract
-import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -37,8 +33,6 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toPersistentList
-import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -48,7 +42,8 @@ class PlayerViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
     private val scannerRepository: ScannerRepository,
     private val settingsRepository: SettingsRepository,
-    private val audioVisualizerRepository: AudioVisualizerRepository
+    private val audioVisualizerRepository: AudioVisualizerRepository,
+    private val queueManager: QueueManager
 ) : ViewModel(), PlaybackControls, QueueControls, LyricsControls {
 
     private var controller: MediaController? = null
@@ -260,103 +255,31 @@ class PlayerViewModel @Inject constructor(
         queueUpdateJob?.cancel()
         queueUpdateJob = viewModelScope.launch(Dispatchers.Default) {
             delay(200)
-            val count = timeline.windowCount
-            if (count == 0) {
-                currentWindowIndices = emptyList()
-                _queueState.update { QueueUiState(items = persistentListOf(), currentIndex = -1) }
-                return@launch
-            }
 
             val (isShuffleOn, currentWindowIndex) = withContext(Dispatchers.Main) {
                 val p = controller
                 (p?.shuffleModeEnabled ?: false) to (p?.currentMediaItemIndex ?: -1)
             }
 
-            val shouldRebuild = forceRebuild ||
-                    currentWindowIndices.size != count ||
-                    currentWindowIndices.any { it !in 0 until count } ||
-                    _playbackState.value.isShuffleOn != isShuffleOn
+            val result = queueManager.buildQueueFromTimeline(
+                timeline = timeline,
+                isShuffleOn = isShuffleOn,
+                currentWindowIndex = currentWindowIndex,
+                currentWindowIndices = currentWindowIndices,
+                forceRebuild = forceRebuild || _playbackState.value.isShuffleOn != isShuffleOn
+            )
 
-            if (shouldRebuild) {
-                val window = Timeline.Window()
-                val newQueue = ArrayList<MediaItem>(count)
-                val newWindowIndices = ArrayList<Int>(count)
-
-                if (isShuffleOn && count > 1) {
-                    val visited = BooleanArray(count)
-                    var visitedCount = 0
-
-                    var index = if (currentWindowIndex in 0 until count) {
-                        currentWindowIndex
-                    } else {
-                        timeline.getFirstWindowIndex(true)
-                    }
-
-                    while (index in 0 until count && !visited[index] && visitedCount < count) {
-                        visited[index] = true
-                        timeline.getWindow(index, window)
-                        newQueue.add(window.mediaItem)
-                        newWindowIndices.add(index)
-                        visitedCount++
-                        index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, true)
-                    }
-
-                    if (visitedCount < count) {
-                        var fallbackIndex = timeline.getFirstWindowIndex(true)
-                        while (fallbackIndex in 0 until count && visitedCount < count) {
-                            if (!visited[fallbackIndex]) {
-                                visited[fallbackIndex] = true
-                                timeline.getWindow(fallbackIndex, window)
-                                newQueue.add(window.mediaItem)
-                                newWindowIndices.add(fallbackIndex)
-                                visitedCount++
-                            }
-                            fallbackIndex = timeline.getNextWindowIndex(fallbackIndex, Player.REPEAT_MODE_OFF, true)
-                        }
-                    }
-
-                    if (visitedCount < count) {
-                        for (i in 0 until count) {
-                            if (!visited[i]) {
-                                timeline.getWindow(i, window)
-                                newQueue.add(window.mediaItem)
-                                newWindowIndices.add(i)
-                            }
-                        }
-                    }
-                } else {
-                    for (i in 0 until count) {
-                        timeline.getWindow(i, window)
-                        newQueue.add(window.mediaItem)
-                        newWindowIndices.add(i)
-                    }
-                }
-
-                currentWindowIndices = newWindowIndices
-                val uiCurrentIndex = if (currentWindowIndex >= 0 && newWindowIndices.isNotEmpty()) {
-                    val found = newWindowIndices.indexOf(currentWindowIndex)
-                    if (found != -1) found else currentWindowIndex.coerceIn(0, newWindowIndices.size - 1)
-                } else {
-                    currentWindowIndex
-                }
-
-                _playbackState.update { it.copy(isShuffleOn = isShuffleOn) }
-                _queueState.update {
+            currentWindowIndices = result.windowIndices
+            _playbackState.update { it.copy(isShuffleOn = result.isShuffleOn) }
+            _queueState.update { current ->
+                if (result.items.isNotEmpty()) {
                     QueueUiState(
-                        items = newQueue.toPersistentList(),
-                        currentIndex = uiCurrentIndex
+                        items = result.items,
+                        currentIndex = result.uiCurrentIndex
                     )
-                }
-            } else {
-                val uiCurrentIndex = if (currentWindowIndex >= 0 && currentWindowIndices.isNotEmpty()) {
-                    val found = currentWindowIndices.indexOf(currentWindowIndex)
-                    if (found != -1) found else currentWindowIndex.coerceIn(0, currentWindowIndices.size - 1)
                 } else {
-                    currentWindowIndex
+                    current.copy(currentIndex = result.uiCurrentIndex)
                 }
-
-                _playbackState.update { it.copy(isShuffleOn = isShuffleOn) }
-                _queueState.update { it.copy(currentIndex = uiCurrentIndex) }
             }
         }
     }
@@ -383,7 +306,7 @@ class PlayerViewModel @Inject constructor(
             lyricsRepository.getLyrics(song)
                 .onSuccess { lyrics ->
                     if (controller?.currentMediaItem?.mediaId == songId) {
-                        val isLocal = isLocalOrEmbeddedLyrics(context, song.uri.toString(), song.fileName, lyrics.content)
+                        val isLocal = lyricsRepository.isLocalOrEmbeddedLyrics(song, lyrics.content)
                         _lyricsState.update {
                             LyricsUiState.Success(
                                 lyrics = lyrics.content,
@@ -540,7 +463,7 @@ class PlayerViewModel @Inject constructor(
                     if (controller?.currentMediaItem?.mediaId == songId) {
                         val song = musicRepository.getSongById(songId)
                         val isLocal = if (song != null) {
-                            isLocalOrEmbeddedLyrics(context, song.uri.toString(), song.fileName, lyrics.content)
+                            lyricsRepository.isLocalOrEmbeddedLyrics(song, lyrics.content)
                         } else false
                         _lyricsState.update {
                             LyricsUiState.Success(
@@ -559,82 +482,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun isLocalOrEmbeddedLyrics(
-        context: Context,
-        songUriString: String,
-        fileName: String,
-        lyricsContent: String?
-    ): Boolean {
-        if (lyricsContent.isNullOrBlank()) return false
-
-        val uri = try { Uri.parse(songUriString) } catch (_: Exception) { null } ?: return false
-
-        val lrcFileName = if (fileName.contains(".")) {
-            fileName.substringBeforeLast(".") + ".lrc"
-        } else {
-            "$fileName.lrc"
-        }
-
-        try {
-            if (uri.scheme == "file") {
-                val file = File(uri.path ?: "")
-                val parent = file.parentFile
-                if (parent != null && File(parent, lrcFileName).exists()) {
-                    return true
-                }
-            } else if (uri.scheme == "content") {
-                if (DocumentsContract.isDocumentUri(context, uri)) {
-                    val docId = DocumentsContract.getDocumentId(uri)
-                    val lrcDocId = if (docId.contains(".")) {
-                        docId.substringBeforeLast(".") + ".lrc"
-                    } else {
-                        "$docId.lrc"
-                    }
-                    val lrcUri = DocumentsContract.buildDocumentUriUsingTree(uri, lrcDocId)
-                    val exists = context.contentResolver.openInputStream(lrcUri)?.use { true } ?: false
-                    if (exists) return true
-                }
-
-                val projection = arrayOf(MediaStore.Audio.Media.DATA)
-                context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val dataIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
-                        if (dataIdx != -1) {
-                            val path = cursor.getString(dataIdx)
-                            if (!path.isNullOrBlank()) {
-                                val audioFile = File(path)
-                                val parent = audioFile.parentFile
-                                if (parent != null && parent.exists()) {
-                                    if (File(parent, lrcFileName).exists()) {
-                                        return true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-
-        try {
-            val retriever = MediaMetadataRetriever()
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                retriever.setDataSource(pfd.fileDescriptor)
-                var embedded: String? = null
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    embedded = retriever.extractMetadata(35) // METADATA_KEY_LYRICS
-                }
-                if (!embedded.isNullOrBlank()) {
-                    retriever.release()
-                    return true
-                }
-            }
-            retriever.release()
-        } catch (_: Exception) {}
-
-        return false
-    }
-
     override fun onSaveLyrics() {
         val currentItem = controller?.currentMediaItem ?: return
         val songId = currentItem.mediaId
@@ -644,75 +491,13 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val song = musicRepository.getSongById(songId)
             if (song != null) {
-                saveLrcFileToStorage(context, song.uri.toString(), song.fileName, lyricsContent)
-            }
-            _lyricsState.update {
-                if (it is LyricsUiState.Success) it.copy(isLocal = true) else it
-            }
-        }
-    }
-
-    private fun saveLrcFileToStorage(context: Context, songUriString: String, fileName: String, lyricsContent: String): Boolean {
-        return try {
-            val uri = Uri.parse(songUriString)
-            val lrcFileName = if (fileName.contains(".")) {
-                fileName.substringBeforeLast(".") + ".lrc"
-            } else {
-                "$fileName.lrc"
-            }
-
-            if (uri.scheme == "file") {
-                val file = File(uri.path ?: return false)
-                val parent = file.parentFile ?: return false
-                val lrcFile = File(parent, lrcFileName)
-                lrcFile.writeText(lyricsContent)
-                true
-            } else if (uri.scheme == "content") {
-                if (DocumentsContract.isDocumentUri(context, uri)) {
-                    val docId = DocumentsContract.getDocumentId(uri)
-                    val parentDocId = if (docId.contains("/")) docId.substringBeforeLast("/") else null
-                    if (parentDocId != null) {
-                        val treeUri = DocumentsContract.buildDocumentUriUsingTree(uri, parentDocId)
-                        val parentFolderUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
-                        val newLrcUri = DocumentsContract.createDocument(
-                            context.contentResolver,
-                            parentFolderUri,
-                            "*/*",
-                            lrcFileName
-                        )
-                        if (newLrcUri != null) {
-                            context.contentResolver.openOutputStream(newLrcUri)?.use { out ->
-                                out.write(lyricsContent.toByteArray())
-                            }
-                            return true
-                        }
+                val saved = lyricsRepository.saveLyrics(song, lyricsContent)
+                if (saved) {
+                    _lyricsState.update {
+                        if (it is LyricsUiState.Success) it.copy(isLocal = true) else it
                     }
                 }
-                val projection = arrayOf(MediaStore.Audio.Media.DATA)
-                context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val dataIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
-                        if (dataIdx != -1) {
-                            val path = cursor.getString(dataIdx)
-                            if (!path.isNullOrBlank()) {
-                                val audioFile = File(path)
-                                val parent = audioFile.parentFile
-                                if (parent != null && parent.exists()) {
-                                    val lrcFile = File(parent, lrcFileName)
-                                    lrcFile.writeText(lyricsContent)
-                                    return true
-                                }
-                            }
-                        }
-                    }
-                }
-                false
-            } else {
-                false
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
         }
     }
 
@@ -838,44 +623,12 @@ class PlayerViewModel @Inject constructor(
 
     override fun playNextInQueue(indices: Set<Int>) {
         val player = controller ?: return
-        val totalCount = player.mediaItemCount
-        val currentIdx = player.currentMediaItemIndex
-        if (totalCount <= 1 || indices.isEmpty()) return
-
-        val windowIndices = currentWindowIndices
-        val targetWindowIndices = indices.mapNotNull { windowIndices.getOrNull(it) }
-            .filter { it in 0 until totalCount }.toSet()
-        if (targetWindowIndices.isEmpty()) return
-
-        if (player.shuffleModeEnabled) {
-            player.shuffleModeEnabled = false
-        }
-
-        val activeCurrentIdx = if (currentIdx in 0 until totalCount) currentIdx else 0
-        val selectedWithoutCurrent = targetWindowIndices.filter { it != activeCurrentIdx }.sorted()
-        val unselected = (0 until totalCount).filter { it !in targetWindowIndices || it == activeCurrentIdx }
-
-        val currentPosInUnselected = unselected.indexOf(activeCurrentIdx).let { if (it == -1) 0 else it }
-
-        val targetList = mutableListOf<Int>()
-        for (i in 0..currentPosInUnselected) {
-            targetList.add(unselected[i])
-        }
-        targetList.addAll(selectedWithoutCurrent)
-        for (i in (currentPosInUnselected + 1) until unselected.size) {
-            targetList.add(unselected[i])
-        }
-
-        val workingList = (0 until totalCount).toMutableList()
-        for (i in targetList.indices) {
-            val targetVal = targetList[i]
-            val fromIndex = (i until workingList.size).firstOrNull { workingList[it] == targetVal }
-            if (fromIndex != null && fromIndex != i) {
-                player.moveMediaItem(fromIndex, i)
-                val item = workingList.removeAt(fromIndex)
-                workingList.add(i, item)
-            }
-        }
+        queueManager.executePlayNext(
+            player = player,
+            currentIdx = player.currentMediaItemIndex,
+            indices = indices,
+            windowIndices = currentWindowIndices
+        )
         updateState()
     }
 
@@ -918,7 +671,7 @@ class PlayerViewModel @Inject constructor(
         }
 
         visualizerJob?.cancel()
-        if (activeVisualizerSongId != activeId || activeVisualizerWave != waveMode) {
+        if (activeVisualizerSongId != activeId || activeVisualizerWave == waveMode) {
             audioVisualizerRepository.clearCache()
             _visualizerState.value = VisualizerState.None
         }
