@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -121,19 +122,78 @@ fun PlayerTimestampBar(
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "Timestamp Bar - Light")
 @Composable
-fun PlayerTimestampBarPreview() {
-    MusicPlayerTheme {
-        PlayerTimestampBar(
-            displayPositionMs = 75000L,
-            durationMs = 210000L,
-            isPlaying = true,
-            scrubFactor = 0f,
-            rowWidthFraction = 1f,
-            recordY = 80.dp,
-            progress = 1f,
-            modifier = Modifier.padding(16.dp)
-        )
+fun PlayerTimestampBarLightPreview() {
+    MusicPlayerTheme(darkTheme = false) {
+        Surface {
+            PlayerTimestampBar(
+                displayPositionMs = 75000L,
+                durationMs = 210000L,
+                isPlaying = true,
+                scrubFactor = 0f,
+                rowWidthFraction = 1f,
+                recordY = 80.dp,
+                progress = 1f,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Timestamp Bar - Dark")
+@Composable
+fun PlayerTimestampBarDarkPreview() {
+    MusicPlayerTheme(darkTheme = true) {
+        Surface {
+            PlayerTimestampBar(
+                displayPositionMs = 75000L,
+                durationMs = 210000L,
+                isPlaying = true,
+                scrubFactor = 0f,
+                rowWidthFraction = 1f,
+                recordY = 80.dp,
+                progress = 1f,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Timestamp Bar Seeking - Light")
+@Composable
+fun PlayerTimestampBarSeekingLightPreview() {
+    MusicPlayerTheme(darkTheme = false) {
+        Surface {
+            PlayerTimestampBar(
+                displayPositionMs = 75000L,
+                durationMs = 210000L,
+                isPlaying = true,
+                scrubFactor = 1f,
+                rowWidthFraction = 1f,
+                recordY = 80.dp,
+                progress = 1f,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Timestamp Bar Seeking - Dark")
+@Composable
+fun PlayerTimestampBarSeekingDarkPreview() {
+    MusicPlayerTheme(darkTheme = true) {
+        Surface {
+            PlayerTimestampBar(
+                displayPositionMs = 75000L,
+                durationMs = 210000L,
+                isPlaying = true,
+                scrubFactor = 1f,
+                rowWidthFraction = 1f,
+                recordY = 80.dp,
+                progress = 1f,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
     }
 }
