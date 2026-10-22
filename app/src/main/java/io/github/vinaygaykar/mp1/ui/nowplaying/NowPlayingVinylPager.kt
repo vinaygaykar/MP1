@@ -27,6 +27,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
@@ -35,6 +36,7 @@ import io.github.vinaygaykar.mp1.playback.PlaybackControls
 import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.ui.library.calculateAngle
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -294,3 +296,116 @@ fun NowPlayingVinylPager(
         }
     }
 }
+
+@Preview(showBackground = true, name = "Vinyl Pager - Light")
+@Composable
+fun NowPlayingVinylPagerLightPreview() {
+    val samplePlaybackState = PlaybackUiState(
+        trackTitle = "Midnight City",
+        artist = "M83",
+        album = "Hurry Up, We're Dreaming",
+        isPlaying = true
+    )
+    val sampleProgressState = PlaybackProgressState(120000L, 240000L)
+    val dummyControls = object : PlaybackControls {
+        override fun onPlayPause() {}
+        override fun play() {}
+        override fun pause() {}
+        override fun onNext() {}
+        override fun onPrevious() {}
+        override fun onSeek(positionMs: Long) {}
+        override fun onShuffleToggle() {}
+        override fun onRepeatToggle() {}
+    }
+    val state = rememberNowPlayingScreenState(
+        playbackState = samplePlaybackState,
+        queueState = io.github.vinaygaykar.mp1.playback.QueueUiState(),
+        playbackControls = dummyControls,
+        peekHeight = 72.dp,
+        screenHeightPx = 2000f,
+        totalBottomGapPx = 100f,
+        initialExpanded = true,
+        bulgeTrigger = 0L
+    )
+
+    MusicPlayerTheme(darkTheme = false) {
+        Box(
+            modifier = Modifier
+                .size(360.dp)
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            NowPlayingVinylPager(
+                state = state,
+                playbackState = samplePlaybackState,
+                progressState = sampleProgressState,
+                playbackControls = dummyControls,
+                recordSize = 260.dp,
+                artworkSize = 160.dp,
+                startPadding = 0.dp,
+                endPadding = 0.dp,
+                recordX = 50.dp,
+                recordY = 50.dp,
+                screenWidth = 360.dp,
+                overlayAlpha = 0f
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Vinyl Pager - Dark")
+@Composable
+fun NowPlayingVinylPagerDarkPreview() {
+    val samplePlaybackState = PlaybackUiState(
+        trackTitle = "Midnight City",
+        artist = "M83",
+        album = "Hurry Up, We're Dreaming",
+        isPlaying = true
+    )
+    val sampleProgressState = PlaybackProgressState(120000L, 240000L)
+    val dummyControls = object : PlaybackControls {
+        override fun onPlayPause() {}
+        override fun play() {}
+        override fun pause() {}
+        override fun onNext() {}
+        override fun onPrevious() {}
+        override fun onSeek(positionMs: Long) {}
+        override fun onShuffleToggle() {}
+        override fun onRepeatToggle() {}
+    }
+    val state = rememberNowPlayingScreenState(
+        playbackState = samplePlaybackState,
+        queueState = io.github.vinaygaykar.mp1.playback.QueueUiState(),
+        playbackControls = dummyControls,
+        peekHeight = 72.dp,
+        screenHeightPx = 2000f,
+        totalBottomGapPx = 100f,
+        initialExpanded = true,
+        bulgeTrigger = 0L
+    )
+
+    MusicPlayerTheme(darkTheme = true) {
+        Box(
+            modifier = Modifier
+                .size(360.dp)
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            NowPlayingVinylPager(
+                state = state,
+                playbackState = samplePlaybackState,
+                progressState = sampleProgressState,
+                playbackControls = dummyControls,
+                recordSize = 260.dp,
+                artworkSize = 160.dp,
+                startPadding = 0.dp,
+                endPadding = 0.dp,
+                recordX = 50.dp,
+                recordY = 50.dp,
+                screenWidth = 360.dp,
+                overlayAlpha = 0f
+            )
+        }
+    }
+}
+

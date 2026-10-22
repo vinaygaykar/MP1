@@ -1,5 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,9 +16,13 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import io.github.vinaygaykar.mp1.playback.PlaybackControls
+import io.github.vinaygaykar.mp1.playback.PlaybackUiState
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 @Composable
 fun NowPlayingScreenBackground(
@@ -85,3 +91,98 @@ fun NowPlayingScreenBackground(
         }
     }
 }
+
+@Preview(showBackground = true, name = "Background - Light")
+@Composable
+fun NowPlayingScreenBackgroundLightPreview() {
+    val samplePlaybackState = PlaybackUiState(
+        trackTitle = "Midnight City",
+        artist = "M83",
+        album = "Hurry Up, We're Dreaming"
+    )
+    val dummyControls = object : PlaybackControls {
+        override fun onPlayPause() {}
+        override fun play() {}
+        override fun pause() {}
+        override fun onNext() {}
+        override fun onPrevious() {}
+        override fun onSeek(positionMs: Long) {}
+        override fun onShuffleToggle() {}
+        override fun onRepeatToggle() {}
+    }
+    val state = rememberNowPlayingScreenState(
+        playbackState = samplePlaybackState,
+        queueState = io.github.vinaygaykar.mp1.playback.QueueUiState(),
+        playbackControls = dummyControls,
+        peekHeight = 72.dp,
+        screenHeightPx = 2000f,
+        totalBottomGapPx = 100f,
+        initialExpanded = true,
+        bulgeTrigger = 0L
+    )
+
+    MusicPlayerTheme(darkTheme = false) {
+        NowPlayingScreenBackground(
+            state = state,
+            peekHeight = 72.dp,
+            screenHeight = 600.dp,
+            startPadding = 0.dp,
+            endPadding = 0.dp,
+            recordX = 100.dp,
+            recordY = 200.dp,
+            recordSize = 200.dp,
+            cornerRadius = 16.dp,
+            sheetShadowElevation = 8.dp
+        ) {
+            Box(modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Background - Dark")
+@Composable
+fun NowPlayingScreenBackgroundDarkPreview() {
+    val samplePlaybackState = PlaybackUiState(
+        trackTitle = "Midnight City",
+        artist = "M83",
+        album = "Hurry Up, We're Dreaming"
+    )
+    val dummyControls = object : PlaybackControls {
+        override fun onPlayPause() {}
+        override fun play() {}
+        override fun pause() {}
+        override fun onNext() {}
+        override fun onPrevious() {}
+        override fun onSeek(positionMs: Long) {}
+        override fun onShuffleToggle() {}
+        override fun onRepeatToggle() {}
+    }
+    val state = rememberNowPlayingScreenState(
+        playbackState = samplePlaybackState,
+        queueState = io.github.vinaygaykar.mp1.playback.QueueUiState(),
+        playbackControls = dummyControls,
+        peekHeight = 72.dp,
+        screenHeightPx = 2000f,
+        totalBottomGapPx = 100f,
+        initialExpanded = true,
+        bulgeTrigger = 0L
+    )
+
+    MusicPlayerTheme(darkTheme = true) {
+        NowPlayingScreenBackground(
+            state = state,
+            peekHeight = 72.dp,
+            screenHeight = 600.dp,
+            startPadding = 0.dp,
+            endPadding = 0.dp,
+            recordX = 100.dp,
+            recordY = 200.dp,
+            recordSize = 200.dp,
+            cornerRadius = 16.dp,
+            sheetShadowElevation = 8.dp
+        ) {
+            Box(modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+

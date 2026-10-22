@@ -215,7 +215,23 @@ fun rememberNowPlayingScreenState(
 
     var stateRef by remember { mutableStateOf<NowPlayingScreenState?>(null) }
 
-    val anchoredDraggableState = remember(initialExpanded) {
+    val anchoredDraggableState = rememberSaveable(
+        saver = AnchoredDraggableState.Saver(
+            snapAnimationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            decayAnimationSpec = splineBasedDecay,
+            positionalThreshold = { distance: Float -> distance * 0.5f },
+            velocityThreshold = { with(density) { 100.dp.toPx() } },
+            confirmValueChange = { newValue ->
+                val s = stateRef
+                if (s != null) {
+                    !((s.showLyrics || s.showQueue || s.showArtistsDialog) && newValue == DragValue.COLLAPSED)
+                } else true
+            }
+        )
+    ) {
         AnchoredDraggableState(
             initialValue = if (initialExpanded) DragValue.EXPANDED else DragValue.COLLAPSED,
             positionalThreshold = { distance: Float -> distance * 0.5f },
@@ -245,7 +261,17 @@ fun rememberNowPlayingScreenState(
         }
     }
 
-    val queueAnchoredDraggableState = remember {
+    val queueAnchoredDraggableState = rememberSaveable(
+        saver = AnchoredDraggableState.Saver(
+            snapAnimationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            decayAnimationSpec = splineBasedDecay,
+            positionalThreshold = { distance: Float -> distance * 0.4f },
+            velocityThreshold = { with(density) { 100.dp.toPx() } }
+        )
+    ) {
         AnchoredDraggableState(
             initialValue = DragValue.COLLAPSED,
             positionalThreshold = { distance: Float -> distance * 0.4f },
@@ -478,6 +504,9 @@ fun rememberNowPlayingScreenState(
     }
     val nextArtworkUri = remember(nextItem) { nextItem?.mediaMetadata?.artworkUri }
 
+    var savedShowLyrics by rememberSaveable { mutableStateOf(false) }
+    var savedShowArtistsDialog by rememberSaveable { mutableStateOf(false) }
+
     val state = remember(density, scope, view) {
         NowPlayingScreenState(
             density = density,
@@ -496,9 +525,17 @@ fun rememberNowPlayingScreenState(
             peekHeightPx = peekHeightPx,
             screenHeightPx = screenHeightPx,
             totalBottomGapPx = totalBottomGapPx
-        )
+        ).apply {
+            showLyrics = savedShowLyrics
+            showArtistsDialog = savedShowArtistsDialog
+        }
     }
     stateRef = state
+
+    SideEffect {
+        savedShowLyrics = state.showLyrics
+        savedShowArtistsDialog = state.showArtistsDialog
+    }
 
     state.isScreenActive = isScreenActive
     state.playerColorScheme = playerColorScheme

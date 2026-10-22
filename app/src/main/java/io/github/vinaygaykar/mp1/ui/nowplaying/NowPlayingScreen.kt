@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
@@ -51,6 +52,9 @@ import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+import android.annotation.SuppressLint
+
+@SuppressLint("DiscouragedApi", "InternalInsetResource")
 @Composable
 fun NowPlayingScreen(
     modifier: Modifier = Modifier,
@@ -72,6 +76,7 @@ fun NowPlayingScreen(
     if (playbackState.trackTitle.isEmpty()) return
 
     val density = LocalDensity.current
+    val context = LocalContext.current
     val view = LocalView.current
 
     val currentPlaybackControls by rememberUpdatedState(playbackControls)
@@ -84,7 +89,12 @@ fun NowPlayingScreen(
         val screenHeightPx = with(density) { screenHeight.toPx() }
         val bottomOffsetPx = with(density) { bottomOffset.toPx() }
         val floatOffsetPx = with(density) { 16.dp.toPx() }
-        val navBarBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+        val navBarResourceHeight = remember(context) {
+            val resId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+            if (resId > 0) context.resources.getDimensionPixelSize(resId) else 0
+        }
+        val composeNavBarBottom = WindowInsets.navigationBars.getBottom(density)
+        val navBarBottomPx = maxOf(composeNavBarBottom, navBarResourceHeight).toFloat()
         val totalBottomGapPx = bottomOffsetPx + floatOffsetPx + navBarBottomPx
 
         val state = rememberNowPlayingScreenState(
@@ -270,9 +280,11 @@ fun NowPlayingScreen(
                                 .offset(x = screenWidth * 0.42f)
                         } else {
                             Modifier.fillMaxSize()
-                        }).alpha(expandedAlpha)
+                        })
+                            .padding(top = 64.dp)
+                            .alpha(expandedAlpha)
 
-                        ExpandedPlayerTrackInfo(
+                        NowPlayingTrackInfo(
                             modifier = trackInfoModifier,
                             playbackState = playbackState,
                             queueState = queueState,

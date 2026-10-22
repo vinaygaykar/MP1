@@ -6,12 +6,12 @@ import android.view.View
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
@@ -35,18 +36,12 @@ import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 
-private data class TrackInfo(
-    val title: String,
-    val artist: String,
-    val album: String,
-    val albumId: String?
-)
-
 @Composable
-internal fun ExpandedPlayerTrackInfo(
+internal fun NowPlayingTrackInfo(
     modifier: Modifier = Modifier,
     playbackState: PlaybackUiState,
     queueState: QueueUiState = QueueUiState(),
@@ -57,7 +52,7 @@ internal fun ExpandedPlayerTrackInfo(
     val view = LocalView.current
 
     if (pagerState == null) {
-        TrackTextContent(
+        NowPlayingTrackTextContext(
             title = playbackState.trackTitle,
             artist = playbackState.artist,
             album = playbackState.album,
@@ -66,28 +61,13 @@ internal fun ExpandedPlayerTrackInfo(
             context = context,
             view = view,
             modifier = modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(top = 64.dp)
         )
     } else {
         val configuration = LocalConfiguration.current
         val density = LocalDensity.current
         val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
-
-        val currentTrackInfo = remember(
-            playbackState.trackTitle,
-            playbackState.artist,
-            playbackState.album,
-            playbackState.albumId
-        ) {
-            TrackInfo(
-                playbackState.trackTitle,
-                playbackState.artist,
-                playbackState.album,
-                playbackState.albumId
-            )
-        }
 
         val items = queueState.items
         val currentIndex = queueState.currentIndex
@@ -96,11 +76,7 @@ internal fun ExpandedPlayerTrackInfo(
             if (items.size <= 1) {
                 playbackState.repeatMode == Player.REPEAT_MODE_ALL
             } else {
-                if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
-                    true
-                } else {
-                    currentIndex > 0
-                }
+                playbackState.repeatMode == Player.REPEAT_MODE_ALL || currentIndex > 0
             }
         }
 
@@ -108,55 +84,23 @@ internal fun ExpandedPlayerTrackInfo(
             if (items.size <= 1) {
                 playbackState.repeatMode == Player.REPEAT_MODE_ALL
             } else {
-                if (playbackState.repeatMode == Player.REPEAT_MODE_ALL) {
-                    true
-                } else {
-                    currentIndex in 0 until items.size - 1
-                }
+                playbackState.repeatMode == Player.REPEAT_MODE_ALL || currentIndex in 0 until items.size - 1
             }
         }
 
         val prevItem = remember(items, currentIndex, hasPrevPage) {
             if (!hasPrevPage || items.isEmpty()) null
             else {
-                val prevIndex = if (currentIndex > 0) {
-                    currentIndex - 1
-                } else {
-                    items.size - 1
-                }
+                val prevIndex = if (currentIndex > 0) currentIndex - 1 else items.size - 1
                 items.getOrNull(prevIndex)
-            }
-        }
-        val prevTrackInfo = remember(prevItem) {
-            prevItem?.let { item ->
-                TrackInfo(
-                    title = item.mediaMetadata.title?.toString() ?: "",
-                    artist = item.mediaMetadata.artist?.toString() ?: "",
-                    album = item.mediaMetadata.albumTitle?.toString() ?: "",
-                    albumId = item.mediaMetadata.extras?.getString("album_id")
-                )
             }
         }
 
         val nextItem = remember(items, currentIndex, hasNextPage) {
             if (!hasNextPage || items.isEmpty()) null
             else {
-                val nextIndex = if (currentIndex in 0 until items.size - 1) {
-                    currentIndex + 1
-                } else {
-                    0
-                }
+                val nextIndex = if (currentIndex in 0 until items.size - 1) currentIndex + 1 else 0
                 items.getOrNull(nextIndex)
-            }
-        }
-        val nextTrackInfo = remember(nextItem) {
-            nextItem?.let { item ->
-                TrackInfo(
-                    title = item.mediaMetadata.title?.toString() ?: "",
-                    artist = item.mediaMetadata.artist?.toString() ?: "",
-                    album = item.mediaMetadata.albumTitle?.toString() ?: "",
-                    albumId = item.mediaMetadata.extras?.getString("album_id")
-                )
             }
         }
 
@@ -165,25 +109,32 @@ internal fun ExpandedPlayerTrackInfo(
 
         Box(
             modifier = modifier
-                .fillMaxSize()
-                .padding(top = 64.dp)
+                .fillMaxWidth()
                 .clipToBounds()
         ) {
             for (page in 0 until totalPageCount) {
-                val trackInfo = when {
-                    page == currentTrackPageIndex -> currentTrackInfo
-                    hasPrevPage && page == currentTrackPageIndex - 1 -> prevTrackInfo
-                    hasNextPage && page == currentTrackPageIndex + 1 -> nextTrackInfo
+                val isCurrent = page == currentTrackPageIndex
+                val isPrev = hasPrevPage && page == currentTrackPageIndex - 1
+                val isNext = hasNextPage && page == currentTrackPageIndex + 1
+
+                val item = when {
+                    isPrev -> prevItem
+                    isNext -> nextItem
                     else -> null
                 }
 
-                if (trackInfo != null) {
-                    TrackTextContent(
-                        title = trackInfo.title,
-                        artist = trackInfo.artist,
-                        album = trackInfo.album,
-                        albumId = trackInfo.albumId,
-                        onArtistClick = if (page == currentTrackPageIndex) onArtistClick else null,
+                val title = if (isCurrent) playbackState.trackTitle else item?.mediaMetadata?.title?.toString().orEmpty()
+                val artist = if (isCurrent) playbackState.artist else item?.mediaMetadata?.artist?.toString().orEmpty()
+                val album = if (isCurrent) playbackState.album else item?.mediaMetadata?.albumTitle?.toString().orEmpty()
+                val albumId = if (isCurrent) playbackState.albumId else item?.mediaMetadata?.extras?.getString("album_id")
+
+                if (isCurrent || isPrev || isNext) {
+                    NowPlayingTrackTextContext(
+                        title = title,
+                        artist = artist,
+                        album = album,
+                        albumId = albumId,
+                        onArtistClick = if (isCurrent) onArtistClick else null,
                         context = context,
                         view = view,
                         modifier = Modifier
@@ -203,7 +154,7 @@ internal fun ExpandedPlayerTrackInfo(
 
 
 @Composable
-private fun TrackTextContent(
+private fun NowPlayingTrackTextContext(
     title: String,
     artist: String,
     album: String,
@@ -271,5 +222,43 @@ private fun TrackTextContent(
                     }
                 },
         )
+    }
+}
+
+@Preview(showBackground = true, name = "Now Playing Track Info - Light")
+@Composable
+fun NowPlayingTrackInfoLightPreview() {
+    MusicPlayerTheme(darkTheme = false) {
+        Surface {
+            NowPlayingTrackInfo(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                playbackState = PlaybackUiState(
+                    trackTitle = "Midnight City",
+                    artist = "M83",
+                    album = "Hurry Up, We're Dreaming"
+                )
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Now Playing Track Info - Dark")
+@Composable
+fun NowPlayingTrackInfoDarkPreview() {
+    MusicPlayerTheme(darkTheme = true) {
+        Surface {
+            NowPlayingTrackInfo(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                playbackState = PlaybackUiState(
+                    trackTitle = "Midnight City",
+                    artist = "M83",
+                    album = "Hurry Up, We're Dreaming"
+                )
+            )
+        }
     }
 }
