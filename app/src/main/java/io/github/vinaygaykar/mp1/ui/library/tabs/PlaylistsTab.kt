@@ -1,5 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
+import android.content.res.Configuration
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -59,9 +60,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Playlist
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 @Composable
 fun PlaylistGrid(
@@ -592,3 +595,48 @@ fun PlaylistMultiSelectionBottomSheet(
         }
     }
 }
+
+private val samplePlaylists = listOf(
+    Playlist(id = 1L, name = "Favorites", songCount = 25),
+    Playlist(id = 2L, name = "Workout Hits", songCount = 12),
+    Playlist(id = 3L, name = "Chill Vibes", songCount = 40),
+    Playlist(id = 4L, name = "Road Trip", songCount = 18)
+)
+
+@Preview(
+    name = "Portrait Light",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun PlaylistsTabPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            PlaylistGrid(
+                playlists = samplePlaylists,
+                onCreateClick = {},
+                onImportClick = {}
+            )
+        }
+    }
+}
+

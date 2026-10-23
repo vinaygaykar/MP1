@@ -1,5 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,9 +39,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -49,9 +53,11 @@ import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.library.LibraryViewModel
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.ui.theme.isArtistMatchingPlayingTrack
 import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 @Composable
@@ -59,12 +65,18 @@ fun ArtistGrid(
     artists: List<Artist>,
     onArtistClick: (Artist, Offset, IntSize) -> Unit,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    libraryViewModel: LibraryViewModel = hiltViewModel(),
-    playerViewModel: PlayerViewModel = hiltViewModel()
+    libraryViewModel: LibraryViewModel? = if (LocalInspectionMode.current) null else hiltViewModel(),
+    playerViewModel: PlayerViewModel? = if (LocalInspectionMode.current) null else hiltViewModel()
 ) {
-    val playingArtist by remember(playerViewModel) { playerViewModel.playbackState.map { it.artist }.distinctUntilChanged() }.collectAsState(initial = "")
-    val playingAlbum by remember(playerViewModel) { playerViewModel.playbackState.map { it.album }.distinctUntilChanged() }.collectAsState(initial = "")
-    val isPlaying by remember(playerViewModel) { playerViewModel.playbackState.map { it.isPlaying }.distinctUntilChanged() }.collectAsState(initial = false)
+    val playingArtist by remember(playerViewModel) {
+        playerViewModel?.playbackState?.map { it.artist }?.distinctUntilChanged() ?: flowOf("")
+    }.collectAsState(initial = "")
+    val playingAlbum by remember(playerViewModel) {
+        playerViewModel?.playbackState?.map { it.album }?.distinctUntilChanged() ?: flowOf("")
+    }.collectAsState(initial = "")
+    val isPlaying by remember(playerViewModel) {
+        playerViewModel?.playbackState?.map { it.isPlaying }?.distinctUntilChanged() ?: flowOf(false)
+    }.collectAsState(initial = false)
 
     if (artists.isEmpty()) {
         Box(
@@ -99,7 +111,7 @@ fun ArtistGrid(
                         playingAlbum = playingAlbum,
                         isPlaying = isPlaying,
                         onClick = { offset, size -> onArtistClick(artist, offset, size) },
-                        onFetchImageUrl = { name, id -> libraryViewModel.getArtistImageUrl(name, id) }
+                        onFetchImageUrl = { name, id -> libraryViewModel?.getArtistImageUrl(name, id) }
                     )
                 }
             }
@@ -204,3 +216,47 @@ fun ArtistGridItem(
         )
     }
 }
+
+private val sampleArtists = listOf(
+    Artist(id = "1", name = "M83", trackCount = 12),
+    Artist(id = "2", name = "The Weeknd", trackCount = 24),
+    Artist(id = "3", name = "Daft Punk", trackCount = 18),
+    Artist(id = "4", name = "Coldplay", trackCount = 30)
+)
+
+@Preview(
+    name = "Portrait Light",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun ArtistsTabPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ArtistGrid(
+                artists = sampleArtists,
+                onArtistClick = { _, _, _ -> }
+            )
+        }
+    }
+}
+

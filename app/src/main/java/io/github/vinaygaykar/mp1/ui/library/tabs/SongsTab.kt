@@ -1,5 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
+import android.content.res.Configuration
+import android.net.Uri
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -26,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -42,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -51,6 +55,7 @@ import coil.request.ImageRequest
 import coil.size.Precision
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 private class Ref<T>(var value: T)
 
@@ -274,3 +279,89 @@ fun SongListItem(
             )
     )
 }
+
+private val sampleSongs = listOf(
+    Song(
+        id = "1",
+        uri = Uri.EMPTY,
+        title = "Midnight City",
+        artist = "M83",
+        album = "Hurry Up, We're Dreaming",
+        durationMs = 243000L,
+        trackNumber = 1,
+        discNumber = 1,
+        year = 2011,
+        artworkUri = null,
+        fileName = "midnight_city.mp3",
+        lastModified = 0L,
+        artistsDisplayString = "M83"
+    ),
+    Song(
+        id = "2",
+        uri = Uri.EMPTY,
+        title = "Starboy",
+        artist = "The Weeknd",
+        album = "Starboy",
+        durationMs = 230000L,
+        trackNumber = 1,
+        discNumber = 1,
+        year = 2016,
+        artworkUri = null,
+        fileName = "starboy.mp3",
+        lastModified = 0L,
+        artistsDisplayString = "The Weeknd, Daft Punk"
+    ),
+    Song(
+        id = "3",
+        uri = Uri.EMPTY,
+        title = "Get Lucky",
+        artist = "Daft Punk",
+        album = "Random Access Memories",
+        durationMs = 248000L,
+        trackNumber = 3,
+        discNumber = 1,
+        year = 2013,
+        artworkUri = null,
+        fileName = "get_lucky.mp3",
+        lastModified = 0L,
+        artistsDisplayString = "Daft Punk ft. Pharrell Williams"
+    )
+)
+
+@Preview(
+    name = "Portrait Light",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun SongsTabPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            SongList(
+                songs = sampleSongs,
+                onSongClick = {},
+                onSwipeRight = { _, _, _ -> }
+            )
+        }
+    }
+}
+
