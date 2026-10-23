@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -58,6 +60,10 @@ fun NowPlayingVinylPager(
     modifier: Modifier = Modifier,
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
+    val currentProgressState by rememberUpdatedState(progressState)
+    val currentPlaybackState by rememberUpdatedState(playbackState)
+    val currentPlaybackControls by rememberUpdatedState(playbackControls)
+
     val containerSize = recordSize * 1.15f
     val sizeDiff = (containerSize - recordSize) / 2
 
@@ -129,12 +135,12 @@ fun NowPlayingVinylPager(
                                                         isDragging = true
                                                         change.consume()
                                                         if (isVinylRing) {
-                                                            wasPlayingOnDragStart = playbackState.isPlaying
-                                                            state.draggedPosition = progressState.positionMs
+                                                            wasPlayingOnDragStart = currentPlaybackState.isPlaying
+                                                            state.draggedPosition = currentProgressState.positionMs
                                                             state.hapticAccumulator = 0f
                                                             state.invalidHapticAccumulator = 0f
                                                             lastAngle = calculateAngle(change.position, localCenter)
-                                                            if (wasPlayingOnDragStart) playbackControls.pause()
+                                                            if (wasPlayingOnDragStart) currentPlaybackControls.pause()
                                                         }
                                                     }
                                                 } else {
@@ -149,7 +155,7 @@ fun NowPlayingVinylPager(
                                                         val positionDelta = (delta / 360f) * 60000f
                                                         val unconstrainedPosition = state.draggedPosition + positionDelta.toLong()
                                                         val minPos = 0L
-                                                        val maxPos = progressState.durationMs
+                                                        val maxPos = currentProgressState.durationMs
 
                                                         if (unconstrainedPosition in minPos..maxPos) {
                                                             state.visualRotation += delta
@@ -193,8 +199,8 @@ fun NowPlayingVinylPager(
                                                 // Released
                                                 if (isDragging && isVinylRing) {
                                                     state.isDraggingScrub = false
-                                                    playbackControls.onSeek(state.draggedPosition)
-                                                    if (wasPlayingOnDragStart) playbackControls.play()
+                                                    currentPlaybackControls.onSeek(state.draggedPosition)
+                                                    if (wasPlayingOnDragStart) currentPlaybackControls.play()
                                                 }
                                                 break
                                             }
@@ -239,7 +245,7 @@ fun NowPlayingVinylPager(
                                                 state.scale.animateTo(0.96f, animationSpec = tween(100))
                                                 try {
                                                     awaitRelease()
-                                                    playbackControls.onPlayPause()
+                                                    currentPlaybackControls.onPlayPause()
                                                 } finally {
                                                     state.scale.animateTo(
                                                         1.0f,
@@ -283,7 +289,7 @@ fun NowPlayingVinylPager(
                                     val distFromCenter = (pressOffset - localCenter).getDistance()
                                     val artworkRadiusPx = with(state.density) { (artworkSize / 2).toPx() }
                                     if (distFromCenter <= artworkRadiusPx) {
-                                        playbackControls.onPlayPause()
+                                        currentPlaybackControls.onPlayPause()
                                     }
                                 }
                             )
