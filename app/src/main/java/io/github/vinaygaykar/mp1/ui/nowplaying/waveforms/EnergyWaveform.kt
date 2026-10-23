@@ -59,7 +59,7 @@ private val BASE_MAX_AMPLITUDE = 6.dp
 private val SCRUB_THUMB_MAX_RADIUS = 8.dp
 
 /** Fixed total height of the waveform canvas container. */
-private val CANVAS_HEIGHT = 88.dp
+private val CANVAS_HEIGHT = 48.dp
 
 /** Default stroke width (thickness) of the waveform path. */
 private val DEFAULT_STROKE_WIDTH = 4.dp

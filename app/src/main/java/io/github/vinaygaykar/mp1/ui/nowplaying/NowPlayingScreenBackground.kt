@@ -1,15 +1,21 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -23,6 +29,28 @@ import androidx.compose.ui.unit.lerp
 import io.github.vinaygaykar.mp1.playback.PlaybackControls
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
+
+@Composable
+fun NowPlayingCollapseHandle(
+    onCollapse: () -> Unit,
+    modifier: Modifier = Modifier,
+    currentColorScheme: androidx.compose.material3.ColorScheme = MaterialTheme.colorScheme
+) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .clickable { onCollapse() }
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 36.dp, height = 4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(currentColorScheme.onPrimaryContainer.copy(alpha = 0.4f))
+        )
+    }
+}
 
 @Composable
 fun NowPlayingScreenBackground(
@@ -87,7 +115,21 @@ fun NowPlayingScreenBackground(
             shape = RoundedCornerShape(cornerRadius),
             tonalElevation = 8.dp
         ) {
-            content()
+            Box(modifier = Modifier.fillMaxSize()) {
+                content()
+
+                if (state.progress > 0.8f) {
+                    val controlsAlpha = ((state.progress - 0.8f) / 0.2f).coerceIn(0f, 1f)
+                    NowPlayingCollapseHandle(
+                        onCollapse = { state.collapse() },
+                        currentColorScheme = state.currentColorScheme,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 16.dp)
+                            .alpha(controlsAlpha)
+                    )
+                }
+            }
         }
     }
 }

@@ -42,13 +42,14 @@ fun PlayerTimestampBar(
     energyDelta: Float = 0f,
     waveCycles: Float = DEFAULT_WAVE_CYCLES,
     minBarWidth: Dp = 140.dp,
+    contentAlignment: Alignment = Alignment.Center
 ) {
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth(rowWidthFraction)
             .then(if (recordY != null) Modifier.offset(y = recordY - 80.dp) else Modifier)
             .alpha(progress),
-        contentAlignment = Alignment.Center
+        contentAlignment = contentAlignment
     ) {
         val maxScreenWidth = this.maxWidth // 90% screen width ceiling
         val textPadding = 72.dp // Estimated width for left/right timestamps + horizontal padding
@@ -70,7 +71,7 @@ fun PlayerTimestampBar(
         Row(
             modifier = Modifier
                 .width(finalBarWidth)
-                .wrapContentWidth(Alignment.CenterHorizontally),
+                .wrapContentWidth(if (contentAlignment == Alignment.CenterStart || contentAlignment == Alignment.TopStart || contentAlignment == Alignment.BottomStart) Alignment.Start else Alignment.CenterHorizontally),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {

@@ -46,6 +46,7 @@ internal fun NowPlayingTrackInfo(
     playbackState: PlaybackUiState,
     queueState: QueueUiState = QueueUiState(),
     pagerState: PagerState? = null,
+    titleMaxLines: Int = 2,
     onArtistClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -57,12 +58,11 @@ internal fun NowPlayingTrackInfo(
             artist = playbackState.artist,
             album = playbackState.album,
             albumId = playbackState.albumId,
+            titleMaxLines = titleMaxLines,
             onArtistClick = onArtistClick,
             context = context,
             view = view,
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+            modifier = modifier.fillMaxWidth()
         )
     } else {
         val configuration = LocalConfiguration.current
@@ -134,12 +134,12 @@ internal fun NowPlayingTrackInfo(
                         artist = artist,
                         album = album,
                         albumId = albumId,
+                        titleMaxLines = titleMaxLines,
                         onArtistClick = if (isCurrent) onArtistClick else null,
                         context = context,
                         view = view,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
                             .graphicsLayer {
                                 val pageOffset =
                                     (page - pagerState.currentPage) - pagerState.currentPageOffsetFraction
@@ -159,6 +159,7 @@ private fun NowPlayingTrackTextContext(
     artist: String,
     album: String,
     albumId: String?,
+    titleMaxLines: Int,
     onArtistClick: (() -> Unit)?,
     context: Context,
     view: View,
@@ -178,7 +179,7 @@ private fun NowPlayingTrackTextContext(
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Start,
-            maxLines = 2,
+            maxLines = titleMaxLines,
             minFontSize = 20.sp,
             maxFontSize = 36.sp,
             modifier = Modifier.fillMaxWidth(),
@@ -233,7 +234,7 @@ fun NowPlayingTrackInfoLightPreview() {
             NowPlayingTrackInfo(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = 16.dp, horizontal = 24.dp),
                 playbackState = PlaybackUiState(
                     trackTitle = "Midnight City",
                     artist = "M83",
@@ -252,7 +253,7 @@ fun NowPlayingTrackInfoDarkPreview() {
             NowPlayingTrackInfo(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = 16.dp, horizontal = 24.dp),
                 playbackState = PlaybackUiState(
                     trackTitle = "Midnight City",
                     artist = "M83",

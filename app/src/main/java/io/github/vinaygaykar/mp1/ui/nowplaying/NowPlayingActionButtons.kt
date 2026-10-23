@@ -1,6 +1,5 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -118,28 +117,6 @@ fun NowPlayingRepeatButton(
 }
 
 @Composable
-fun NowPlayingCollapseHandle(
-    onCollapse: () -> Unit,
-    modifier: Modifier = Modifier,
-    currentColorScheme: androidx.compose.material3.ColorScheme = MaterialTheme.colorScheme
-) {
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .clickable { onCollapse() }
-            .padding(horizontal = 24.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = 36.dp, height = 4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(currentColorScheme.onPrimaryContainer.copy(alpha = 0.4f))
-        )
-    }
-}
-
-@Composable
 fun NowPlayingActionRow(
     repeatMode: Int,
     onLyricsClick: () -> Unit,
@@ -180,16 +157,6 @@ fun BoxScope.NowPlayingActionButtons(
 
     val controlsAlpha = ((state.progress - 0.8f) / 0.2f).coerceIn(0f, 1f)
 
-    // Top Collapse Handle
-    NowPlayingCollapseHandle(
-        onCollapse = { state.collapse() },
-        currentColorScheme = state.currentColorScheme,
-        modifier = Modifier
-            .align(Alignment.TopCenter)
-            .padding(top = 16.dp)
-            .alpha(controlsAlpha)
-    )
-
     if (isLandscape) {
         NowPlayingActionRow(
             repeatMode = playbackState.repeatMode,
@@ -197,8 +164,8 @@ fun BoxScope.NowPlayingActionButtons(
             onRepeatToggle = { playbackControls.onRepeatToggle() },
             onQueueClick = { state.showQueue = true },
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 24.dp, bottom = 20.dp)
+                .align(Alignment.BottomStart)
+                .padding(start = 24.dp, bottom = 24.dp)
                 .alpha(controlsAlpha)
         )
     } else {

@@ -1,5 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import android.annotation.SuppressLint
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -11,6 +13,7 @@ import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -52,8 +56,6 @@ import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-import android.annotation.SuppressLint
-
 @SuppressLint("DiscouragedApi", "InternalInsetResource")
 @Composable
 fun NowPlayingScreen(
@@ -71,6 +73,7 @@ fun NowPlayingScreen(
     bottomOffset: Dp = 0.dp,
     initialExpanded: Boolean = false,
     bulgeTrigger: Long = 0L,
+    hideProgress: Float = 0f,
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
     if (playbackState.trackTitle.isEmpty()) return
@@ -154,7 +157,7 @@ fun NowPlayingScreen(
         val sheetShadowElevation = lerp(8.dp, 0.dp, state.progress)
 
         val targetRecordSize = if (isLandscape) {
-            min(screenHeight * 0.72f, screenWidth * 0.35f)
+            min(screenHeight * 0.72f, screenWidth * 0.42f)
         } else {
             screenWidth * 0.85f
         }
@@ -162,7 +165,7 @@ fun NowPlayingScreen(
         val artworkSize = lerp(56.dp, min(210.dp, recordSize * 0.6f), state.progress)
 
         val targetRecordX = if (isLandscape) {
-            (screenWidth * 0.42f - targetRecordSize) / 2
+            screenWidth * 0.50f + (screenWidth * 0.50f - targetRecordSize) / 2
         } else {
             (screenWidth - targetRecordSize) / 2 - horizontalPadding
         }
@@ -196,11 +199,15 @@ fun NowPlayingScreen(
             label = "row_width_fraction"
         )
 
+        val hideTranslationYPx = with(density) {
+            (peekHeight + 32.dp + navBarBottomPx.toDp()).toPx() * hideProgress * (1f - state.progress)
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(lerp(peekHeight, screenHeight, state.progress))
-                .offset { IntOffset(0, state.dragOffset.roundToInt()) }
+                .offset { IntOffset(0, (state.dragOffset + hideTranslationYPx).roundToInt()) }
                 .anchoredDraggable(state.anchoredDraggableState, Orientation.Vertical)
         ) {
             NowPlayingScreenBackground(
@@ -215,196 +222,11 @@ fun NowPlayingScreen(
                 cornerRadius = cornerRadius,
                 sheetShadowElevation = sheetShadowElevation
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(screenHeight)
-                        .clipToBounds()
-                        .pointerInput(state.progress, state.showQueue, state.showLyrics, state.showArtistsDialog, state.totalRange) {
-                            if (state.progress > 0.8f && !state.showQueue && !state.showLyrics && !state.showArtistsDialog) {
-                                detectVerticalDragGestures(
-                                    onVerticalDrag = { change, dragAmount ->
-                                        val currentPlayerOffset = try {
-                                            state.anchoredDraggableState.requireOffset()
-                                        } catch (_: Exception) {
-                                            0f
-                                        }
+                val controlsAlpha = ((state.progress - 0.8f) / 0.2f).coerceIn(0f, 1f)
+                val expandedAlpha = ((state.progress - 0.05f) / 0.15f).coerceIn(0f, 1f)
 
-                                        if (dragAmount > 0f) { // Dragging DOWN
-                                            if (currentPlayerOffset < state.totalRange) {
-                                                val newOffset = (currentPlayerOffset + dragAmount).coerceAtMost(state.totalRange)
-                                                state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
-                                                change.consume()
-                                            }
-                                        } else if (dragAmount < 0f) { // Dragging UP
-                                            if (currentPlayerOffset > 0f) {
-                                                val newOffset = (currentPlayerOffset + dragAmount).coerceAtLeast(0f)
-                                                state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
-                                                change.consume()
-                                            }
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        val currentPlayerOffset = try {
-                                            state.anchoredDraggableState.requireOffset()
-                                        } catch (_: Exception) {
-                                            0f
-                                        }
-
-                                        if (currentPlayerOffset > 0f) {
-                                            if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
-                                        }
-                                    },
-                                    onDragCancel = {
-                                        val currentPlayerOffset = try {
-                                            state.anchoredDraggableState.requireOffset()
-                                        } catch (_: Exception) {
-                                            0f
-                                        }
-
-                                        if (currentPlayerOffset > 0f) {
-                                            if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                ) {
-                    // Expanded Content
-                    if (state.progress > 0.05f) {
-                        val expandedAlpha = ((state.progress - 0.05f) / 0.15f).coerceIn(0f, 1f)
-                        val trackInfoModifier = (if (isLandscape) {
-                            Modifier
-                                .fillMaxHeight()
-                                .width(screenWidth * 0.58f)
-                                .offset(x = screenWidth * 0.42f)
-                        } else {
-                            Modifier.fillMaxSize()
-                        })
-                            .padding(top = 64.dp)
-                            .alpha(expandedAlpha)
-
-                        NowPlayingTrackInfo(
-                            modifier = trackInfoModifier,
-                            playbackState = playbackState,
-                            queueState = queueState,
-                            pagerState = state.pagerState
-                        ) {
-                            state.showArtistsDialog = true
-                        }
-                    }
-
-                    // Collapsed View Content
-                    if (state.progress < 0.2f) {
-                        val miniPlayerAlpha = ((0.2f - state.progress) / 0.2f).coerceIn(0f, 1f)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(peekHeight)
-                                .alpha(miniPlayerAlpha)
-                                .clickable {
-                                    state.expand()
-                                }
-                        ) {
-                            NowPlayingCollapsedView(
-                                playbackState = playbackState,
-                                progressState = progressState,
-                                queueState = queueState,
-                                actions = playbackControls,
-                                showRecord = false,
-                                rotation = state.visualRotation,
-                                textAlpha = ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f),
-                                onClick = {
-                                    state.expand()
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // Floating Overlays (Vinyl Record, Lyrics, Queue, Controls, Timestamp)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    val controlsAlpha = ((state.progress - 0.8f) / 0.2f).coerceIn(0f, 1f)
-
-                    // Collapse Handle & Action Buttons
-                    NowPlayingActionButtons(
-                        state = state,
-                        playbackState = playbackState,
-                        playbackControls = playbackControls,
-                        isLandscape = isLandscape
-                    )
-
-                    // Timestamp bar
-                    if (state.progress > 0.8f) {
-                        val displayPosition =
-                            if (state.isDraggingScrub) state.draggedPosition else progressState.positionMs
-                        val (currentEnergy, currentEnergyDelta) = remember(visualizerState, displayPosition) {
-                            if (visualizerState is VisualizerState.Energy) {
-                                val curve = visualizerState.curve
-                                val bucketIndex = (displayPosition / AudioEnergyExtractor.ENERGY_INTERVAL_MS).toInt()
-                                if (bucketIndex in curve.indices) {
-                                    val curr = curve[bucketIndex]
-                                    val prev = if (bucketIndex > 0) curve[bucketIndex - 1] else curr
-                                    val delta = abs(curr - prev)
-                                    (curr as Float?) to delta
-                                } else {
-                                    null to 0f
-                                }
-                            } else {
-                                null to 0f
-                            }
-                        }
-                        if (isLandscape) {
-                            PlayerTimestampBar(
-                                displayPositionMs = displayPosition,
-                                durationMs = progressState.durationMs,
-                                isPlaying = playbackState.isPlaying,
-                                scrubFactor = scrubFactor,
-                                rowWidthFraction = 1f,
-                                recordY = null,
-                                progress = controlsAlpha,
-                                energy = currentEnergy,
-                                energyDelta = currentEnergyDelta,
-                                modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .offset(x = screenWidth * 0.42f, y = screenHeight * 0.50f)
-                                    .padding(end = 24.dp)
-                            )
-                        } else {
-                            PlayerTimestampBar(
-                                displayPositionMs = displayPosition,
-                                durationMs = progressState.durationMs,
-                                isPlaying = playbackState.isPlaying,
-                                scrubFactor = scrubFactor,
-                                rowWidthFraction = rowWidthFraction,
-                                recordY = recordY,
-                                progress = controlsAlpha,
-                                energy = currentEnergy,
-                                energyDelta = currentEnergyDelta,
-                                modifier = Modifier.align(Alignment.TopCenter)
-                            )
-                        }
-                    }
-
-                    // Record Vinyl Pager
-                    NowPlayingVinylPager(
-                        state = state,
-                        playbackState = playbackState,
-                        progressState = progressState,
-                        playbackControls = playbackControls,
-                        recordSize = recordSize,
-                        artworkSize = artworkSize,
-                        startPadding = startPadding,
-                        endPadding = endPadding,
-                        recordX = recordX,
-                        recordY = recordY,
-                        screenWidth = screenWidth,
-                        overlayAlpha = overlayAlpha,
-                        onMiniPlayerPositioned = onMiniPlayerPositioned
-                    )
-
-                    // Overlays (Lyrics, Queue, Artist Dialog)
-                    NowPlayingOverlays(
+                if (isLandscape) {
+                    NowPlayingLandscapeContent(
                         state = state,
                         playbackState = playbackState,
                         progressState = progressState,
@@ -413,10 +235,418 @@ fun NowPlayingScreen(
                         playbackControls = playbackControls,
                         queueControls = queueControls,
                         lyricsControls = lyricsControls,
+                        visualizerState = visualizerState,
+                        recordSize = recordSize,
+                        artworkSize = artworkSize,
+                        startPadding = startPadding,
+                        endPadding = endPadding,
+                        recordX = recordX,
+                        recordY = recordY,
+                        screenWidth = screenWidth,
+                        screenHeight = screenHeight,
+                        peekHeight = peekHeight,
+                        overlayAlpha = overlayAlpha,
+                        scrubFactor = scrubFactor,
+                        controlsAlpha = controlsAlpha,
+                        expandedAlpha = expandedAlpha,
+                        onMiniPlayerPositioned = onMiniPlayerPositioned,
+                        view = view
+                    )
+                } else {
+                    NowPlayingPortraitContent(
+                        state = state,
+                        playbackState = playbackState,
+                        progressState = progressState,
+                        queueState = queueState,
+                        lyricsState = lyricsState,
+                        playbackControls = playbackControls,
+                        queueControls = queueControls,
+                        lyricsControls = lyricsControls,
+                        visualizerState = visualizerState,
+                        recordSize = recordSize,
+                        artworkSize = artworkSize,
+                        startPadding = startPadding,
+                        endPadding = endPadding,
+                        recordX = recordX,
+                        recordY = recordY,
+                        screenWidth = screenWidth,
+                        peekHeight = peekHeight,
+                        rowWidthFraction = rowWidthFraction,
+                        overlayAlpha = overlayAlpha,
+                        scrubFactor = scrubFactor,
+                        controlsAlpha = controlsAlpha,
+                        expandedAlpha = expandedAlpha,
+                        onMiniPlayerPositioned = onMiniPlayerPositioned,
                         view = view
                     )
                 }
             }
         }
+    }
+}
+
+// TODO: move somewhere else
+private fun calculateEnergy(
+    visualizerState: VisualizerState,
+    displayPosition: Long
+): Pair<Float?, Float> {
+    return if (visualizerState is VisualizerState.Energy) {
+        val curve = visualizerState.curve
+        val bucketIndex = (displayPosition / AudioEnergyExtractor.ENERGY_INTERVAL_MS).toInt()
+        if (bucketIndex in curve.indices) {
+            val curr = curve[bucketIndex]
+            val prev = if (bucketIndex > 0) curve[bucketIndex - 1] else curr
+            val delta = abs(curr - prev)
+            (curr as Float?) to delta
+        } else {
+            null to 0f
+        }
+    } else {
+        null to 0f
+    }
+}
+
+@Composable
+private fun NowPlayingPortraitContent(
+    state: NowPlayingScreenState,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    queueState: QueueUiState,
+    lyricsState: LyricsUiState,
+    playbackControls: PlaybackControls,
+    queueControls: QueueControls,
+    lyricsControls: LyricsControls,
+    visualizerState: VisualizerState,
+    recordSize: Dp,
+    artworkSize: Dp,
+    startPadding: Dp,
+    endPadding: Dp,
+    recordX: Dp,
+    recordY: Dp,
+    screenWidth: Dp,
+    peekHeight: Dp,
+    rowWidthFraction: Float,
+    overlayAlpha: Float,
+    scrubFactor: Float,
+    controlsAlpha: Float,
+    expandedAlpha: Float,
+    onMiniPlayerPositioned: ((Offset) -> Unit)?,
+    view: android.view.View
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .pointerInput(state.progress, state.showQueue, state.showLyrics, state.showArtistsDialog, state.totalRange) {
+                if (state.progress > 0.8f && !state.showQueue && !state.showLyrics && !state.showArtistsDialog) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            val currentPlayerOffset = try {
+                                state.anchoredDraggableState.requireOffset()
+                            } catch (_: Exception) { 0f }
+                            if (dragAmount > 0f) {
+                                if (currentPlayerOffset < state.totalRange) {
+                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtMost(state.totalRange)
+                                    state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                    change.consume()
+                                }
+                            } else if (dragAmount < 0f) {
+                                if (currentPlayerOffset > 0f) {
+                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtLeast(0f)
+                                    state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                    change.consume()
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            val currentPlayerOffset = try { state.anchoredDraggableState.requireOffset() } catch (_: Exception) { 0f }
+                            if (currentPlayerOffset > 0f) {
+                                if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
+                            }
+                        },
+                        onDragCancel = {
+                            val currentPlayerOffset = try { state.anchoredDraggableState.requireOffset() } catch (_: Exception) { 0f }
+                            if (currentPlayerOffset > 0f) {
+                                if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
+                            }
+                        }
+                    )
+                }
+            }
+    ) {
+        // Track Content
+        if (state.progress > 0.05f) {
+            NowPlayingTrackInfo(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 64.dp)
+                    .padding(horizontal = 24.dp)
+                    .alpha(expandedAlpha),
+                playbackState = playbackState,
+                queueState = queueState,
+                pagerState = state.pagerState
+            ) {
+                state.showArtistsDialog = true
+            }
+        }
+
+        // Collapsed View Content
+        if (state.progress < 0.2f) {
+            val miniPlayerAlpha = ((0.2f - state.progress) / 0.2f).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(peekHeight)
+                    .alpha(miniPlayerAlpha)
+                    .clickable { state.expand() }
+            ) {
+                NowPlayingCollapsedView(
+                    playbackState = playbackState,
+                    progressState = progressState,
+                    queueState = queueState,
+                    actions = playbackControls,
+                    showRecord = false,
+                    rotation = state.visualRotation,
+                    textAlpha = ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f),
+                    onClick = { state.expand() }
+                )
+            }
+        }
+
+        // Action Buttons
+        NowPlayingActionButtons(
+            state = state,
+            playbackState = playbackState,
+            playbackControls = playbackControls,
+            isLandscape = false
+        )
+
+        // Waveform / Timestamp Bar
+        if (state.progress > 0.8f) {
+            val displayPosition = if (state.isDraggingScrub) state.draggedPosition else progressState.positionMs
+            val (currentEnergy, currentEnergyDelta) = calculateEnergy(visualizerState, displayPosition)
+            PlayerTimestampBar(
+                displayPositionMs = displayPosition,
+                durationMs = progressState.durationMs,
+                isPlaying = playbackState.isPlaying,
+                scrubFactor = scrubFactor,
+                rowWidthFraction = rowWidthFraction,
+                recordY = recordY,
+                progress = controlsAlpha,
+                energy = currentEnergy,
+                energyDelta = currentEnergyDelta,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+
+        // Vinyl Record Pager
+        NowPlayingVinylPager(
+            state = state,
+            playbackState = playbackState,
+            progressState = progressState,
+            playbackControls = playbackControls,
+            recordSize = recordSize,
+            artworkSize = artworkSize,
+            startPadding = startPadding,
+            endPadding = endPadding,
+            recordX = recordX,
+            recordY = recordY,
+            screenWidth = screenWidth,
+            overlayAlpha = overlayAlpha,
+            onMiniPlayerPositioned = onMiniPlayerPositioned
+        )
+
+        // Overlays
+        NowPlayingOverlays(
+            state = state,
+            playbackState = playbackState,
+            progressState = progressState,
+            queueState = queueState,
+            lyricsState = lyricsState,
+            playbackControls = playbackControls,
+            queueControls = queueControls,
+            lyricsControls = lyricsControls,
+            view = view
+        )
+    }
+}
+
+@Composable
+private fun NowPlayingLandscapeContent(
+    state: NowPlayingScreenState,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    queueState: QueueUiState,
+    lyricsState: LyricsUiState,
+    playbackControls: PlaybackControls,
+    queueControls: QueueControls,
+    lyricsControls: LyricsControls,
+    visualizerState: VisualizerState,
+    recordSize: Dp,
+    artworkSize: Dp,
+    startPadding: Dp,
+    endPadding: Dp,
+    recordX: Dp,
+    recordY: Dp,
+    screenWidth: Dp,
+    screenHeight: Dp,
+    peekHeight: Dp,
+    overlayAlpha: Float,
+    scrubFactor: Float,
+    controlsAlpha: Float,
+    expandedAlpha: Float,
+    onMiniPlayerPositioned: ((Offset) -> Unit)?,
+    view: android.view.View
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .pointerInput(state.progress, state.showQueue, state.showLyrics, state.showArtistsDialog, state.totalRange) {
+                if (state.progress > 0.8f && !state.showQueue && !state.showLyrics && !state.showArtistsDialog) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            val currentPlayerOffset = try {
+                                state.anchoredDraggableState.requireOffset()
+                            } catch (_: Exception) { 0f }
+                            if (dragAmount > 0f) {
+                                if (currentPlayerOffset < state.totalRange) {
+                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtMost(state.totalRange)
+                                    state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                    change.consume()
+                                }
+                            } else if (dragAmount < 0f) {
+                                if (currentPlayerOffset > 0f) {
+                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtLeast(0f)
+                                    state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                    change.consume()
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            val currentPlayerOffset = try { state.anchoredDraggableState.requireOffset() } catch (_: Exception) { 0f }
+                            if (currentPlayerOffset > 0f) {
+                                if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
+                            }
+                        },
+                        onDragCancel = {
+                            val currentPlayerOffset = try { state.anchoredDraggableState.requireOffset() } catch (_: Exception) { 0f }
+                            if (currentPlayerOffset > 0f) {
+                                if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
+                            }
+                        }
+                    )
+                }
+            }
+    ) {
+        // Left 50% Column (Track Content & Waveform directly below with 12dp margin)
+        if (state.progress > 0.05f) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(screenWidth * 0.50f)
+                    .padding(top = 48.dp)
+                    .alpha(expandedAlpha)
+            ) {
+                NowPlayingTrackInfo(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    playbackState = playbackState,
+                    queueState = queueState,
+                    pagerState = state.pagerState,
+                    titleMaxLines = 1
+                ) {
+                    state.showArtistsDialog = true
+                }
+
+                if (state.progress > 0.8f) {
+                    val displayPosition = if (state.isDraggingScrub) state.draggedPosition else progressState.positionMs
+                    val (currentEnergy, currentEnergyDelta) = calculateEnergy(visualizerState, displayPosition)
+                    val landscapeWaveCycles = remember(currentEnergy) {
+                        val energyVal = (currentEnergy ?: 0.2f).coerceIn(0f, 1f)
+                        val energyForCycles = ((energyVal - 0.6f) / 0.4f).coerceIn(0f, 1f)
+                        5.0f + (energyForCycles * 3.0f)
+                    }
+                    PlayerTimestampBar(
+                        displayPositionMs = displayPosition,
+                        durationMs = progressState.durationMs,
+                        isPlaying = playbackState.isPlaying,
+                        scrubFactor = scrubFactor,
+                        rowWidthFraction = 1f,
+                        recordY = null,
+                        progress = controlsAlpha,
+                        energy = currentEnergy,
+                        energyDelta = currentEnergyDelta,
+                        waveCycles = landscapeWaveCycles,
+                        contentAlignment = Alignment.CenterStart,
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        // Collapsed View Content
+        if (state.progress < 0.2f) {
+            val miniPlayerAlpha = ((0.2f - state.progress) / 0.2f).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(peekHeight)
+                    .alpha(miniPlayerAlpha)
+                    .clickable { state.expand() }
+            ) {
+                NowPlayingCollapsedView(
+                    playbackState = playbackState,
+                    progressState = progressState,
+                    queueState = queueState,
+                    actions = playbackControls,
+                    showRecord = false,
+                    rotation = state.visualRotation,
+                    textAlpha = ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f),
+                    onClick = { state.expand() }
+                )
+            }
+        }
+
+        // Action Buttons (Left 50% Pane, bottom left)
+        NowPlayingActionButtons(
+            state = state,
+            playbackState = playbackState,
+            playbackControls = playbackControls,
+            isLandscape = true
+        )
+
+        // Vinyl Record Pager (Floating in Right 50% Pane)
+        NowPlayingVinylPager(
+            state = state,
+            playbackState = playbackState,
+            progressState = progressState,
+            playbackControls = playbackControls,
+            recordSize = recordSize,
+            artworkSize = artworkSize,
+            startPadding = startPadding,
+            endPadding = endPadding,
+            recordX = recordX,
+            recordY = recordY,
+            screenWidth = screenWidth,
+            overlayAlpha = overlayAlpha,
+            onMiniPlayerPositioned = onMiniPlayerPositioned
+        )
+
+        // Overlays
+        NowPlayingOverlays(
+            state = state,
+            playbackState = playbackState,
+            progressState = progressState,
+            queueState = queueState,
+            lyricsState = lyricsState,
+            playbackControls = playbackControls,
+            queueControls = queueControls,
+            lyricsControls = lyricsControls,
+            view = view
+        )
     }
 }
