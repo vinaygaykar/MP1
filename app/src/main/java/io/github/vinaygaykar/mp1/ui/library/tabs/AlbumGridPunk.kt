@@ -287,8 +287,8 @@ fun AlbumGridPunk(
     ) {
         val targetedHeight = this@BoxWithConstraints.maxWidth * 0.90f
         val nonTargetedHeight = this@BoxWithConstraints.maxHeight * 0.072f
-        val normalVerticalPadding = (this@BoxWithConstraints.maxHeight - targetedHeight) / 2
-        val bottomContentPadding = normalVerticalPadding + contentPadding.calculateBottomPadding()
+        val normalVerticalPadding = ((this@BoxWithConstraints.maxHeight - targetedHeight) / 2).coerceAtLeast(0.dp)
+        val bottomContentPadding = (normalVerticalPadding + contentPadding.calculateBottomPadding()).coerceAtLeast(0.dp)
 
         // 1. Slow Scrolling 1-Column Layout (AlbumGridPunk)
         if (fastScrollProgress < 0.99f) {

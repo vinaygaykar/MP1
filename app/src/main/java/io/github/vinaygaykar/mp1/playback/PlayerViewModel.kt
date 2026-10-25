@@ -69,6 +69,19 @@ class PlayerViewModel @Inject constructor(
     private val _visualizerState = MutableStateFlow<VisualizerState>(VisualizerState.None)
     val visualizerState: StateFlow<VisualizerState> = _visualizerState.asStateFlow()
 
+    private val _isMiniPlayerPinned = MutableStateFlow(false)
+    val isMiniPlayerPinned: StateFlow<Boolean> = _isMiniPlayerPinned.asStateFlow()
+    private var miniPlayerPinJob: Job? = null
+
+    fun pinMiniPlayer(durationMs: Long = 5000L) {
+        miniPlayerPinJob?.cancel()
+        miniPlayerPinJob = viewModelScope.launch {
+            _isMiniPlayerPinned.value = true
+            delay(durationMs)
+            _isMiniPlayerPinned.value = false
+        }
+    }
+
     private var positionUpdateJob: Job? = null
     private var currentArtworkJob: Job? = null
     private var visualizerJob: Job? = null
@@ -160,6 +173,7 @@ class PlayerViewModel @Inject constructor(
         val isNewMediaItem = mediaId != activeMediaId
         if (isNewMediaItem) {
             activeMediaId = mediaId
+            pinMiniPlayer()
         }
 
         val albumIdToUse =

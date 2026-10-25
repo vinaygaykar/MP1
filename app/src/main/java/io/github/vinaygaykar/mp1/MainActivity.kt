@@ -31,13 +31,20 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
-import io.github.vinaygaykar.mp1.ui.library.LibraryScreen
+import io.github.vinaygaykar.mp1.ui.library.v2.LibraryScreenV2
 import io.github.vinaygaykar.mp1.ui.search.SearchScreen
 import io.github.vinaygaykar.mp1.ui.settings.ScanLocationScreen
 import io.github.vinaygaykar.mp1.ui.settings.SettingsScreen
@@ -66,6 +73,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Settings : Screen("settings", "Settings", Icons.Default.Settings)
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MainScreen(
     playerViewModel: PlayerViewModel = hiltViewModel(),
@@ -98,6 +106,8 @@ fun MainScreen(
 
     var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
     var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
+    var miniPlayerHideProgress by remember { mutableFloatStateOf(0f) }
+    val isMiniPlayerPinned by playerViewModel.isMiniPlayerPinned.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -116,53 +126,92 @@ fun MainScreen(
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { innerPadding ->
             Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                NavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    composable(Screen.Library.route) { 
-                        LibraryScreen(
-                            bottomPadding = bottomPadding,
-                            isPlayerActive = isPlayerActive,
-                            miniPlayerTargetOffset = miniPlayerTargetOffset,
-                            onBulgeMiniPlayer = { miniPlayerBulgeTrigger = System.currentTimeMillis() },
-                            onSearchClick = { navController.navigate(Screen.Search.route) },
-                            onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                            onOpenScanLocations = { navController.navigate("scan_locations") }
-                        ) 
-                    }
-                    composable(Screen.Search.route) { 
-                        SearchScreen(
-                            bottomPadding = bottomPadding,
-                            onBack = { navController.popBackStack() }
-                        ) 
-                    }
-                    composable(Screen.Settings.route) {
-                        SettingsScreen(
-                            bottomPadding = bottomPadding,
-                            onBack = { navController.popBackStack() },
-                            onNavigateToScanLocations = { navController.navigate("scan_locations") }
-                        )
-                    }
-                    composable("scan_locations") {
-                        ScanLocationScreen(
-                            onBack = { navController.popBackStack() },
-                            bottomPadding = bottomPadding,
-                            isOnboarding = false
-                        )
-                    }
-                    composable("onboarding_scan_locations") {
-                        ScanLocationScreen(
-                            onBack = { (context as? Activity)?.finish() },
-                            onContinueInBackground = {
-                                navController.navigate(Screen.Library.route) {
-                                    popUpTo("onboarding_scan_locations") { inclusive = true }
-                                }
+                SharedTransitionLayout {
+                    NavHost(
+                        navController = navController,
+                        startDestination = startDestination,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        composable(
+                            route = Screen.Library.route,
+                            exitTransition = {
+                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeOut(tween(350))
                             },
-                            bottomPadding = bottomPadding,
-                            isOnboarding = true
-                        )
+                            popEnterTransition = {
+                                slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeIn(tween(350))
+                            }
+                        ) { 
+                            LibraryScreenV2(
+                                bottomPadding = bottomPadding,
+                                isPlayerActive = isPlayerActive,
+                                miniPlayerTargetOffset = miniPlayerTargetOffset,
+                                onBulgeMiniPlayer = { miniPlayerBulgeTrigger = System.currentTimeMillis() },
+                                onSearchClick = { navController.navigate(Screen.Search.route) },
+                                onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                                onOpenScanLocations = { navController.navigate("scan_locations") },
+                                onMiniPlayerHideProgressUpdate = { miniPlayerHideProgress = it }
+                            ) 
+                        }
+                        composable(
+                            route = Screen.Search.route,
+                            enterTransition = {
+                                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(350)) + fadeIn(tween(350))
+                            },
+                            exitTransition = {
+                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeOut(tween(350))
+                            },
+                            popEnterTransition = {
+                                slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeIn(tween(350))
+                            },
+                            popExitTransition = {
+                                slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(350)) + fadeOut(tween(350))
+                            }
+                        ) { 
+                            SearchScreen(
+                                bottomPadding = bottomPadding,
+                                onBack = { navController.popBackStack() }
+                            ) 
+                        }
+                        composable(
+                            route = Screen.Settings.route,
+                            enterTransition = {
+                                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(350)) + fadeIn(tween(350))
+                            },
+                            exitTransition = {
+                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeOut(tween(350))
+                            },
+                            popEnterTransition = {
+                                slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeIn(tween(350))
+                            },
+                            popExitTransition = {
+                                slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(350)) + fadeOut(tween(350))
+                            }
+                        ) {
+                            SettingsScreen(
+                                bottomPadding = bottomPadding,
+                                onBack = { navController.popBackStack() },
+                                onNavigateToScanLocations = { navController.navigate("scan_locations") }
+                            )
+                        }
+                        composable("scan_locations") {
+                            ScanLocationScreen(
+                                onBack = { navController.popBackStack() },
+                                bottomPadding = bottomPadding,
+                                isOnboarding = false
+                            )
+                        }
+                        composable("onboarding_scan_locations") {
+                            ScanLocationScreen(
+                                onBack = { (context as? Activity)?.finish() },
+                                onContinueInBackground = {
+                                    navController.navigate(Screen.Library.route) {
+                                        popUpTo("onboarding_scan_locations") { inclusive = true }
+                                    }
+                                },
+                                bottomPadding = bottomPadding,
+                                isOnboarding = true
+                            )
+                        }
                     }
                 }
             }
@@ -180,7 +229,8 @@ fun MainScreen(
             lyricsControls = playerViewModel,
             onProgressUpdate = { expansionProgress.floatValue = it },
             visualizerState = visualizerState,
-            bulgeTrigger = miniPlayerBulgeTrigger
+            bulgeTrigger = miniPlayerBulgeTrigger,
+            hideProgress = if (isMiniPlayerPinned) 0f else miniPlayerHideProgress
         ) { offset -> miniPlayerTargetOffset = offset }
     }
 }
