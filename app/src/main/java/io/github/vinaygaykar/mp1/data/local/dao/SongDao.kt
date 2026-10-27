@@ -17,7 +17,14 @@ interface SongDao {
     suspend fun getSongById(id: String): SongEntity?
 
     @Query("SELECT * FROM songs WHERE id IN (:songIds)")
-    suspend fun getSongsByIdsSync(songIds: List<String>): List<SongEntity>
+    suspend fun getSongsByIdsRaw(songIds: List<String>): List<SongEntity>
+
+    suspend fun getSongsByIdsSync(songIds: List<String>): List<SongEntity> {
+        if (songIds.isEmpty()) return emptyList()
+        return songIds.chunked(900).flatMap { chunk ->
+            getSongsByIdsRaw(chunk)
+        }
+    }
 
     @Query("SELECT * FROM songs WHERE albumId = :albumId ORDER BY COALESCE(discNumber, 1) ASC, COALESCE(trackNumber, 999) ASC, title ASC")
     fun getSongsByAlbum(albumId: String): Flow<List<SongEntity>>
@@ -41,7 +48,14 @@ interface SongDao {
     suspend fun getSongsByFolderSync(scanFolderId: String): List<SongEntity>
 
     @Query("DELETE FROM songs WHERE id IN (:songIds)")
-    suspend fun deleteSongsByIds(songIds: List<String>)
+    suspend fun deleteSongsByIdsRaw(songIds: List<String>)
+
+    suspend fun deleteSongsByIds(songIds: List<String>) {
+        if (songIds.isEmpty()) return
+        songIds.chunked(900).forEach { chunk ->
+            deleteSongsByIdsRaw(chunk)
+        }
+    }
 
     @Query("DELETE FROM songs")
     suspend fun deleteAllSongs()

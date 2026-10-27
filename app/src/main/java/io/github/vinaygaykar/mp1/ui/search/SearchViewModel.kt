@@ -60,7 +60,10 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             val sessionToken =
                 SessionToken(context, ComponentName(context, PlaybackService::class.java))
-            controller = MediaController.Builder(context, sessionToken).buildAsync().await()
+            val hints = android.os.Bundle().apply { putBoolean("NEEDS_TIMELINE", false) }
+            controller = MediaController.Builder(context, sessionToken)
+                .setConnectionHints(hints)
+                .buildAsync().await()
         }
     }
 

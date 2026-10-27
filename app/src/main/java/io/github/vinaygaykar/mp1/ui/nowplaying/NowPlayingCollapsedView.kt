@@ -78,8 +78,8 @@ fun NowPlayingCollapsedView(
     queueState: QueueUiState,
     actions: PlaybackControls,
     showRecord: Boolean = true,
-    rotation: Float? = null,
-    textAlpha: Float = 1f,
+    rotation: (() -> Float)? = null,
+    textAlpha: () -> Float = { 1f },
     onClick: (() -> Unit)? = null,
     onPositioned: ((Offset) -> Unit)? = null,
 ) {
@@ -88,15 +88,15 @@ fun NowPlayingCollapsedView(
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
 
-    val internalRotation = if (rotation == null) {
+    val internalRotation: () -> Float = rotation ?: run {
         val targetRotation = progressState.positionMs * 0.12f
-        val animRotation by animateFloatAsState(
+        val animRotation = animateFloatAsState(
             targetValue = targetRotation,
             animationSpec = tween(durationMillis = 200, easing = LinearEasing),
-            label = "mini_vinyl_rotation"
+            label = "mini_vinyl_rotation",
         )
-        animRotation
-    } else rotation
+        return@run { animRotation.value }
+    }
 
     val hasPrevPage = remember(queueState.items.size, queueState.currentIndex, playbackState.repeatMode) {
         if (queueState.items.size <= 1) {
@@ -360,7 +360,7 @@ fun NowPlayingCollapsedView(
                     .padding(horizontal = 28.dp)
                     .align(Alignment.BottomCenter)
                     .height(2.dp)
-                    .graphicsLayer { alpha = textAlpha },
+                    .graphicsLayer { alpha = textAlpha() },
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = Color.Transparent,
                 strokeCap = StrokeCap.Round
@@ -375,8 +375,8 @@ private fun NowPlayingCollapsedItemContent(
     artist: String,
     artworkUri: Uri?,
     showRecord: Boolean,
-    rotation: Float,
-    textAlpha: Float,
+    rotation: () -> Float,
+    textAlpha: () -> Float,
     modifier: Modifier = Modifier,
     onPositioned: ((Offset) -> Unit)? = null
 ) {
@@ -388,7 +388,7 @@ private fun NowPlayingCollapsedItemContent(
             modifier = Modifier
                 .fillMaxHeight()
                 .padding(start = 28.dp, end = 72.dp)
-                .graphicsLayer { alpha = textAlpha },
+                .graphicsLayer { alpha = textAlpha() },
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.Start
         ) {
@@ -422,7 +422,7 @@ private fun NowPlayingCollapsedItemContent(
                 .padding(end = 8.dp)
                 .size(56.dp)
                 .alpha(if (showRecord) 1f else 0f)
-                .graphicsLayer { rotationZ = rotation % 360f }
+                .graphicsLayer { rotationZ = rotation() % 360f }
                 .clip(CircleShape)
                 .then(
                     if (onPositioned != null) {
@@ -480,8 +480,8 @@ fun MiniPlayer(
     queueState: QueueUiState,
     actions: PlaybackControls,
     showRecord: Boolean = true,
-    rotation: Float? = null,
-    textAlpha: Float = 1f,
+    rotation: (() -> Float)? = null,
+    textAlpha: () -> Float = { 1f },
     onClick: (() -> Unit)? = null,
     onPositioned: ((Offset) -> Unit)? = null,
 ) {

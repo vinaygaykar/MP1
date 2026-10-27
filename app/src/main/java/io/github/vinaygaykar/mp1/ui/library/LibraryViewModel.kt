@@ -58,7 +58,10 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             val sessionToken =
                 SessionToken(context, ComponentName(context, PlaybackService::class.java))
-            controller = MediaController.Builder(context, sessionToken).buildAsync().await()
+            val hints = Bundle().apply { putBoolean("NEEDS_TIMELINE", false) }
+            controller = MediaController.Builder(context, sessionToken)
+                .setConnectionHints(hints)
+                .buildAsync().await()
         }
     }
 
@@ -138,7 +141,7 @@ class LibraryViewModel @Inject constructor(
 
     fun playSong(song: Song, songList: List<Song> = songs.value) {
         playSongJob?.cancel()
-        playSongJob = viewModelScope.launch {
+        playSongJob = viewModelScope.launch(Dispatchers.Default) {
             val activeController = controller ?: return@launch
             val currentSongs = songList.ifEmpty { songs.value }
             if (currentSongs.isEmpty()) return@launch
@@ -150,10 +153,12 @@ class LibraryViewModel @Inject constructor(
                 putStringArrayList("song_ids", songIds)
                 putInt("start_index", startIndex)
             }
-            activeController.sendCustomCommand(
-                SessionCommand("ACTION_PLAY_LIST", Bundle.EMPTY),
-                args
-            )
+            withContext(Dispatchers.Main) {
+                activeController.sendCustomCommand(
+                    SessionCommand("ACTION_PLAY_LIST", Bundle.EMPTY),
+                    args
+                )
+            }
         }
     }
 
