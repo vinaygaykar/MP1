@@ -403,8 +403,8 @@ private fun NowPlayingPortraitContent(
                     queueState = queueState,
                     actions = playbackControls,
                     showRecord = false,
-                    rotation = state.visualRotation,
-                    textAlpha = ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f),
+                    rotation = { state.visualRotation },
+                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) },
                     onClick = { state.expand() }
                 )
             }
@@ -601,8 +601,8 @@ private fun NowPlayingLandscapeContent(
                     queueState = queueState,
                     actions = playbackControls,
                     showRecord = false,
-                    rotation = state.visualRotation,
-                    textAlpha = ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f),
+                    rotation = { state.visualRotation },
+                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) },
                     onClick = { state.expand() }
                 )
             }

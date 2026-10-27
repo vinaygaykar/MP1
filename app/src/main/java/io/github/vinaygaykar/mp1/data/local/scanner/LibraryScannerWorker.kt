@@ -220,7 +220,10 @@ class LibraryScannerWorker @AssistedInject constructor(
                     val sessionToken = SessionToken(appContext,
                         ComponentName(appContext, PlaybackService::class.java)
                     )
-                    val controller = MediaController.Builder(appContext, sessionToken).buildAsync().await()
+                    val hints = android.os.Bundle().apply { putBoolean("NEEDS_TIMELINE", false) }
+                    val controller = MediaController.Builder(appContext, sessionToken)
+                        .setConnectionHints(hints)
+                        .buildAsync().await()
                     controller.stop()
                     controller.clearMediaItems()
                     controller.release()

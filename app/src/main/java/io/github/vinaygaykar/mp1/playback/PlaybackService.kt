@@ -3,7 +3,6 @@ package io.github.vinaygaykar.mp1.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
-import android.os.Debug
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -29,7 +28,6 @@ import io.github.vinaygaykar.mp1.data.local.entities.QueueItemEntity
 import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.utils.traceSection
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -150,9 +148,19 @@ class PlaybackService : MediaSessionService() {
                     .add(repeatCommand)
                     .add(playListCommand)
                     .build()
+
+                val needsTimeline = controller.connectionHints.getBoolean("NEEDS_TIMELINE", true)
+                val availablePlayerCommands = if (!needsTimeline) {
+                    connectionResult.availablePlayerCommands.buildUpon()
+                        .remove(Player.COMMAND_GET_TIMELINE)
+                        .build()
+                } else {
+                    connectionResult.availablePlayerCommands
+                }
+
                 return MediaSession.ConnectionResult.accept(
                     availableSessionCommands,
-                    connectionResult.availablePlayerCommands
+                    availablePlayerCommands
                 )
             }
 
@@ -223,47 +231,44 @@ class PlaybackService : MediaSessionService() {
             val allSongs = musicRepository.getSongsByIdsSync(songIds)
             if (allSongs.isEmpty()) return@launch
 
-            val allMediaItems = allSongs.map { it.toMediaItem() }
+            val byId = allSongs.associateBy { it.id }
+            val ordered = songIds.mapNotNull(byId::get)
+            val start = ordered.indexOfFirst { it.id == targetId }.coerceAtLeast(0)
+
+            val allMediaItems = ordered.map { it.toMediaItem() }
 
             delay(100)
 
             val chunkSize = 150
-            val itemsAfter = if (validStartIndex + 1 < allMediaItems.size) {
-                allMediaItems.subList(validStartIndex + 1, allMediaItems.size)
+            val itemsAfter = if (start + 1 < allMediaItems.size) {
+                allMediaItems.subList(start + 1, allMediaItems.size)
             } else emptyList()
 
-            val itemsBefore = if (validStartIndex > 0) {
-                allMediaItems.subList(0, validStartIndex)
+            val itemsBefore = if (start > 0) {
+                allMediaItems.subList(0, start)
             } else emptyList()
 
-            val traceFile = File(getExternalFilesDir(null), "chunk_phase.trace")
-            Debug.startMethodTracingSampling(traceFile.absolutePath, 8 * 1024 * 1024, 1000)
-
-            try {
-                for (chunk in itemsAfter.chunked(chunkSize)) {
-                    withContext(Dispatchers.Main) {
-                        val currentCount = player.mediaItemCount
-                        traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
-                            player.addMediaItems(chunk)
-                        }
+            for (chunk in itemsAfter.chunked(chunkSize)) {
+                withContext(Dispatchers.Main) {
+                    val currentCount = player.mediaItemCount
+                    traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
+                        player.addMediaItems(chunk)
                     }
-                    delay(50)
                 }
+                delay(50)
+            }
 
-                var insertPos = 0
-                for (chunk in itemsBefore.chunked(chunkSize)) {
-                    val currentPos = insertPos
-                    withContext(Dispatchers.Main) {
-                        val currentCount = player.mediaItemCount
-                        traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
-                            player.addMediaItems(currentPos, chunk)
-                        }
+            var insertPos = 0
+            for (chunk in itemsBefore.chunked(chunkSize)) {
+                val currentPos = insertPos
+                withContext(Dispatchers.Main) {
+                    val currentCount = player.mediaItemCount
+                    traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
+                        player.addMediaItems(currentPos, chunk)
                     }
-                    insertPos += chunk.size
-                    delay(50)
                 }
-            } finally {
-                Debug.stopMethodTracing()
+                insertPos += chunk.size
+                delay(50)
             }
         }
     }
@@ -272,33 +277,42 @@ class PlaybackService : MediaSessionService() {
         if (isRestoringState) return
         saveQueueJob?.cancel()
 
-        val currentTimeline = player.currentTimeline
-        val count = currentTimeline.windowCount
-        val window = Timeline.Window()
-        val queueEntities = ArrayList<QueueItemEntity>(count)
-
-        traceSection("Service_buildQueueEntities_$count") {
-            for (i in 0 until count) {
-                currentTimeline.getWindow(i, window)
-                val songId = window.mediaItem.mediaId
-                queueEntities.add(
-                    QueueItemEntity(
-                        queueItemId = "$i-$songId",
-                        position = i,
-                        songId = songId,
-                        sourceContext = null
-                    )
-                )
-            }
-        }
-
-        val currentSongId = player.currentMediaItem?.mediaId
-        val currentPosition = player.currentPosition
-        val repeatMode = player.repeatMode
-        val isShuffleOn = player.shuffleModeEnabled
-
         saveQueueJob = serviceScope.launch(Dispatchers.IO) {
             delay(500)
+
+            val timeline: Timeline
+            val currentSongId: String?
+            val currentPosition: Long
+            val repeatMode: Int
+            val isShuffleOn: Boolean
+
+            withContext(Dispatchers.Main) {
+                timeline = player.currentTimeline
+                currentSongId = player.currentMediaItem?.mediaId
+                currentPosition = player.currentPosition
+                repeatMode = player.repeatMode
+                isShuffleOn = player.shuffleModeEnabled
+            }
+
+            val count = timeline.windowCount
+            val window = Timeline.Window()
+            val queueEntities = ArrayList<QueueItemEntity>(count)
+
+            traceSection("Service_buildQueueEntities_$count") {
+                for (i in 0 until count) {
+                    timeline.getWindow(i, window)
+                    val songId = window.mediaItem.mediaId
+                    queueEntities.add(
+                        QueueItemEntity(
+                            queueItemId = "$i-$songId",
+                            position = i,
+                            songId = songId,
+                            sourceContext = null
+                        )
+                    )
+                }
+            }
+
             traceSection("Room_replaceQueue_${queueEntities.size}") {
                 queueDao.replaceQueue(queueEntities)
             }

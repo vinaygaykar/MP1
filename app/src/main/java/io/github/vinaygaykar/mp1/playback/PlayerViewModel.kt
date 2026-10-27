@@ -33,6 +33,7 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import javax.inject.Inject
 
 @HiltViewModel
@@ -93,7 +94,10 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val sessionToken =
                 SessionToken(context, ComponentName(context, PlaybackService::class.java))
-            controller = MediaController.Builder(context, sessionToken).buildAsync().await()
+            val hints = android.os.Bundle().apply { putBoolean("NEEDS_TIMELINE", true) }
+            controller = MediaController.Builder(context, sessionToken)
+                .setConnectionHints(hints)
+                .buildAsync().await()
             controller?.addListener(object : Player.Listener {
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                     updateState()
@@ -121,8 +125,11 @@ class PlayerViewModel @Inject constructor(
                     timeline: Timeline,
                     reason: Int
                 ) {
-                    updateState()
-                    updateQueueFromTimeline(timeline, forceRebuild = false)
+                    if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
+                        updateState()
+                    }
+                    val isPlaylistChanged = reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
+                    updateQueueFromTimeline(timeline, forceRebuild = isPlaylistChanged)
                 }
             })
             updateState()
