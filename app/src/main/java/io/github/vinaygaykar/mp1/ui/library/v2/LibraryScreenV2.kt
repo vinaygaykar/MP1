@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
@@ -468,14 +469,18 @@ fun LibraryContentV2(
             val currentWidth = lerp(l1Bounds.width, l2Bounds.width, detailProgress)
             val currentHeight = lerp(l1Bounds.height, l2Bounds.height, detailProgress)
 
+            val startFontSize = MaterialTheme.typography.displaySmall.fontSize
+            val endFontSize = MaterialTheme.typography.titleLarge.fontSize
+            val currentFontSize = lerp(startFontSize.value, endFontSize.value, detailProgress).sp
+
             val currentColor = lerp(
                 MaterialTheme.colorScheme.onSurface,
-                MaterialTheme.colorScheme.onSurfaceVariant,
+                MaterialTheme.colorScheme.onSurface,
                 detailProgress
             )
             val currentWeightInt = lerp(
                 FontWeight.Bold.weight,
-                FontWeight.SemiBold.weight,
+                FontWeight.Bold.weight,
                 detailProgress
             )
 
@@ -489,7 +494,8 @@ fun LibraryContentV2(
             ) {
                 Text(
                     text = currentCategory.title,
-                    style = MaterialTheme.typography.titleLarge.copy(
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        fontSize = currentFontSize,
                         fontWeight = FontWeight(currentWeightInt)
                     ),
                     color = currentColor,
