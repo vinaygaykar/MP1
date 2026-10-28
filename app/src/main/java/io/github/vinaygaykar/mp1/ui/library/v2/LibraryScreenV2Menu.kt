@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -95,10 +96,7 @@ internal fun CategoryMenuScreen(
     categoryTitleModifiers: Map<LibraryCategory, Modifier> = emptyMap()
 ) {
     val configuration = LocalConfiguration.current
-    val screenHeightDp = configuration.screenHeightDp.dp
-    val headerHeightDp = screenHeightDp * 0.28f
-
-    val scrollState = rememberScrollState()
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     Box(
         modifier = modifier
@@ -108,12 +106,246 @@ internal fun CategoryMenuScreen(
                 alpha = 1f - (detailProgress * 0.3f)
             }
     ) {
+        if (isLandscape) {
+            CategoryMenuLandscapeContent(
+                uiState = uiState,
+                displayFolder = displayFolder,
+                bottomPadding = bottomPadding,
+                onOpenCategory = onOpenCategory,
+                onSettingsClick = onSettingsClick,
+                onOpenScanLocations = onOpenScanLocations,
+                categoryTitleModifiers = categoryTitleModifiers
+            )
+        } else {
+            CategoryMenuPortraitContent(
+                uiState = uiState,
+                displayFolder = displayFolder,
+                bottomPadding = bottomPadding,
+                onOpenCategory = onOpenCategory,
+                onSettingsClick = onSettingsClick,
+                onOpenScanLocations = onOpenScanLocations,
+                categoryTitleModifiers = categoryTitleModifiers
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryMenuPortraitContent(
+    uiState: LibraryUiState,
+    displayFolder: String?,
+    bottomPadding: Dp,
+    onOpenCategory: (LibraryCategory) -> Unit,
+    onSettingsClick: () -> Unit,
+    onOpenScanLocations: () -> Unit,
+    categoryTitleModifiers: Map<LibraryCategory, Modifier>,
+    modifier: Modifier = Modifier
+) {
+    val configuration = LocalConfiguration.current
+    val screenHeightDp = configuration.screenHeightDp.dp
+    val headerHeightDp = screenHeightDp * 0.28f
+
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .verticalScroll(scrollState)
+            .padding(bottom = bottomPadding)
+    ) {
+        // Scan Notice Banner
+        AnimatedVisibility(
+            visible = uiState.isScanning,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            NoticeBanner(
+                title = "Library scan in progress...",
+                subtitle = if (!displayFolder.isNullOrBlank()) "Scanning $displayFolder" else null,
+                onClick = onOpenScanLocations,
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Open Scan Directories",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            )
+        }
+
+        // Hero Header Space (28% screen height) containing MP.1 Title + Search & Settings Buttons
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(headerHeightDp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 16.dp),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            val maxW = this.maxWidth
+            val maxH = this.maxHeight
+            val fontSize = minOf(maxW.value * 0.22f, maxH.value * 0.45f, 76f).sp
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = "MP.1",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.ExtraBold,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    softWrap = false
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Surface(
+                        onClick = { onOpenCategory(LibraryCategory.SEARCH) },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                    Surface(
+                        onClick = onSettingsClick,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Category List Content
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+        ) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            CategoryCardItem(
+                title = LibraryCategory.PLAYLISTS.title,
+                onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.PLAYLISTS] ?: Modifier
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            CategoryCardItem(
+                title = LibraryCategory.SONGS.title,
+                onClick = { onOpenCategory(LibraryCategory.SONGS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.SONGS] ?: Modifier
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            CategoryCardItem(
+                title = LibraryCategory.ALBUMS.title,
+                onClick = { onOpenCategory(LibraryCategory.ALBUMS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.ALBUMS] ?: Modifier
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            CategoryCardItem(
+                title = LibraryCategory.ARTISTS.title,
+                onClick = { onOpenCategory(LibraryCategory.ARTISTS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.ARTISTS] ?: Modifier
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        }
+    }
+}
+
+@Composable
+private fun CategoryMenuLandscapeContent(
+    uiState: LibraryUiState,
+    displayFolder: String?,
+    bottomPadding: Dp,
+    onOpenCategory: (LibraryCategory) -> Unit,
+    onSettingsClick: () -> Unit,
+    onOpenScanLocations: () -> Unit,
+    categoryTitleModifiers: Map<LibraryCategory, Modifier>,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
+        // Left Pane: MP.1 Title at Bottom Left
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(1f)
+                .padding(start = 24.dp, end = 16.dp, bottom = 24.dp, top = 16.dp),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            val maxW = this.maxWidth
+            val maxH = this.maxHeight
+            val fontSize = minOf(maxW.value * 0.22f, maxH.value * 0.45f, 76f).sp
+
+            Text(
+                text = "MP.1",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = fontSize,
+                    fontWeight = FontWeight.ExtraBold,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+
+        // Right Pane: Scrollable Category List + Search and Settings icons
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(1f)
                 .verticalScroll(scrollState)
                 .padding(bottom = bottomPadding)
+                .padding(start = 12.dp, end = 24.dp, top = 16.dp)
         ) {
             // Scan Notice Banner
             AnimatedVisibility(
@@ -122,7 +354,7 @@ internal fun CategoryMenuScreen(
                 exit = shrinkVertically() + fadeOut(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 12.dp)
             ) {
                 NoticeBanner(
                     title = "Library scan in progress...",
@@ -147,112 +379,80 @@ internal fun CategoryMenuScreen(
                 )
             }
 
-            // Hero Header Space (28% screen height) containing MP.1 Title + Search & Settings Buttons
-            BoxWithConstraints(
+            // Search and Settings buttons
+            Row(
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(headerHeightDp)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 16.dp),
-                contentAlignment = Alignment.BottomStart
+                    .padding(bottom = 12.dp, end = 4.dp)
             ) {
-                val maxW = this.maxWidth
-                val maxH = this.maxHeight
-                val fontSize = minOf(maxW.value * 0.22f, maxH.value * 0.45f, 76f).sp
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Text(
-                        text = "MP.1",
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = fontSize,
-                            fontWeight = FontWeight.ExtraBold,
-                            platformStyle = PlatformTextStyle(includeFontPadding = false)
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 6.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        onClick = { onOpenCategory(LibraryCategory.SEARCH) },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.size(44.dp)
                     ) {
-                        Surface(
-                            onClick = { onOpenCategory(LibraryCategory.SEARCH) },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Search",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-                        Surface(
-                            onClick = onSettingsClick,
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "Settings",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                    }
+                    Surface(
+                        onClick = onSettingsClick,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }
             }
 
             // Category List Content
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            ) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                CategoryCardItem(
-                    title = LibraryCategory.PLAYLISTS.title,
-                    onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) },
-                    titleModifier = categoryTitleModifiers[LibraryCategory.PLAYLISTS] ?: Modifier
-                )
+            CategoryCardItem(
+                title = LibraryCategory.PLAYLISTS.title,
+                onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.PLAYLISTS] ?: Modifier
+            )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                CategoryCardItem(
-                    title = LibraryCategory.SONGS.title,
-                    onClick = { onOpenCategory(LibraryCategory.SONGS) },
-                    titleModifier = categoryTitleModifiers[LibraryCategory.SONGS] ?: Modifier
-                )
+            CategoryCardItem(
+                title = LibraryCategory.SONGS.title,
+                onClick = { onOpenCategory(LibraryCategory.SONGS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.SONGS] ?: Modifier
+            )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                CategoryCardItem(
-                    title = LibraryCategory.ALBUMS.title,
-                    onClick = { onOpenCategory(LibraryCategory.ALBUMS) },
-                    titleModifier = categoryTitleModifiers[LibraryCategory.ALBUMS] ?: Modifier
-                )
+            CategoryCardItem(
+                title = LibraryCategory.ALBUMS.title,
+                onClick = { onOpenCategory(LibraryCategory.ALBUMS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.ALBUMS] ?: Modifier
+            )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                CategoryCardItem(
-                    title = LibraryCategory.ARTISTS.title,
-                    onClick = { onOpenCategory(LibraryCategory.ARTISTS) },
-                    titleModifier = categoryTitleModifiers[LibraryCategory.ARTISTS] ?: Modifier
-                )
+            CategoryCardItem(
+                title = LibraryCategory.ARTISTS.title,
+                onClick = { onOpenCategory(LibraryCategory.ARTISTS) },
+                titleModifier = categoryTitleModifiers[LibraryCategory.ARTISTS] ?: Modifier
+            )
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         }
     }
 }
