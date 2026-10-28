@@ -148,7 +148,6 @@ class NowPlayingScreenState(
     var displayedIndexState by mutableIntStateOf(-1)
     var displayedColorState by mutableStateOf<Color?>(null)
     var prevQueueState by mutableStateOf<List<MediaItem>?>(null)
-    var lastAnimatedTrackKey by mutableStateOf<String?>(null)
 
     val pendingColorQueue = mutableStateListOf<ColorStep>()
 
@@ -564,14 +563,8 @@ fun rememberNowPlayingScreenState(
         state.lastTrackTitle = playbackState.trackTitle
     }
 
-    // Song change color spread producer
-    val currentTrackKey = remember(queueState.currentIndex, playbackState.trackTitle) {
-        "${queueState.currentIndex}_${playbackState.trackTitle}"
-    }
-
-    var lastAnimatedTrackKey by rememberSaveable { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(currentTrackKey, targetBgColor) {
+    // Song change queue direction producer
+    LaunchedEffect(queueState.currentIndex, queueState.items) {
         val newIndex = queueState.currentIndex
         val prevIndex = state.displayedIndexState
         val newQueue = queueState.items
@@ -581,35 +574,24 @@ fun rememberNowPlayingScreenState(
                 prevQueue.size == newQueue.size &&
                 prevQueue.indices.all { i -> prevQueue[i].mediaId == newQueue[i].mediaId }
 
-        var currentIsReverse = state.isReverseRipple
         if (newIndex != prevIndex && newIndex != -1) {
-            currentIsReverse = isSameQueue && prevIndex != -1 && newIndex < prevIndex
-            state.isReverseRipple = currentIsReverse
+            state.isReverseRipple = isSameQueue && prevIndex != -1 && newIndex < prevIndex
             state.displayedIndexState = newIndex
             state.prevQueueState = newQueue
         }
+    }
 
-        val isInitialLoad = lastAnimatedTrackKey == null || state.displayedColorState == null
-        val isSongChanged = lastAnimatedTrackKey != null && lastAnimatedTrackKey != currentTrackKey
-        val isArtworkLoading = playbackState.artworkUri != null && playbackState.seedColor == null
-
-        if (isInitialLoad) {
+    // Color ripple producer
+    LaunchedEffect(targetBgColor) {
+        if (state.displayedColorState == null) {
             state.displayedColorState = targetBgColor
-            lastAnimatedTrackKey = currentTrackKey
-        } else if (isSongChanged) {
+        } else {
             val startColor = state.pendingColorQueue.lastOrNull()?.color ?: state.displayedColorState ?: targetBgColor
-            if (startColor != targetBgColor && !isArtworkLoading) {
+            if (startColor != targetBgColor) {
                 while (state.pendingColorQueue.size >= 4) {
                     state.pendingColorQueue.removeAt(0)
                 }
-                state.pendingColorQueue.add(ColorStep(targetBgColor, currentIsReverse))
-                lastAnimatedTrackKey = currentTrackKey
-            } else if (startColor == targetBgColor && !isArtworkLoading) {
-                lastAnimatedTrackKey = currentTrackKey
-            }
-        } else {
-            if (state.pendingColorQueue.isEmpty() && state.bgColorPair == null) {
-                state.displayedColorState = targetBgColor
+                state.pendingColorQueue.add(ColorStep(targetBgColor, state.isReverseRipple))
             }
         }
     }

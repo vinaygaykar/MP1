@@ -191,7 +191,7 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
-        val seedColorToUse = if (isNewArtwork) null else _playbackState.value.seedColor
+        val seedColorToUse = _playbackState.value.seedColor
 
         if (isNewMediaItem) {
             if (mediaId != activeVisualizerSongId) {
