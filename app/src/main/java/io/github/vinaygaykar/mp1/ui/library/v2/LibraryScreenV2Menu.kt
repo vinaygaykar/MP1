@@ -6,7 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,26 +16,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,7 +41,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -58,75 +50,31 @@ import io.github.vinaygaykar.mp1.ui.components.NoticeBanner
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 /**
- * Reusable category card item component for Level 1 Category Menu.
+ * Reusable category item component for Level 1 Category Menu.
  */
 @Composable
 internal fun CategoryCardItem(
     title: String,
-    subtitle: String,
-    icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    titleModifier: Modifier = Modifier
+    titleModifier: Modifier = Modifier,
+    @Suppress("UNUSED_PARAMETER") subtitle: String? = null,
+    @Suppress("UNUSED_PARAMETER") icon: ImageVector? = null
 ) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(84.dp)
+            .clickable(onClick = onClick)
+            .padding(vertical = 18.dp, horizontal = 4.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-
-                Column {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = titleModifier
-                    )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = titleModifier
+        )
     }
 }
 
@@ -147,9 +95,8 @@ internal fun CategoryMenuScreen(
     categoryTitleModifiers: Map<LibraryCategory, Modifier> = emptyMap()
 ) {
     val configuration = LocalConfiguration.current
-
     val screenHeightDp = configuration.screenHeightDp.dp
-    val headerHeightDp = screenHeightDp * 0.30f
+    val headerHeightDp = screenHeightDp * 0.28f
 
     val scrollState = rememberScrollState()
 
@@ -200,52 +147,39 @@ internal fun CategoryMenuScreen(
                 )
             }
 
-            // Level 1 Hero Header (30% screen height, fixed, non-collapsible, scrolls with content)
+            // Hero Header Space (28% screen height) containing MP.1 Title + Search & Settings Buttons
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(headerHeightDp)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.Center
+                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp, top = 16.dp),
+                contentAlignment = Alignment.BottomStart
             ) {
                 val maxW = this.maxWidth
                 val maxH = this.maxHeight
-                val fontSize = minOf(maxW.value * 0.30f, maxH.value * 0.70f).sp
+                val fontSize = minOf(maxW.value * 0.22f, maxH.value * 0.45f, 76f).sp
 
-                Text(
-                    text = "MP.1",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = fontSize,
-                        fontWeight = FontWeight.Bold,
-                        platformStyle = PlatformTextStyle(includeFontPadding = false)
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset(x = 10.dp)
-                )
-            }
-
-            // Scrollable Content (Search & Settings buttons + Category Cards)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Search and Settings buttons (moved outside the action bar for Level 1 screen)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
+                    Text(
+                        text = "MP.1",
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontSize = fontSize,
+                            fontWeight = FontWeight.ExtraBold,
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 6.dp)
                     ) {
                         Surface(
                             onClick = { onOpenCategory(LibraryCategory.SEARCH) },
@@ -277,38 +211,47 @@ internal fun CategoryMenuScreen(
                         }
                     }
                 }
+            }
+
+            // Category List Content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                 CategoryCardItem(
                     title = LibraryCategory.PLAYLISTS.title,
-                    subtitle = "${uiState.playlists.size} playlists",
-                    icon = Icons.Default.LibraryMusic,
                     onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) },
                     titleModifier = categoryTitleModifiers[LibraryCategory.PLAYLISTS] ?: Modifier
                 )
 
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
                 CategoryCardItem(
                     title = LibraryCategory.SONGS.title,
-                    subtitle = "${uiState.songs.size} tracks",
-                    icon = Icons.Default.MusicNote,
                     onClick = { onOpenCategory(LibraryCategory.SONGS) },
                     titleModifier = categoryTitleModifiers[LibraryCategory.SONGS] ?: Modifier
                 )
 
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
                 CategoryCardItem(
                     title = LibraryCategory.ALBUMS.title,
-                    subtitle = "${uiState.albums.size} albums",
-                    icon = Icons.Default.Album,
                     onClick = { onOpenCategory(LibraryCategory.ALBUMS) },
                     titleModifier = categoryTitleModifiers[LibraryCategory.ALBUMS] ?: Modifier
                 )
 
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
                 CategoryCardItem(
                     title = LibraryCategory.ARTISTS.title,
-                    subtitle = "${uiState.artists.size} artists",
-                    icon = Icons.Default.Person,
                     onClick = { onOpenCategory(LibraryCategory.ARTISTS) },
                     titleModifier = categoryTitleModifiers[LibraryCategory.ARTISTS] ?: Modifier
                 )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
         }
     }
