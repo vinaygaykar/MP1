@@ -32,6 +32,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +76,7 @@ fun LibraryScreenV2(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
+    onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -115,6 +119,7 @@ fun LibraryScreenV2(
         onSearchClick = onSearchClick,
         onSettingsClick = onSettingsClick,
         onOpenScanLocations = onOpenScanLocations,
+        onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
         onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
         onAddToQueue = { viewModel.addToQueue(it) },
         onCreatePlaylist = { viewModel.createPlaylist(it) },
@@ -144,6 +149,7 @@ fun LibraryContentV2(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
+    onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onPlaySong: (io.github.vinaygaykar.mp1.domain.models.Song, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> },
     onAddToQueue: (io.github.vinaygaykar.mp1.domain.models.Song) -> Unit = {},
     onCreatePlaylist: (String) -> Unit = {},
@@ -217,7 +223,22 @@ fun LibraryContentV2(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     var previousOpenedCategory by remember { mutableStateOf<LibraryCategory?>(null) }
 
+    val nestedScrollConnection = remember(onMiniPlayerCollapseChange) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val deltaY = available.y
+                if (deltaY < -8f) {
+                    onMiniPlayerCollapseChange(true)
+                } else if (deltaY > 8f) {
+                    onMiniPlayerCollapseChange(false)
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
     fun openCategory(category: LibraryCategory) {
+        onMiniPlayerCollapseChange(false)
         if (category.isListCategory) {
             val isNewCategory = previousOpenedCategory != category
             if (isNewCategory) {
@@ -237,6 +258,7 @@ fun LibraryContentV2(
     }
 
     fun openCategoryMenu() {
+        onMiniPlayerCollapseChange(false)
         coroutineScope.launch {
             libraryState.animateToCollapsed()
         }
@@ -397,6 +419,7 @@ fun LibraryContentV2(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
                 .anchoredDraggable(
                     state = anchoredDraggableState,
                     orientation = Orientation.Horizontal,

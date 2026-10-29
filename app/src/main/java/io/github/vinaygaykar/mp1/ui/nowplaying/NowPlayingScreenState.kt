@@ -195,7 +195,8 @@ fun rememberNowPlayingScreenState(
     screenHeightPx: Float,
     totalBottomGapPx: Float,
     initialExpanded: Boolean,
-    bulgeTrigger: Long
+    bulgeTrigger: Long,
+    isCollapsedOnScroll: Boolean = false
 ): NowPlayingScreenState {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -552,15 +553,37 @@ fun rememberNowPlayingScreenState(
     LaunchedEffect(playbackState.trackTitle) {
         if (state.lastTrackTitle.isEmpty() && playbackState.trackTitle.isNotEmpty()) {
             expandAnimProgress.snapTo(0f)
-            delay(1000L)
+            delay(2000L)
             expandAnimProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
             )
         } else if (playbackState.trackTitle.isEmpty()) {
             expandAnimProgress.snapTo(0f)
+        } else if (state.lastTrackTitle != playbackState.trackTitle) {
+            expandAnimProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+            )
         }
         state.lastTrackTitle = playbackState.trackTitle
+    }
+
+    // Scroll collapse/expand animation trigger
+    LaunchedEffect(isCollapsedOnScroll) {
+        if (playbackState.trackTitle.isNotEmpty() && state.lastTrackTitle.isNotEmpty()) {
+            if (isCollapsedOnScroll) {
+                expandAnimProgress.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+                )
+            } else {
+                expandAnimProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+                )
+            }
+        }
     }
 
     // Song change queue direction producer

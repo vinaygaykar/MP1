@@ -106,6 +106,11 @@ fun MainScreen(
 
     var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
     var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
+    var isMiniPlayerCollapsedOnScroll by remember { mutableStateOf(false) }
+
+    LaunchedEffect(playbackState.trackTitle) {
+        isMiniPlayerCollapsedOnScroll = false
+    }
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -146,7 +151,8 @@ fun MainScreen(
                                 onBulgeMiniPlayer = { miniPlayerBulgeTrigger = System.currentTimeMillis() },
                                 onSearchClick = { navController.navigate(Screen.Search.route) },
                                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                                onOpenScanLocations = { navController.navigate("scan_locations") }
+                                onOpenScanLocations = { navController.navigate("scan_locations") },
+                                onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it }
                             ) 
                         }
                         composable(
@@ -226,7 +232,8 @@ fun MainScreen(
             lyricsControls = playerViewModel,
             onProgressUpdate = { expansionProgress.floatValue = it },
             visualizerState = visualizerState,
-            bulgeTrigger = miniPlayerBulgeTrigger
+            bulgeTrigger = miniPlayerBulgeTrigger,
+            isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll
         ) { offset -> miniPlayerTargetOffset = offset }
     }
 }

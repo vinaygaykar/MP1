@@ -73,6 +73,7 @@ fun NowPlayingScreen(
     bottomOffset: Dp = 0.dp,
     initialExpanded: Boolean = false,
     bulgeTrigger: Long = 0L,
+    isCollapsedOnScroll: Boolean = false,
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
     if (playbackState.trackTitle.isEmpty()) return
@@ -107,7 +108,8 @@ fun NowPlayingScreen(
             screenHeightPx = screenHeightPx,
             totalBottomGapPx = totalBottomGapPx,
             initialExpanded = initialExpanded,
-            bulgeTrigger = bulgeTrigger
+            bulgeTrigger = bulgeTrigger,
+            isCollapsedOnScroll = isCollapsedOnScroll
         )
 
         BackHandler(
