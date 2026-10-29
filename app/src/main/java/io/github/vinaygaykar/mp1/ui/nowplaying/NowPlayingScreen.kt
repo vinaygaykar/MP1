@@ -73,7 +73,6 @@ fun NowPlayingScreen(
     bottomOffset: Dp = 0.dp,
     initialExpanded: Boolean = false,
     bulgeTrigger: Long = 0L,
-    hideProgress: Float = 0f,
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
     if (playbackState.trackTitle.isEmpty()) return
@@ -199,15 +198,11 @@ fun NowPlayingScreen(
             label = "row_width_fraction"
         )
 
-        val hideTranslationYPx = with(density) {
-            (peekHeight + 32.dp + navBarBottomPx.toDp()).toPx() * hideProgress * (1f - state.progress)
-        }
-
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(lerp(peekHeight, screenHeight, state.progress))
-                .offset { IntOffset(0, (state.dragOffset + hideTranslationYPx).roundToInt()) }
+                .offset { IntOffset(0, state.dragOffset.roundToInt()) }
                 .anchoredDraggable(state.anchoredDraggableState, Orientation.Vertical)
         ) {
             NowPlayingScreenBackground(

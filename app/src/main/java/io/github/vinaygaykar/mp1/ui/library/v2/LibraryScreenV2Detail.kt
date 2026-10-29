@@ -83,7 +83,6 @@ internal fun CategoryDetailScreen(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
-    onMiniPlayerHideProgressUpdate: (Float) -> Unit,
     onActionBarExpandedChange: (Boolean) -> Unit = {},
     onPlaySong: (Song, List<Song>) -> Unit,
     onAddToQueue: (Song) -> Unit,
@@ -99,7 +98,6 @@ internal fun CategoryDetailScreen(
     val collapsedFraction = scrollBehavior.state.collapsedFraction
 
     LaunchedEffect(collapsedFraction) {
-        onMiniPlayerHideProgressUpdate(collapsedFraction)
         onActionBarExpandedChange(collapsedFraction < 0.1f)
     }
 

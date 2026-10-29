@@ -106,8 +106,6 @@ fun MainScreen(
 
     var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
     var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
-    var miniPlayerHideProgress by remember { mutableFloatStateOf(0f) }
-    val isMiniPlayerPinned by playerViewModel.isMiniPlayerPinned.collectAsState()
 
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
@@ -148,8 +146,7 @@ fun MainScreen(
                                 onBulgeMiniPlayer = { miniPlayerBulgeTrigger = System.currentTimeMillis() },
                                 onSearchClick = { navController.navigate(Screen.Search.route) },
                                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                                onOpenScanLocations = { navController.navigate("scan_locations") },
-                                onMiniPlayerHideProgressUpdate = { miniPlayerHideProgress = it }
+                                onOpenScanLocations = { navController.navigate("scan_locations") }
                             ) 
                         }
                         composable(
@@ -229,8 +226,7 @@ fun MainScreen(
             lyricsControls = playerViewModel,
             onProgressUpdate = { expansionProgress.floatValue = it },
             visualizerState = visualizerState,
-            bulgeTrigger = miniPlayerBulgeTrigger,
-            hideProgress = if (isMiniPlayerPinned) 0f else miniPlayerHideProgress
+            bulgeTrigger = miniPlayerBulgeTrigger
         ) { offset -> miniPlayerTargetOffset = offset }
     }
 }
