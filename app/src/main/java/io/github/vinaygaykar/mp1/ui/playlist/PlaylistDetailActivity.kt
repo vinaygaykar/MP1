@@ -51,6 +51,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -160,6 +164,32 @@ fun PlaylistDetailScreen(
         }
 
         var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
+        var isMiniPlayerCollapsedOnScroll by remember { mutableStateOf(false) }
+
+        LaunchedEffect(playbackState.trackTitle) {
+            isMiniPlayerCollapsedOnScroll = false
+        }
+
+        LaunchedEffect(playbackState.isPlaying) {
+            if (isMiniPlayerCollapsedOnScroll) {
+                isMiniPlayerCollapsedOnScroll = false
+            }
+        }
+
+        val nestedScrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    val deltaY = available.y
+                    if (deltaY < -8f) {
+                        isMiniPlayerCollapsedOnScroll = true
+                    } else if (deltaY > 8f) {
+                        isMiniPlayerCollapsedOnScroll = false
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
+
         val flyingArtworks = remember { mutableStateListOf<FlyingArtworkItem>() }
         var rootOffsetInWindow by remember { mutableStateOf(Offset.Zero) }
         var rootSize by remember { mutableStateOf(IntSize.Zero) }
@@ -180,6 +210,7 @@ fun PlaylistDetailScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
                 .onGloballyPositioned { coords ->
                     rootOffsetInWindow = coords.positionInRoot()
                     rootSize = coords.size
@@ -353,7 +384,8 @@ fun PlaylistDetailScreen(
                 queueControls = playerViewModel,
                 lyricsControls = playerViewModel,
                 onProgressUpdate = { expansionProgress.floatValue = it },
-                visualizerState = visualizerState
+                visualizerState = visualizerState,
+                isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll
             ) { miniPlayerTargetOffset = it }
         }
     }

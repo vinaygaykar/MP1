@@ -112,6 +112,12 @@ fun MainScreen(
         isMiniPlayerCollapsedOnScroll = false
     }
 
+    LaunchedEffect(playbackState.isPlaying) {
+        if (isMiniPlayerCollapsedOnScroll) {
+            isMiniPlayerCollapsedOnScroll = false
+        }
+    }
+
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 

@@ -84,6 +84,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -234,6 +237,32 @@ fun AlbumDetailScreen(
 
         var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
         var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
+        var isMiniPlayerCollapsedOnScroll by remember { mutableStateOf(false) }
+
+        LaunchedEffect(playbackState.trackTitle) {
+            isMiniPlayerCollapsedOnScroll = false
+        }
+
+        LaunchedEffect(playbackState.isPlaying) {
+            if (isMiniPlayerCollapsedOnScroll) {
+                isMiniPlayerCollapsedOnScroll = false
+            }
+        }
+
+        val nestedScrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    val deltaY = available.y
+                    if (deltaY < -8f) {
+                        isMiniPlayerCollapsedOnScroll = true
+                    } else if (deltaY > 8f) {
+                        isMiniPlayerCollapsedOnScroll = false
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
+
         val flyingArtworks = remember { mutableStateListOf<FlyingArtworkItem>() }
         var rootOffsetInWindow by remember { mutableStateOf(Offset.Zero) }
         var rootSize by remember { mutableStateOf(IntSize.Zero) }
@@ -256,6 +285,7 @@ fun AlbumDetailScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
                 .onGloballyPositioned { coords ->
                     rootOffsetInWindow = coords.positionInRoot()
                     rootSize = coords.size
@@ -667,7 +697,8 @@ fun AlbumDetailScreen(
                 lyricsControls = playerViewModel,
                 onProgressUpdate = { expansionProgress.floatValue = it },
                 visualizerState = visualizerState,
-                bulgeTrigger = miniPlayerBulgeTrigger
+                bulgeTrigger = miniPlayerBulgeTrigger,
+                isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll
             ) { miniPlayerTargetOffset = it }
 
             // Multi-selection Bottom Sheet
