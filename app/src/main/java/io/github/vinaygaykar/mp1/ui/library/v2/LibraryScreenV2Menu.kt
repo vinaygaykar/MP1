@@ -313,7 +313,7 @@ private fun CategoryMenuLandscapeContent(
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        // Left Pane: MP.1 Title at Bottom Left
+        // 1st Pane: MP.1 Title at Bottom Left (reverted to original weight(1f) space)
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxHeight()
@@ -338,14 +338,14 @@ private fun CategoryMenuLandscapeContent(
             )
         }
 
-        // Right Pane: Scrollable Category List + Search and Settings icons
+        // 2nd Pane: Category List Content
         Column(
             modifier = Modifier
                 .fillMaxHeight()
                 .weight(1f)
                 .verticalScroll(scrollState)
                 .padding(bottom = bottomPadding)
-                .padding(start = 12.dp, end = 24.dp, top = 16.dp)
+                .padding(start = 12.dp, end = 12.dp, top = 16.dp)
         ) {
             // Scan Notice Banner
             AnimatedVisibility(
@@ -377,46 +377,6 @@ private fun CategoryMenuLandscapeContent(
                         }
                     }
                 )
-            }
-
-            // Search and Settings buttons
-            Row(
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp, end = 4.dp)
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(
-                        onClick = { onOpenCategory(LibraryCategory.SEARCH) },
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                    Surface(
-                        onClick = onSettingsClick,
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
             }
 
             // Category List Content
@@ -453,6 +413,74 @@ private fun CategoryMenuLandscapeContent(
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        }
+
+        // 3rd Pane (Required space only): Vertically Stacked Search and Settings Icons
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(start = 8.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+            contentAlignment = Alignment.TopStart
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    onClick = { onOpenCategory(LibraryCategory.SEARCH) },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                Surface(
+                    onClick = onSettingsClick,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Preview(
+    name = "Category Menu - Landscape Direct Preview",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Composable
+private fun CategoryMenuLandscapePreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            CategoryMenuLandscapeContent(
+                uiState = LibraryUiState(
+                    playlists = listOf(Playlist(id = 1L, name = "Favorites", songCount = 12)),
+                    isScanning = false
+                ),
+                displayFolder = null,
+                bottomPadding = 0.dp,
+                onOpenCategory = {},
+                onSettingsClick = {},
+                onOpenScanLocations = {},
+                categoryTitleModifiers = emptyMap()
+            )
         }
     }
 }
