@@ -223,14 +223,25 @@ fun LibraryContentV2(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     var previousOpenedCategory by remember { mutableStateOf<LibraryCategory?>(null) }
 
-    val nestedScrollConnection = remember(onMiniPlayerCollapseChange) {
+    val nestedScrollConnection = remember(onMiniPlayerCollapseChange, anchoredDraggableState, screenWidthPx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val deltaY = available.y
-                if (deltaY < -8f) {
+                val dragOffsetPx = try {
+                    anchoredDraggableState.requireOffset()
+                } catch (_: Exception) { 0f }
+                val currentDetailProgress = if (screenWidthPx > 0f) {
+                    ((screenWidthPx - dragOffsetPx) / screenWidthPx).coerceIn(0f, 1f)
+                } else 1f
+
+                if (currentDetailProgress > 0.5f) {
+                    if (deltaY < -8f) {
+                        onMiniPlayerCollapseChange(true)
+                    } else if (deltaY > 8f) {
+                        onMiniPlayerCollapseChange(false)
+                    }
+                } else {
                     onMiniPlayerCollapseChange(true)
-                } else if (deltaY > 8f) {
-                    onMiniPlayerCollapseChange(false)
                 }
                 return Offset.Zero
             }
@@ -238,8 +249,8 @@ fun LibraryContentV2(
     }
 
     fun openCategory(category: LibraryCategory) {
-        onMiniPlayerCollapseChange(false)
         if (category.isListCategory) {
+            onMiniPlayerCollapseChange(false)
             val isNewCategory = previousOpenedCategory != category
             if (isNewCategory) {
                 scrollBehavior.state.heightOffset = 0f
@@ -258,7 +269,7 @@ fun LibraryContentV2(
     }
 
     fun openCategoryMenu() {
-        onMiniPlayerCollapseChange(false)
+        onMiniPlayerCollapseChange(true)
         coroutineScope.launch {
             libraryState.animateToCollapsed()
         }
@@ -346,6 +357,11 @@ fun LibraryContentV2(
         LaunchedEffect(detailProgress) {
             if (detailProgress == 0f || detailProgress == 1f) {
                 shouldAnimateTransition = scrollBehavior.state.collapsedFraction <= 0.05f
+            }
+            if (detailProgress < 0.1f) {
+                onMiniPlayerCollapseChange(true)
+            } else if (detailProgress > 0.9f) {
+                onMiniPlayerCollapseChange(false)
             }
         }
 
