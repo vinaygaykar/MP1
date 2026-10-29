@@ -127,8 +127,7 @@ class PlayerViewModel @Inject constructor(
                     reason: Int
                 ) {
                     updateState()
-                    val isPlaylistChanged = reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
-                    updateQueueFromTimeline(timeline, forceRebuild = isPlaylistChanged)
+                    updateQueueFromTimeline(timeline, forceRebuild = false)
                 }
             })
             updateState()
@@ -736,6 +735,25 @@ class PlayerViewModel @Inject constructor(
         val windowIndices = currentWindowIndices
         val targetWindowIndex = windowIndices.getOrNull(index) ?: index
         if (targetWindowIndex in 0 until player.mediaItemCount) {
+            val currentItems = _queueState.value.items
+            if (index in currentItems.indices) {
+                val newItems = currentItems.toMutableList().apply { removeAt(index) }
+                val newWindowIndices = currentWindowIndices.toMutableList().apply { removeAt(index) }
+                    .map { w -> if (w > targetWindowIndex) w - 1 else w }
+
+                currentWindowIndices = newWindowIndices
+                val uiCurrentIndex = player.currentMediaItemIndex.let { cur ->
+                    val found = newWindowIndices.indexOf(cur)
+                    if (found != -1) found else _queueState.value.currentIndex.coerceIn(0, (newItems.size - 1).coerceAtLeast(0))
+                }
+
+                _queueState.update {
+                    QueueUiState(
+                        items = newItems.toPersistentList(),
+                        currentIndex = uiCurrentIndex
+                    )
+                }
+            }
             player.removeMediaItem(targetWindowIndex)
         }
     }
@@ -773,24 +791,49 @@ class PlayerViewModel @Inject constructor(
 
     override fun removeIndicesFromQueue(indices: Set<Int>) {
         val player = controller ?: return
-        val windowIndices = currentWindowIndices
-        val targetWindowIndices = indices.mapNotNull { windowIndices.getOrNull(it) }
-            .filter { it in 0 until player.mediaItemCount }
-            .sortedDescending()
-        for (wIndex in targetWindowIndices) {
+        val sortedUiIndices = indices.filter { it in _queueState.value.items.indices }.sortedDescending()
+        if (sortedUiIndices.isEmpty()) return
+
+        val newItems = _queueState.value.items.toMutableList()
+        val newWindowIndices = currentWindowIndices.toMutableList()
+
+        val targetWindowIndices = mutableListOf<Int>()
+        for (uiIndex in sortedUiIndices) {
+            val targetWindow = newWindowIndices.getOrNull(uiIndex) ?: uiIndex
+            if (targetWindow in 0 until player.mediaItemCount) {
+                targetWindowIndices.add(targetWindow)
+                newItems.removeAt(uiIndex)
+                newWindowIndices.removeAt(uiIndex)
+                for (i in newWindowIndices.indices) {
+                    if (newWindowIndices[i] > targetWindow) {
+                        newWindowIndices[i] = newWindowIndices[i] - 1
+                    }
+                }
+            }
+        }
+
+        currentWindowIndices = newWindowIndices
+        val uiCurrentIndex = player.currentMediaItemIndex.let { cur ->
+            val found = newWindowIndices.indexOf(cur)
+            if (found != -1) found else _queueState.value.currentIndex.coerceIn(0, (newItems.size - 1).coerceAtLeast(0))
+        }
+
+        _queueState.update {
+            QueueUiState(
+                items = newItems.toPersistentList(),
+                currentIndex = uiCurrentIndex
+            )
+        }
+
+        for (wIndex in targetWindowIndices.sortedDescending()) {
             player.removeMediaItem(wIndex)
         }
     }
 
     override fun removeOthersFromQueue(indicesToKeep: Set<Int>) {
-        val player = controller ?: return
-        val windowIndices = currentWindowIndices
-        val targetWindowIndicesToKeep = indicesToKeep.mapNotNull { windowIndices.getOrNull(it) }.toSet()
-        val totalCount = player.mediaItemCount
-        val indicesToRemove = (0 until totalCount).filter { it !in targetWindowIndicesToKeep }.sortedDescending()
-        for (wIndex in indicesToRemove) {
-            player.removeMediaItem(wIndex)
-        }
+        val allIndices = _queueState.value.items.indices.toSet()
+        val indicesToRemove = allIndices.filter { it !in indicesToKeep }.toSet()
+        removeIndicesFromQueue(indicesToRemove)
     }
 
     override fun playNextInQueue(indices: Set<Int>) {
