@@ -743,7 +743,6 @@ fun AlbumDetailScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongCardItem(
     song: Song,
@@ -903,68 +902,6 @@ fun SongCardItem(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ExpressiveButtonGroup(
-    onPlayClick: () -> Unit,
-    onShuffleClick: () -> Unit,
-    enabled: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Primary Button: Play
-        Button(
-            onClick = onPlayClick,
-            enabled = enabled,
-            modifier = Modifier.height(52.dp),
-            shape = RoundedCornerShape(
-                topStart = 28.dp,
-                bottomStart = 28.dp,
-                topEnd = 8.dp,
-                bottomEnd = 8.dp
-            ),
-            contentPadding = PaddingValues(start = 20.dp, end = 24.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Play",
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Play",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        // Secondary Button: Shuffle (Icon only)
-        FilledTonalButton(
-            onClick = onShuffleClick,
-            enabled = enabled,
-            modifier = Modifier
-                .height(52.dp)
-                .width(52.dp),
-            shape = RoundedCornerShape(
-                topStart = 8.dp,
-                bottomStart = 8.dp,
-                topEnd = 28.dp,
-                bottomEnd = 28.dp
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Shuffle,
-                contentDescription = "Shuffle",
-                modifier = Modifier.size(22.dp)
-            )
         }
     }
 }

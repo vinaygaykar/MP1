@@ -1,8 +1,14 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import android.content.res.Configuration
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,12 +21,20 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Deselect
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalView
@@ -100,9 +115,6 @@ fun QueueBottomSheet(
     }
 }
 
-
-
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QueueBottomSheetContent(
     queueState: QueueUiState,
@@ -110,9 +122,46 @@ fun QueueBottomSheetContent(
     isShuffleOn: Boolean = false,
     onShuffleToggle: () -> Unit = {},
     modifier: Modifier = Modifier,
-    onDismiss: () -> Unit = {}
+    onDismiss: () -> Unit = {},
+    initialSelectedIndices: Set<Int> = emptySet()
 ) {
-    var selectedIndices by remember { mutableStateOf(setOf<Int>()) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    if (isLandscape) {
+        QueueLandscapeContent(
+            queueState = queueState,
+            actions = actions,
+            isShuffleOn = isShuffleOn,
+            onShuffleToggle = onShuffleToggle,
+            modifier = modifier,
+            onDismiss = onDismiss,
+            initialSelectedIndices = initialSelectedIndices
+        )
+    } else {
+        QueuePortraitContent(
+            queueState = queueState,
+            actions = actions,
+            isShuffleOn = isShuffleOn,
+            onShuffleToggle = onShuffleToggle,
+            modifier = modifier,
+            onDismiss = onDismiss,
+            initialSelectedIndices = initialSelectedIndices
+        )
+    }
+}
+
+@Composable
+private fun QueuePortraitContent(
+    queueState: QueueUiState,
+    actions: QueueControls,
+    isShuffleOn: Boolean = false,
+    onShuffleToggle: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {},
+    initialSelectedIndices: Set<Int> = emptySet()
+) {
+    var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
     val isSelectionMode = selectedIndices.isNotEmpty()
     var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
 
@@ -132,6 +181,36 @@ fun QueueBottomSheetContent(
         selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
     }
 
+    val lazyListState = rememberLazyListState()
+    var draggedKey by remember { mutableStateOf<String?>(null) }
+    var isTitleVisible by remember { mutableStateOf(true) }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                if (draggedKey == null) {
+                    if (delta < -8f) {
+                        isTitleVisible = false
+                    } else if (delta > 8f) {
+                        isTitleVisible = true
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
+    LaunchedEffect(lazyListState) {
+        snapshotFlow {
+            lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset == 0
+        }.collect { isAtTop ->
+            if (isAtTop) {
+                isTitleVisible = true
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -145,68 +224,75 @@ fun QueueBottomSheetContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = 6.dp)
             ) {
-                // Top Drag Handle Indicator
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 36.dp, height = 4.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                    )
-                }
-
-                // "Playing Queue" Title & Track Count
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                // "Playing Queue" Title & Track Count (Hides on scroll)
+                AnimatedVisibility(
+                    visible = isTitleVisible,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
                 ) {
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "Playing Queue",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "${queueState.items.size}",
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                text = "Playing Queue",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ) {
+                                Text(
+                                    text = "${queueState.items.size}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        // Dismiss Chevron Down Button
+                        FilledTonalIconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(32.dp),
+                            shape = CircleShape,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "Dismiss",
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
-                // Selection or Queue Actions Row
+                // Selection or Queue Actions Row (Static)
                 if (isSelectionMode) {
                     SelectionActionRow(
                         selectedCount = selectedIndices.size,
                         onSelectAll = { selectedIndices = queueState.items.indices.toSet() },
                         onDeselect = { selectedIndices = emptySet() },
-                        onOptionsClick = { showQueueMultiSelectionSheet = true },
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        onOptionsClick = { showQueueMultiSelectionSheet = true }
                     )
                 } else if (queueState.items.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -215,7 +301,7 @@ fun QueueBottomSheetContent(
                             targetValue = if (isShuffleOn) {
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
-                                MaterialTheme.colorScheme.surfaceContainerLowest
+                                MaterialTheme.colorScheme.surfaceContainerHigh
                             },
                             label = "shuffle_btn_bg"
                         )
@@ -223,17 +309,24 @@ fun QueueBottomSheetContent(
                             targetValue = if (isShuffleOn) {
                                 MaterialTheme.colorScheme.onPrimaryContainer
                             } else {
-                                MaterialTheme.colorScheme.onSurface
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             label = "shuffle_btn_content"
                         )
 
                         // Clear All Button (Left)
-                        OutlinedButton(
+                        FilledTonalButton(
                             onClick = { actions.clearQueue() },
                             enabled = queueState.items.size > 1,
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.height(40.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.ClearAll,
@@ -244,7 +337,7 @@ fun QueueBottomSheetContent(
                             Text(
                                 text = "Clear All",
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Medium
                             )
                         }
 
@@ -252,14 +345,15 @@ fun QueueBottomSheetContent(
                         FilledTonalButton(
                             onClick = { onShuffleToggle() },
                             enabled = isShuffleEnabled,
-                            shape = CircleShape,
+                            shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = shuffleContainerColor,
                                 contentColor = shuffleContentColor,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.5f),
-                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                             ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.height(40.dp)
                         ) {
                             Icon(
                                 imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
@@ -270,7 +364,7 @@ fun QueueBottomSheetContent(
                             Text(
                                 text = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -293,8 +387,6 @@ fun QueueBottomSheetContent(
                 )
             }
         } else {
-            val lazyListState = rememberLazyListState()
-            var draggedKey by remember { mutableStateOf<String?>(null) }
             var dragOffsetY by remember { mutableFloatStateOf(0f) }
             val coroutineScope = rememberCoroutineScope()
 
@@ -324,6 +416,7 @@ fun QueueBottomSheetContent(
                     .fillMaxWidth()
                     .weight(1f)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .nestedScroll(nestedScrollConnection)
             ) {
                 LazyColumn(
                     state = lazyListState,
@@ -413,6 +506,461 @@ fun QueueBottomSheetContent(
                     modifier = Modifier.align(Alignment.CenterEnd),
                     paddingEnd = 8.dp
                 )
+            }
+        }
+    }
+
+    if (showQueueMultiSelectionSheet) {
+        val selectedItems = remember(selectedIndices, queueState.items) {
+            selectedIndices.mapNotNull { queueState.items.getOrNull(it) }
+        }
+
+        QueueMultiSelectionBottomSheet(
+            selectedItems = selectedItems,
+            onDismiss = { showQueueMultiSelectionSheet = false },
+            onRemoveFromQueue = {
+                actions.removeIndicesFromQueue(selectedIndices)
+                selectedIndices = emptySet()
+            },
+            onRemoveOthersFromQueue = {
+                actions.removeOthersFromQueue(selectedIndices)
+                selectedIndices = emptySet()
+            },
+            onPlayNext = {
+                actions.playNextInQueue(selectedIndices)
+                selectedIndices = emptySet()
+            }
+        )
+    }
+
+    Spacer(modifier = Modifier.navigationBarsPadding())
+}
+
+@Composable
+private fun QueueLandscapeContent(
+    queueState: QueueUiState,
+    actions: QueueControls,
+    isShuffleOn: Boolean = false,
+    onShuffleToggle: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {},
+    initialSelectedIndices: Set<Int> = emptySet()
+) {
+    var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
+    val isSelectionMode = selectedIndices.isNotEmpty()
+    var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
+
+    fun toggleSelection(index: Int) {
+        selectedIndices = if (selectedIndices.contains(index)) {
+            selectedIndices - index
+        } else {
+            selectedIndices + index
+        }
+    }
+
+    BackHandler(enabled = isSelectionMode) {
+        selectedIndices = emptySet()
+    }
+
+    LaunchedEffect(queueState.items.size) {
+        selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
+        // Left Pane (occupy all available space)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        ) {
+            if (queueState.items.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Non-sticky Action Bar
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Playing Queue",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ) {
+                                        Text(
+                                            text = "0",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No items in queue",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                val lazyListState = rememberLazyListState()
+                var draggedKey by remember { mutableStateOf<String?>(null) }
+                var dragOffsetY by remember { mutableFloatStateOf(0f) }
+                val coroutineScope = rememberCoroutineScope()
+
+                var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
+
+                LaunchedEffect(queueState.currentIndex, queueState.items.size) {
+                    if (!hasScrolledToInitialPosition && queueState.currentIndex in queueState.items.indices) {
+                        lazyListState.scrollToItem(index = queueState.currentIndex)
+                        hasScrolledToInitialPosition = true
+                    }
+                }
+
+                val itemKeys = remember(queueState.items) {
+                    val counts = mutableMapOf<Int, Int>()
+                    queueState.items.map { item ->
+                        val identity = System.identityHashCode(item)
+                        val count = counts.getOrDefault(identity, 0)
+                        counts[identity] = count + 1
+                        val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
+                        if (count == 0) "${baseId}_$identity" else "${baseId}_${identity}_$count"
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Header Surface (Playing Queue Title Row)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Playing Queue",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ) {
+                                        Text(
+                                            text = "${queueState.items.size}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ) {
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)
+                        ) {
+                            itemsIndexed(
+                                items = queueState.items,
+                                key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
+                            ) { index, item ->
+                                val itemKey = itemKeys.getOrElse(index) { "item_$index" }
+                                val isCurrent = index == queueState.currentIndex
+                                val isSelected = selectedIndices.contains(index)
+                                val isBeingDragged = draggedKey == itemKey
+
+                                QueueItemRow(
+                                    item = item,
+                                    isCurrent = isCurrent,
+                                    isBeingDragged = isBeingDragged,
+                                    dragOffsetY = if (isBeingDragged) dragOffsetY else 0f,
+                                    onSelect = {
+                                        if (isSelectionMode) {
+                                            toggleSelection(index)
+                                        } else {
+                                            actions.onSkipToQueueItem(index)
+                                        }
+                                    },
+                                    onRemove = {
+                                        actions.removeFromQueue(index)
+                                    },
+                                    onDragStart = {
+                                        draggedKey = itemKey
+                                        dragOffsetY = 0f
+                                    },
+                                    onDrag = { deltaY ->
+                                        dragOffsetY += deltaY
+                                        val layoutInfo = lazyListState.layoutInfo
+                                        val visibleItems = layoutInfo.visibleItemsInfo
+                                        val currentItemInfo = visibleItems.find { it.key == draggedKey }
+
+                                        if (currentItemInfo != null) {
+                                            val threshold = currentItemInfo.size / 2f
+                                            val currentIndex = visibleItems.indexOf(currentItemInfo)
+
+                                            if (dragOffsetY > threshold && currentIndex < visibleItems.size - 1) {
+                                                val targetItem = visibleItems[currentIndex + 1]
+                                                val fromIdx = currentItemInfo.index
+                                                val toIdx = targetItem.index
+                                                if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
+                                                    actions.moveQueueItem(fromIdx, toIdx)
+                                                    dragOffsetY -= currentItemInfo.size
+                                                }
+                                            } else if (dragOffsetY < -threshold && currentIndex > 0) {
+                                                val targetItem = visibleItems[currentIndex - 1]
+                                                val fromIdx = currentItemInfo.index
+                                                val toIdx = targetItem.index
+                                                if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
+                                                    actions.moveQueueItem(fromIdx, toIdx)
+                                                    dragOffsetY += currentItemInfo.size
+                                                }
+                                            }
+
+                                            val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                                            val topBounds = currentItemInfo.offset + dragOffsetY
+                                            val bottomBounds = topBounds + currentItemInfo.size
+
+                                            if (bottomBounds > viewportHeight - 50) {
+                                                coroutineScope.launch { lazyListState.scrollBy(15f) }
+                                            } else if (topBounds < 50) {
+                                                coroutineScope.launch { lazyListState.scrollBy(-15f) }
+                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggedKey = null
+                                        dragOffsetY = 0f
+                                    },
+                                    isSelected = isSelected,
+                                    isSelectionMode = isSelectionMode,
+                                    onLongClick = { toggleSelection(index) }
+                                )
+                            }
+                        }
+
+                        SimpleScrollBar(
+                            listState = lazyListState,
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                            paddingEnd = 8.dp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Right Pane (occupy only required space)
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .wrapContentWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Dismiss Chevron Down Button (first icon in landscape right pane)
+            FilledTonalIconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(32.dp),
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "Dismiss",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (isSelectionMode) {
+                // Multi-select controls in Right Pane
+                // 1. Vertical pill button containing kebab icon (top) and count (below)
+                Surface(
+                    onClick = { showQueueMultiSelectionSheet = true },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.width(48.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreHoriz,
+                            contentDescription = "More Options",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "${selectedIndices.size}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+
+                // Spacer to push All and None buttons to the bottom of the right pane
+                Spacer(modifier = Modifier.weight(1f))
+
+                // 2. Select All button (icon only)
+                FilledTonalIconButton(
+                    onClick = { selectedIndices = queueState.items.indices.toSet() },
+                    modifier = Modifier.size(48.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SelectAll,
+                        contentDescription = "Select All",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 3. Deselect button (icon only, at bottom)
+                FilledTonalIconButton(
+                    onClick = { selectedIndices = emptySet() },
+                    modifier = Modifier.size(48.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Deselect,
+                        contentDescription = "Deselect",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                // Standard controls in Right Pane (Clear All & Shuffle)
+                val isShuffleEnabled = queueState.items.size > 1
+                val isClearEnabled = queueState.items.size > 1
+
+                val shuffleContainerColor by animateColorAsState(
+                    targetValue = if (isShuffleOn) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    label = "shuffle_btn_bg_land"
+                )
+                val shuffleContentColor by animateColorAsState(
+                    targetValue = if (isShuffleOn) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    label = "shuffle_btn_content_land"
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Clear All Button (top)
+                FilledTonalIconButton(
+                    onClick = { actions.clearQueue() },
+                    enabled = isClearEnabled,
+                    modifier = Modifier.size(48.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ClearAll,
+                        contentDescription = "Clear All",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Shuffle Button
+                FilledTonalIconButton(
+                    onClick = { onShuffleToggle() },
+                    enabled = isShuffleEnabled,
+                    modifier = Modifier.size(48.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = shuffleContainerColor,
+                        contentColor = shuffleContentColor,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                        contentDescription = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }
@@ -686,142 +1234,160 @@ fun QueueMultiSelectionBottomSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
-        Column(
+        QueueMultiSelectionBottomSheetContent(
+            selectedItems = selectedItems,
+            onDismiss = onDismiss,
+            onRemoveFromQueue = onRemoveFromQueue,
+            onRemoveOthersFromQueue = onRemoveOthersFromQueue,
+            onPlayNext = onPlayNext
+        )
+    }
+}
+
+@Composable
+fun QueueMultiSelectionBottomSheetContent(
+    selectedItems: List<MediaItem>,
+    onDismiss: () -> Unit = {},
+    onRemoveFromQueue: () -> Unit = {},
+    onRemoveOthersFromQueue: () -> Unit = {},
+    onPlayNext: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
+    ) {
+        // First Row: Overlapping circular artworks on left, selected count on right
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // First Row: Overlapping circular artworks on left, selected count on right
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                OverlappingMediaItemArtworksRow(items = selectedItems)
+            OverlappingMediaItemArtworksRow(items = selectedItems)
 
-                Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${selectedItems.size}",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = if (selectedItems.size == 1) "Song Selected" else "Songs Selected",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "${selectedItems.size}",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = if (selectedItems.size == 1) "Song Selected" else "Songs Selected",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+        }
 
-            Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-            // Row 1: Remove and Remove others
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Remove button
-                FilledTonalButton(
-                    onClick = {
-                        onRemoveFromQueue()
-                        onDismiss()
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    ),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.DeleteOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Remove",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
-
-                // Remove others button
-                FilledTonalButton(
-                    onClick = {
-                        onRemoveOthersFromQueue()
-                        onDismiss()
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.ClearAll,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Remove others",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Row 2: Play next
-            Button(
+        // Row 1: Remove and Remove others
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Remove button
+            FilledTonalButton(
                 onClick = {
-                    onPlayNext()
+                    onRemoveFromQueue()
                     onDismiss()
                 },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                    .weight(1f)
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.PlaylistPlay,
+                    imageVector = Icons.Rounded.DeleteOutline,
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(18.dp)
                 )
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Play next",
+                    text = "Remove",
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // Remove others button
+            FilledTonalButton(
+                onClick = {
+                    onRemoveOthersFromQueue()
+                    onDismiss()
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ClearAll,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Remove others",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Row 2: Play next
+        Button(
+            onClick = {
+                onPlayNext()
+                onDismiss()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.PlaylistPlay,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Play next",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
     }
 }
 
@@ -873,6 +1439,188 @@ private fun OverlappingMediaItemArtworksRow(
                         modifier = Modifier.size(28.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+private val samplePreviewQueueItems = persistentListOf(
+    MediaItem.Builder()
+        .setMediaId("1")
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle("Midnight City")
+                .setArtist("M83")
+                .build()
+        )
+        .build(),
+    MediaItem.Builder()
+        .setMediaId("2")
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle("Get Lucky")
+                .setArtist("Daft Punk ft. Pharrell Williams")
+                .build()
+        )
+        .build(),
+    MediaItem.Builder()
+        .setMediaId("3")
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle("Starboy")
+                .setArtist("The Weeknd")
+                .build()
+        )
+        .build()
+)
+
+private val samplePreviewQueueState = QueueUiState(
+    items = samplePreviewQueueItems,
+    currentIndex = 0
+)
+
+private val samplePreviewQueueActions = object : QueueControls {
+    override fun addToQueue(mediaItem: MediaItem) {}
+    override fun onSkipToQueueItem(index: Int) {}
+    override fun removeFromQueue(index: Int) {}
+    override fun moveQueueItem(fromIndex: Int, toIndex: Int) {}
+    override fun clearQueue() {}
+}
+
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 1: Standard Playing Queue Screen
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "1. Queue Screen - Standard",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "1. Queue Screen - Standard",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "1. Queue Screen - Standard",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "1. Queue Screen - Standard",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun QueueScreenStandardPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            QueueBottomSheetContent(
+                queueState = samplePreviewQueueState,
+                actions = samplePreviewQueueActions,
+                isShuffleOn = false
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 2: Multi-Select Mode Queue Screen
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "2. Queue Screen - Multi Select Mode",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "2. Queue Screen - Multi Select Mode",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "2. Queue Screen - Multi Select Mode",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "2. Queue Screen - Multi Select Mode",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun QueueScreenMultiSelectPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            QueueBottomSheetContent(
+                queueState = samplePreviewQueueState,
+                actions = samplePreviewQueueActions,
+                isShuffleOn = false,
+                initialSelectedIndices = setOf(0, 1)
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 3: Multi-Select Bottom Sheet
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "3. Multi Select Bottom Sheet",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "3. Multi Select Bottom Sheet",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "3. Multi Select Bottom Sheet",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "3. Multi Select Bottom Sheet",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun QueueMultiSelectBottomSheetPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(contentAlignment = Alignment.BottomCenter) {
+                QueueMultiSelectionBottomSheetContent(
+                    selectedItems = samplePreviewQueueItems.take(2)
+                )
             }
         }
     }
