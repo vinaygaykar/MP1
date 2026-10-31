@@ -152,6 +152,273 @@ fun QueueBottomSheetContent(
 }
 
 @Composable
+private fun QueueHeaderTitle(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+    ) {
+        Text(
+            text = "Playing Queue",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        ) {
+            Text(
+                text = "$count",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DismissIconButton(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FilledTonalIconButton(
+        onClick = onDismiss,
+        modifier = modifier.size(32.dp),
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.KeyboardArrowDown,
+            contentDescription = "Dismiss",
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.QueueItemList(
+    queueState: QueueUiState,
+    actions: QueueControls,
+    selectedIndices: Set<Int>,
+    onToggleSelection: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    onTitleVisibilityChange: ((Boolean) -> Unit)? = null
+) {
+    if (queueState.items.isEmpty()) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No items in queue",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        val lazyListState = rememberLazyListState()
+        var draggedKey by remember { mutableStateOf<String?>(null) }
+        var dragOffsetY by remember { mutableFloatStateOf(0f) }
+        val coroutineScope = rememberCoroutineScope()
+
+        var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
+
+        val nestedScrollConnection = remember(onTitleVisibilityChange) {
+            if (onTitleVisibilityChange != null) {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        val delta = available.y
+                        if (draggedKey == null) {
+                            if (delta < -8f) {
+                                onTitleVisibilityChange(false)
+                            } else if (delta > 8f) {
+                                onTitleVisibilityChange(true)
+                            }
+                        }
+                        return Offset.Zero
+                    }
+                }
+            } else null
+        }
+
+        LaunchedEffect(lazyListState, onTitleVisibilityChange) {
+            if (onTitleVisibilityChange != null) {
+                snapshotFlow {
+                    lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset == 0
+                }.collect { isAtTop ->
+                    if (isAtTop) {
+                        onTitleVisibilityChange(true)
+                    }
+                }
+            }
+        }
+
+        LaunchedEffect(queueState.currentIndex, queueState.items.size) {
+            if (!hasScrolledToInitialPosition && queueState.currentIndex in queueState.items.indices) {
+                lazyListState.scrollToItem(index = queueState.currentIndex)
+                hasScrolledToInitialPosition = true
+            }
+        }
+
+        val itemKeys = remember(queueState.items) {
+            val counts = mutableMapOf<Int, Int>()
+            queueState.items.map { item ->
+                val identity = System.identityHashCode(item)
+                val count = counts.getOrDefault(identity, 0)
+                counts[identity] = count + 1
+                val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
+                if (count == 0) "${baseId}_$identity" else "${baseId}_${identity}_$count"
+            }
+        }
+
+        val isSelectionMode = selectedIndices.isNotEmpty()
+
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .then(
+                    if (nestedScrollConnection != null) {
+                        Modifier.nestedScroll(nestedScrollConnection)
+                    } else Modifier
+                )
+        ) {
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)
+            ) {
+                itemsIndexed(
+                    items = queueState.items,
+                    key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
+                ) { index, item ->
+                    val itemKey = itemKeys.getOrElse(index) { "item_$index" }
+                    val isCurrent = index == queueState.currentIndex
+                    val isSelected = selectedIndices.contains(index)
+                    val isBeingDragged = draggedKey == itemKey
+
+                    QueueItemRow(
+                        item = item,
+                        isCurrent = isCurrent,
+                        isBeingDragged = isBeingDragged,
+                        dragOffsetY = if (isBeingDragged) dragOffsetY else 0f,
+                        onSelect = {
+                            if (isSelectionMode) {
+                                onToggleSelection(index)
+                            } else {
+                                actions.onSkipToQueueItem(index)
+                            }
+                        },
+                        onRemove = {
+                            actions.removeFromQueue(index)
+                        },
+                        onDragStart = {
+                            draggedKey = itemKey
+                            dragOffsetY = 0f
+                        },
+                        onDrag = { deltaY ->
+                            dragOffsetY += deltaY
+                            val layoutInfo = lazyListState.layoutInfo
+                            val visibleItems = layoutInfo.visibleItemsInfo
+                            val currentItemInfo = visibleItems.find { it.key == draggedKey }
+
+                            if (currentItemInfo != null) {
+                                val threshold = currentItemInfo.size / 2f
+                                val currentIndex = visibleItems.indexOf(currentItemInfo)
+
+                                if (dragOffsetY > threshold && currentIndex < visibleItems.size - 1) {
+                                    val targetItem = visibleItems[currentIndex + 1]
+                                    val fromIdx = currentItemInfo.index
+                                    val toIdx = targetItem.index
+                                    if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
+                                        actions.moveQueueItem(fromIdx, toIdx)
+                                        dragOffsetY -= currentItemInfo.size
+                                    }
+                                } else if (dragOffsetY < -threshold && currentIndex > 0) {
+                                    val targetItem = visibleItems[currentIndex - 1]
+                                    val fromIdx = currentItemInfo.index
+                                    val toIdx = targetItem.index
+                                    if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
+                                        actions.moveQueueItem(fromIdx, toIdx)
+                                        dragOffsetY += currentItemInfo.size
+                                    }
+                                }
+
+                                val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                                val topBounds = currentItemInfo.offset + dragOffsetY
+                                val bottomBounds = topBounds + currentItemInfo.size
+
+                                if (bottomBounds > viewportHeight - 50) {
+                                    coroutineScope.launch { lazyListState.scrollBy(15f) }
+                                } else if (topBounds < 50) {
+                                    coroutineScope.launch { lazyListState.scrollBy(-15f) }
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            draggedKey = null
+                            dragOffsetY = 0f
+                        },
+                        isSelected = isSelected,
+                        isSelectionMode = isSelectionMode,
+                        onLongClick = { onToggleSelection(index) }
+                    )
+                }
+            }
+
+            SimpleScrollBar(
+                listState = lazyListState,
+                modifier = Modifier.align(Alignment.CenterEnd),
+                paddingEnd = 8.dp
+            )
+        }
+    }
+}
+
+@Composable
+private fun QueueMultiSelectionSheetHost(
+    showSheet: Boolean,
+    selectedIndices: Set<Int>,
+    items: List<MediaItem>,
+    actions: QueueControls,
+    onDismissSheet: () -> Unit,
+    onClearSelection: () -> Unit
+) {
+    if (showSheet) {
+        val selectedItems = remember(selectedIndices, items) {
+            selectedIndices.mapNotNull { items.getOrNull(it) }
+        }
+
+        QueueMultiSelectionBottomSheet(
+            selectedItems = selectedItems,
+            onDismiss = onDismissSheet,
+            onRemoveFromQueue = {
+                actions.removeIndicesFromQueue(selectedIndices)
+                onClearSelection()
+            },
+            onRemoveOthersFromQueue = {
+                actions.removeOthersFromQueue(selectedIndices)
+                onClearSelection()
+            },
+            onPlayNext = {
+                actions.playNextInQueue(selectedIndices)
+                onClearSelection()
+            }
+        )
+    }
+}
+
+@Composable
 private fun QueuePortraitContent(
     queueState: QueueUiState,
     actions: QueueControls,
@@ -164,6 +431,7 @@ private fun QueuePortraitContent(
     var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
     val isSelectionMode = selectedIndices.isNotEmpty()
     var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
+    var isTitleVisible by remember { mutableStateOf(true) }
 
     fun toggleSelection(index: Int) {
         selectedIndices = if (selectedIndices.contains(index)) {
@@ -179,36 +447,6 @@ private fun QueuePortraitContent(
 
     LaunchedEffect(queueState.items.size) {
         selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
-    }
-
-    val lazyListState = rememberLazyListState()
-    var draggedKey by remember { mutableStateOf<String?>(null) }
-    var isTitleVisible by remember { mutableStateOf(true) }
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val delta = available.y
-                if (draggedKey == null) {
-                    if (delta < -8f) {
-                        isTitleVisible = false
-                    } else if (delta > 8f) {
-                        isTitleVisible = true
-                    }
-                }
-                return Offset.Zero
-            }
-        }
-    }
-
-    LaunchedEffect(lazyListState) {
-        snapshotFlow {
-            lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset == 0
-        }.collect { isAtTop ->
-            if (isAtTop) {
-                isTitleVisible = true
-            }
-        }
     }
 
     Column(
@@ -239,44 +477,8 @@ private fun QueuePortraitContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "Playing Queue",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ) {
-                                Text(
-                                    text = "${queueState.items.size}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-
-                        // Dismiss Chevron Down Button
-                        FilledTonalIconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.size(32.dp),
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Dismiss",
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        QueueHeaderTitle(count = queueState.items.size)
+                        DismissIconButton(onDismiss = onDismiss)
                     }
                 }
 
@@ -372,166 +574,23 @@ private fun QueuePortraitContent(
             }
         }
 
-        // Queue Body: Songs List or Empty State
-        if (queueState.items.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No items in queue",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            var dragOffsetY by remember { mutableFloatStateOf(0f) }
-            val coroutineScope = rememberCoroutineScope()
-
-            var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
-
-            // Scroll to current playing song ONCE when sheet opens
-            LaunchedEffect(queueState.currentIndex, queueState.items.size) {
-                if (!hasScrolledToInitialPosition && queueState.currentIndex in queueState.items.indices) {
-                    lazyListState.scrollToItem(index = queueState.currentIndex)
-                    hasScrolledToInitialPosition = true
-                }
-            }
-
-            val itemKeys = remember(queueState.items) {
-                val counts = mutableMapOf<Int, Int>()
-                queueState.items.map { item ->
-                    val identity = System.identityHashCode(item)
-                    val count = counts.getOrDefault(identity, 0)
-                    counts[identity] = count + 1
-                    val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
-                    if (count == 0) "${baseId}_$identity" else "${baseId}_${identity}_$count"
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .nestedScroll(nestedScrollConnection)
-            ) {
-                LazyColumn(
-                    state = lazyListState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)
-                ) {
-                    itemsIndexed(
-                        items = queueState.items,
-                        key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
-                    ) { index, item ->
-                        val itemKey = itemKeys.getOrElse(index) { "item_$index" }
-                        val isCurrent = index == queueState.currentIndex
-                        val isSelected = selectedIndices.contains(index)
-                        val isBeingDragged = draggedKey == itemKey
-
-                        QueueItemRow(
-                            item = item,
-                            isCurrent = isCurrent,
-                            isBeingDragged = isBeingDragged,
-                            dragOffsetY = if (isBeingDragged) dragOffsetY else 0f,
-                            onSelect = {
-                                if (isSelectionMode) {
-                                    toggleSelection(index)
-                                } else {
-                                    actions.onSkipToQueueItem(index)
-                                }
-                            },
-                            onRemove = {
-                                actions.removeFromQueue(index)
-                            },
-                            onDragStart = {
-                                draggedKey = itemKey
-                                dragOffsetY = 0f
-                            },
-                            onDrag = { deltaY ->
-                                dragOffsetY += deltaY
-                                val layoutInfo = lazyListState.layoutInfo
-                                val visibleItems = layoutInfo.visibleItemsInfo
-                                val currentItemInfo = visibleItems.find { it.key == draggedKey }
-
-                                if (currentItemInfo != null) {
-                                    val threshold = currentItemInfo.size / 2f
-                                    val currentIndex = visibleItems.indexOf(currentItemInfo)
-
-                                    if (dragOffsetY > threshold && currentIndex < visibleItems.size - 1) {
-                                        val targetItem = visibleItems[currentIndex + 1]
-                                        val fromIdx = currentItemInfo.index
-                                        val toIdx = targetItem.index
-                                        if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
-                                            actions.moveQueueItem(fromIdx, toIdx)
-                                            dragOffsetY -= currentItemInfo.size
-                                        }
-                                    } else if (dragOffsetY < -threshold && currentIndex > 0) {
-                                        val targetItem = visibleItems[currentIndex - 1]
-                                        val fromIdx = currentItemInfo.index
-                                        val toIdx = targetItem.index
-                                        if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
-                                            actions.moveQueueItem(fromIdx, toIdx)
-                                            dragOffsetY += currentItemInfo.size
-                                        }
-                                    }
-
-                                    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-                                    val topBounds = currentItemInfo.offset + dragOffsetY
-                                    val bottomBounds = topBounds + currentItemInfo.size
-
-                                    if (bottomBounds > viewportHeight - 50) {
-                                        coroutineScope.launch { lazyListState.scrollBy(15f) }
-                                    } else if (topBounds < 50) {
-                                        coroutineScope.launch { lazyListState.scrollBy(-15f) }
-                                    }
-                                }
-                            },
-                            onDragEnd = {
-                                draggedKey = null
-                                dragOffsetY = 0f
-                            },
-                            isSelected = isSelected,
-                            isSelectionMode = isSelectionMode,
-                            onLongClick = { toggleSelection(index) }
-                        )
-                    }
-                }
-
-                SimpleScrollBar(
-                    listState = lazyListState,
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    paddingEnd = 8.dp
-                )
-            }
-        }
-    }
-
-    if (showQueueMultiSelectionSheet) {
-        val selectedItems = remember(selectedIndices, queueState.items) {
-            selectedIndices.mapNotNull { queueState.items.getOrNull(it) }
-        }
-
-        QueueMultiSelectionBottomSheet(
-            selectedItems = selectedItems,
-            onDismiss = { showQueueMultiSelectionSheet = false },
-            onRemoveFromQueue = {
-                actions.removeIndicesFromQueue(selectedIndices)
-                selectedIndices = emptySet()
-            },
-            onRemoveOthersFromQueue = {
-                actions.removeOthersFromQueue(selectedIndices)
-                selectedIndices = emptySet()
-            },
-            onPlayNext = {
-                actions.playNextInQueue(selectedIndices)
-                selectedIndices = emptySet()
-            }
+        QueueItemList(
+            queueState = queueState,
+            actions = actions,
+            selectedIndices = selectedIndices,
+            onToggleSelection = ::toggleSelection,
+            onTitleVisibilityChange = { isTitleVisible = it }
         )
     }
+
+    QueueMultiSelectionSheetHost(
+        showSheet = showQueueMultiSelectionSheet,
+        selectedIndices = selectedIndices,
+        items = queueState.items,
+        actions = actions,
+        onDismissSheet = { showQueueMultiSelectionSheet = false },
+        onClearSelection = { selectedIndices = emptySet() }
+    )
 
     Spacer(modifier = Modifier.navigationBarsPadding())
 }
@@ -549,6 +608,7 @@ private fun QueueLandscapeContent(
     var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
     val isSelectionMode = selectedIndices.isNotEmpty()
     var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
+    var isTitleVisible by remember { mutableStateOf(true) }
 
     fun toggleSelection(index: Int) {
         selectedIndices = if (selectedIndices.contains(index)) {
@@ -572,238 +632,46 @@ private fun QueueLandscapeContent(
             .statusBarsPadding()
     ) {
         // Left Pane (occupy all available space)
-        Box(
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            if (queueState.items.isEmpty()) {
+            // Header Surface (Playing Queue Title Row)
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
                 ) {
-                    // Non-sticky Action Bar
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxWidth()
+                    AnimatedVisibility(
+                        visible = isTitleVisible,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp)
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = "Playing Queue",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    ) {
-                                        Text(
-                                            text = "0",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                            }
+                            QueueHeaderTitle(count = queueState.items.size)
                         }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No items in queue",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-                val lazyListState = rememberLazyListState()
-                var draggedKey by remember { mutableStateOf<String?>(null) }
-                var dragOffsetY by remember { mutableFloatStateOf(0f) }
-                val coroutineScope = rememberCoroutineScope()
-
-                var hasScrolledToInitialPosition by remember { mutableStateOf(false) }
-
-                LaunchedEffect(queueState.currentIndex, queueState.items.size) {
-                    if (!hasScrolledToInitialPosition && queueState.currentIndex in queueState.items.indices) {
-                        lazyListState.scrollToItem(index = queueState.currentIndex)
-                        hasScrolledToInitialPosition = true
-                    }
-                }
-
-                val itemKeys = remember(queueState.items) {
-                    val counts = mutableMapOf<Int, Int>()
-                    queueState.items.map { item ->
-                        val identity = System.identityHashCode(item)
-                        val count = counts.getOrDefault(identity, 0)
-                        counts[identity] = count + 1
-                        val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
-                        if (count == 0) "${baseId}_$identity" else "${baseId}_${identity}_$count"
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Header Surface (Playing Queue Title Row)
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = "Playing Queue",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    ) {
-                                        Text(
-                                            text = "${queueState.items.size}",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    ) {
-                        LazyColumn(
-                            state = lazyListState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)
-                        ) {
-                            itemsIndexed(
-                                items = queueState.items,
-                                key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
-                            ) { index, item ->
-                                val itemKey = itemKeys.getOrElse(index) { "item_$index" }
-                                val isCurrent = index == queueState.currentIndex
-                                val isSelected = selectedIndices.contains(index)
-                                val isBeingDragged = draggedKey == itemKey
-
-                                QueueItemRow(
-                                    item = item,
-                                    isCurrent = isCurrent,
-                                    isBeingDragged = isBeingDragged,
-                                    dragOffsetY = if (isBeingDragged) dragOffsetY else 0f,
-                                    onSelect = {
-                                        if (isSelectionMode) {
-                                            toggleSelection(index)
-                                        } else {
-                                            actions.onSkipToQueueItem(index)
-                                        }
-                                    },
-                                    onRemove = {
-                                        actions.removeFromQueue(index)
-                                    },
-                                    onDragStart = {
-                                        draggedKey = itemKey
-                                        dragOffsetY = 0f
-                                    },
-                                    onDrag = { deltaY ->
-                                        dragOffsetY += deltaY
-                                        val layoutInfo = lazyListState.layoutInfo
-                                        val visibleItems = layoutInfo.visibleItemsInfo
-                                        val currentItemInfo = visibleItems.find { it.key == draggedKey }
-
-                                        if (currentItemInfo != null) {
-                                            val threshold = currentItemInfo.size / 2f
-                                            val currentIndex = visibleItems.indexOf(currentItemInfo)
-
-                                            if (dragOffsetY > threshold && currentIndex < visibleItems.size - 1) {
-                                                val targetItem = visibleItems[currentIndex + 1]
-                                                val fromIdx = currentItemInfo.index
-                                                val toIdx = targetItem.index
-                                                if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
-                                                    actions.moveQueueItem(fromIdx, toIdx)
-                                                    dragOffsetY -= currentItemInfo.size
-                                                }
-                                            } else if (dragOffsetY < -threshold && currentIndex > 0) {
-                                                val targetItem = visibleItems[currentIndex - 1]
-                                                val fromIdx = currentItemInfo.index
-                                                val toIdx = targetItem.index
-                                                if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
-                                                    actions.moveQueueItem(fromIdx, toIdx)
-                                                    dragOffsetY += currentItemInfo.size
-                                                }
-                                            }
-
-                                            val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-                                            val topBounds = currentItemInfo.offset + dragOffsetY
-                                            val bottomBounds = topBounds + currentItemInfo.size
-
-                                            if (bottomBounds > viewportHeight - 50) {
-                                                coroutineScope.launch { lazyListState.scrollBy(15f) }
-                                            } else if (topBounds < 50) {
-                                                coroutineScope.launch { lazyListState.scrollBy(-15f) }
-                                            }
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        draggedKey = null
-                                        dragOffsetY = 0f
-                                    },
-                                    isSelected = isSelected,
-                                    isSelectionMode = isSelectionMode,
-                                    onLongClick = { toggleSelection(index) }
-                                )
-                            }
-                        }
-
-                        SimpleScrollBar(
-                            listState = lazyListState,
-                            modifier = Modifier.align(Alignment.CenterEnd),
-                            paddingEnd = 8.dp
-                        )
                     }
                 }
             }
+
+            QueueItemList(
+                queueState = queueState,
+                actions = actions,
+                selectedIndices = selectedIndices,
+                onToggleSelection = ::toggleSelection,
+                onTitleVisibilityChange = { isTitleVisible = it }
+            )
         }
 
         // Right Pane (occupy only required space)
@@ -815,21 +683,7 @@ private fun QueueLandscapeContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Dismiss Chevron Down Button (first icon in landscape right pane)
-            FilledTonalIconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(32.dp),
-                shape = CircleShape,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "Dismiss",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            DismissIconButton(onDismiss = onDismiss)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -965,28 +819,14 @@ private fun QueueLandscapeContent(
         }
     }
 
-    if (showQueueMultiSelectionSheet) {
-        val selectedItems = remember(selectedIndices, queueState.items) {
-            selectedIndices.mapNotNull { queueState.items.getOrNull(it) }
-        }
-
-        QueueMultiSelectionBottomSheet(
-            selectedItems = selectedItems,
-            onDismiss = { showQueueMultiSelectionSheet = false },
-            onRemoveFromQueue = {
-                actions.removeIndicesFromQueue(selectedIndices)
-                selectedIndices = emptySet()
-            },
-            onRemoveOthersFromQueue = {
-                actions.removeOthersFromQueue(selectedIndices)
-                selectedIndices = emptySet()
-            },
-            onPlayNext = {
-                actions.playNextInQueue(selectedIndices)
-                selectedIndices = emptySet()
-            }
-        )
-    }
+    QueueMultiSelectionSheetHost(
+        showSheet = showQueueMultiSelectionSheet,
+        selectedIndices = selectedIndices,
+        items = queueState.items,
+        actions = actions,
+        onDismissSheet = { showQueueMultiSelectionSheet = false },
+        onClearSelection = { selectedIndices = emptySet() }
+    )
 
     Spacer(modifier = Modifier.navigationBarsPadding())
 }
