@@ -37,7 +37,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import io.github.vinaygaykar.mp1.utils.traceSection
 import javax.inject.Inject
 
 @HiltViewModel
@@ -163,9 +162,7 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun addToQueue(song: Song) {
-        traceSection("controller.addMediaItem") {
-            controller?.addMediaItem(song.toMediaItem())
-        }
+        controller?.addMediaItem(song.toMediaItem())
     }
 
     override fun onCleared() {

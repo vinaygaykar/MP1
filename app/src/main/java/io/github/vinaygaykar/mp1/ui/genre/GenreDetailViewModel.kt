@@ -26,7 +26,6 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
-import io.github.vinaygaykar.mp1.utils.traceSection
 
 @HiltViewModel
 class GenreDetailViewModel @Inject constructor(
@@ -118,9 +117,7 @@ class GenreDetailViewModel @Inject constructor(
     }
 
     fun addToQueue(song: Song) {
-        traceSection("controller.addMediaItem") {
-            controller?.addMediaItem(song.toMediaItem())
-        }
+        controller?.addMediaItem(song.toMediaItem())
     }
 
     override fun onCleared() {

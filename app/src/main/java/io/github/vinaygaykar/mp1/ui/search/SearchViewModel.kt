@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import io.github.vinaygaykar.mp1.utils.traceSection
 
 enum class SearchFilterType(val label: String) {
     SONGS("Songs"),
@@ -119,18 +118,14 @@ class SearchViewModel @Inject constructor(
 
     fun onSongClick(song: Song) {
         val player = controller ?: return
-        traceSection("player.setMediaItem_single") {
-            player.setMediaItem(song.toMediaItem())
-        }
+        player.setMediaItem(song.toMediaItem())
         player.prepare()
         player.play()
     }
 
     fun addToQueue(song: Song) {
         val player = controller ?: return
-        traceSection("controller.addMediaItem") {
-            player.addMediaItem(song.toMediaItem())
-        }
+        player.addMediaItem(song.toMediaItem())
     }
 
     override fun onCleared() {
