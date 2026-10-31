@@ -27,6 +27,7 @@ import io.github.vinaygaykar.mp1.data.local.entities.PlaybackStateEntity
 import io.github.vinaygaykar.mp1.data.local.entities.QueueItemEntity
 import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
+import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,7 +35,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @OptIn(UnstableApi::class)
@@ -46,9 +49,6 @@ class PlaybackService : MediaSessionService() {
 
     private var playListJob: Job? = null
     private var saveQueueJob: Job? = null
-
-    private val repeatCommand = SessionCommand("ACTION_TOGGLE_REPEAT", Bundle.EMPTY)
-    private val playListCommand = SessionCommand("ACTION_PLAY_LIST", Bundle.EMPTY)
 
     @Inject
     lateinit var playbackStateDao: PlaybackStateDao
@@ -142,22 +142,13 @@ class PlaybackService : MediaSessionService() {
             ): MediaSession.ConnectionResult {
                 val connectionResult = super.onConnect(session, controller)
                 val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
-                    .add(repeatCommand)
-                    .add(playListCommand)
+                    .add(PlaybackSessionContract.ToggleRepeatCommand)
+                    .add(PlaybackSessionContract.PlayListCommand)
                     .build()
-
-                val needsTimeline = controller.connectionHints.getBoolean("NEEDS_TIMELINE", true)
-                val availablePlayerCommands = if (!needsTimeline) {
-                    connectionResult.availablePlayerCommands.buildUpon()
-                        .remove(Player.COMMAND_GET_TIMELINE)
-                        .build()
-                } else {
-                    connectionResult.availablePlayerCommands
-                }
 
                 return MediaSession.ConnectionResult.accept(
                     availableSessionCommands,
-                    availablePlayerCommands
+                    connectionResult.availablePlayerCommands
                 )
             }
 
@@ -167,13 +158,13 @@ class PlaybackService : MediaSessionService() {
                 customCommand: SessionCommand,
                 args: Bundle
             ): ListenableFuture<SessionResult> {
-                if (customCommand.customAction == "ACTION_TOGGLE_REPEAT") {
+                if (customCommand == PlaybackSessionContract.ToggleRepeatCommand) {
                     session.player.repeatMode = (session.player.repeatMode + 1) % 3
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
-                if (customCommand.customAction == "ACTION_PLAY_LIST") {
-                    val songIds = args.getStringArrayList("song_ids") ?: emptyList()
-                    val startIndex = args.getInt("start_index", 0)
+                if (customCommand == PlaybackSessionContract.PlayListCommand) {
+                    val songIds = args.getStringArrayList(PlaybackSessionContract.EXTRA_SONG_IDS) ?: emptyList()
+                    val startIndex = args.getInt(PlaybackSessionContract.EXTRA_START_INDEX, 0)
                     playList(songIds, startIndex)
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
@@ -198,7 +189,7 @@ class PlaybackService : MediaSessionService() {
         val repeatButton = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
             .setCustomIconResId(repeatIconRes)
             .setDisplayName("Repeat")
-            .setSessionCommand(repeatCommand)
+            .setSessionCommand(PlaybackSessionContract.ToggleRepeatCommand)
             .setSlots(CommandButton.SLOT_OVERFLOW)
             .build()
 
@@ -354,16 +345,22 @@ class PlaybackService : MediaSessionService() {
                 val currentPosition = player.currentPosition
                 val repeatMode = player.repeatMode
                 val isShuffleOn = player.shuffleModeEnabled
-                serviceScope.launch(Dispatchers.IO) {
-                    playbackStateDao.upsertPlaybackState(
-                        PlaybackStateEntity(
-                            id = 0,
-                            currentQueueItemId = currentSongId,
-                            positionMs = currentPosition,
-                            isShuffleOn = isShuffleOn,
-                            repeatMode = repeatMode
-                        )
-                    )
+                // serviceScope is cancelled below, so a launch here would never run.
+                // Block briefly instead. Must not hop to Main inside (we are on Main).
+                runBlocking {
+                    withTimeoutOrNull(1_000) {
+                        withContext(Dispatchers.IO) {
+                            playbackStateDao.upsertPlaybackState(
+                                PlaybackStateEntity(
+                                    id = 0,
+                                    currentQueueItemId = currentSongId,
+                                    positionMs = currentPosition,
+                                    isShuffleOn = isShuffleOn,
+                                    repeatMode = repeatMode
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }

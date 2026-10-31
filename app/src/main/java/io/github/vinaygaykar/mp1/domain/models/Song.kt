@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
 import io.github.vinaygaykar.mp1.utils.DEFAULT_ARTIST_DELIMITERS
 import io.github.vinaygaykar.mp1.utils.DEFAULT_WORD_DELIMITERS
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
@@ -46,7 +47,7 @@ fun Song.getArtists(
 }
 
 fun Song.toMediaItem(): MediaItem {
-    val extras = albumId?.let { Bundle(1).apply { putString("album_id", it) } }
+    val extras = albumId?.let { Bundle(1).apply { putString(PlaybackSessionContract.EXTRA_ALBUM_ID, it) } }
     val displayArtist = artistsDisplayString.ifBlank { artist.ifBlank { "Unknown Artist" } }
 
     return MediaItem.Builder()

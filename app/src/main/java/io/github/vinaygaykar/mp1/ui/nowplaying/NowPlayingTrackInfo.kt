@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.playback.QueueUiState
+import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
@@ -126,7 +127,7 @@ internal fun NowPlayingTrackInfo(
                 val title = if (isCurrent) playbackState.trackTitle else item?.mediaMetadata?.title?.toString().orEmpty()
                 val artist = if (isCurrent) playbackState.artist else item?.mediaMetadata?.artist?.toString().orEmpty()
                 val album = if (isCurrent) playbackState.album else item?.mediaMetadata?.albumTitle?.toString().orEmpty()
-                val albumId = if (isCurrent) playbackState.albumId else item?.mediaMetadata?.extras?.getString("album_id")
+                val albumId = if (isCurrent) playbackState.albumId else item?.mediaMetadata?.extras?.getString(PlaybackSessionContract.EXTRA_ALBUM_ID)
 
                 if (isCurrent || isPrev || isNext) {
                     NowPlayingTrackTextContext(

@@ -1,6 +1,5 @@
 package io.github.vinaygaykar.mp1.playback
 
-import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -9,7 +8,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.vinaygaykar.mp1.data.local.scanner.ScannerRepository
@@ -27,11 +25,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.github.vinaygaykar.mp1.playback.client.PlaybackConnection
+import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import javax.inject.Inject
@@ -44,10 +46,12 @@ class PlayerViewModel @Inject constructor(
     private val scannerRepository: ScannerRepository,
     private val settingsRepository: SettingsRepository,
     private val audioVisualizerRepository: AudioVisualizerRepository,
-    private val queueManager: QueueManager
+    private val queueManager: QueueManager,
+    private val playbackConnection: PlaybackConnection
 ) : ViewModel(), PlaybackControls, QueueControls, LyricsControls {
 
     private var controller: MediaController? = null
+    private var playerListener: Player.Listener? = null
 
     // Domain state flows
     private val _playbackState = MutableStateFlow(PlaybackUiState())
@@ -91,14 +95,11 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch {
-            val sessionToken =
-                SessionToken(context, ComponentName(context, PlaybackService::class.java))
-            val hints = android.os.Bundle().apply { putBoolean("NEEDS_TIMELINE", true) }
-            controller = MediaController.Builder(context, sessionToken)
-                .setConnectionHints(hints)
-                .buildAsync().await()
-            controller?.addListener(object : Player.Listener {
+        playbackConnection.current.filterNotNull().onEach { newController ->
+            stopPositionUpdates()
+            playerListener?.let { controller?.removeListener(it) }
+            controller = newController
+            playerListener = object : Player.Listener {
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                     updateState()
                 }
@@ -131,13 +132,13 @@ class PlayerViewModel @Inject constructor(
                     val isPlaylistChanged = reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
                     updateQueueFromTimeline(timeline, forceRebuild = isPlaylistChanged)
                 }
-            })
+            }.also { newController.addListener(it) }
             updateState()
             controller?.currentTimeline?.let { updateQueueFromTimeline(it, forceRebuild = true) }
             if (controller?.isPlaying == true) {
                 startPositionUpdates()
             }
-        }
+        }.launchIn(viewModelScope)
     }
 
     private fun updateState() {
@@ -156,7 +157,7 @@ class PlayerViewModel @Inject constructor(
 
         val mediaId = currentItem.mediaId
         val extras = currentItem.mediaMetadata.extras
-        val albumIdFromExtras = extras?.getString("album_id")
+        val albumIdFromExtras = extras?.getString(PlaybackSessionContract.EXTRA_ALBUM_ID)
 
         val isNewMediaItem = mediaId != activeMediaId
         if (isNewMediaItem) {
@@ -715,6 +716,6 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        controller?.release()
+        playerListener?.let { controller?.removeListener(it) }
     }
 }

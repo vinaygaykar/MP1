@@ -1,19 +1,13 @@
 package io.github.vinaygaykar.mp1.ui.search
 
-import android.content.ComponentName
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
+import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.domain.models.Song
-import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
-import io.github.vinaygaykar.mp1.playback.PlaybackService
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.vinaygaykar.mp1.playback.client.PlaybackClient
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +21,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -50,21 +43,8 @@ data class SearchResults(
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
-    @ApplicationContext private val context: Context
+    private val playback: PlaybackClient
 ) : ViewModel() {
-
-    private var controller: MediaController? = null
-
-    init {
-        viewModelScope.launch {
-            val sessionToken =
-                SessionToken(context, ComponentName(context, PlaybackService::class.java))
-            val hints = android.os.Bundle().apply { putBoolean("NEEDS_TIMELINE", false) }
-            controller = MediaController.Builder(context, sessionToken)
-                .setConnectionHints(hints)
-                .buildAsync().await()
-        }
-    }
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
@@ -117,19 +97,10 @@ class SearchViewModel @Inject constructor(
     }
 
     fun onSongClick(song: Song) {
-        val player = controller ?: return
-        player.setMediaItem(song.toMediaItem())
-        player.prepare()
-        player.play()
+        viewModelScope.launch { playback.playSingle(song) }
     }
 
     fun addToQueue(song: Song) {
-        val player = controller ?: return
-        player.addMediaItem(song.toMediaItem())
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        controller?.release()
+        viewModelScope.launch { playback.addToQueue(song) }
     }
 }
