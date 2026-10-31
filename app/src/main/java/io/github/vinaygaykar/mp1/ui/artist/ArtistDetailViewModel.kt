@@ -19,7 +19,6 @@ import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.domain.repository.PlaylistRepository
 import io.github.vinaygaykar.mp1.playback.PlaybackService
-import io.github.vinaygaykar.mp1.utils.traceSection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -218,9 +217,7 @@ class ArtistDetailViewModel @Inject constructor(
     }
 
     fun addToQueue(song: Song) {
-        traceSection("controller.addMediaItem") {
-            controller?.addMediaItem(song.toMediaItem())
-        }
+        controller?.addMediaItem(song.toMediaItem())
     }
 
     override fun onCleared() {

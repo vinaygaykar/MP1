@@ -27,7 +27,6 @@ import io.github.vinaygaykar.mp1.data.local.entities.PlaybackStateEntity
 import io.github.vinaygaykar.mp1.data.local.entities.QueueItemEntity
 import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
-import io.github.vinaygaykar.mp1.utils.traceSection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -117,9 +116,7 @@ class PlaybackService : MediaSessionService() {
 
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                 if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
-                    traceSection("Service_onTimelineChanged") {
-                        if (!isRestoringState) scheduleQueueAndPlaybackStateSave(player)
-                    }
+                    if (!isRestoringState) scheduleQueueAndPlaybackStateSave(player)
                 }
             }
 
@@ -250,10 +247,7 @@ class PlaybackService : MediaSessionService() {
 
             for (chunk in itemsAfter.chunked(chunkSize)) {
                 withContext(Dispatchers.Main) {
-                    val currentCount = player.mediaItemCount
-                    traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
-                        player.addMediaItems(chunk)
-                    }
+                    player.addMediaItems(chunk)
                 }
                 delay(50)
             }
@@ -262,10 +256,7 @@ class PlaybackService : MediaSessionService() {
             for (chunk in itemsBefore.chunked(chunkSize)) {
                 val currentPos = insertPos
                 withContext(Dispatchers.Main) {
-                    val currentCount = player.mediaItemCount
-                    traceSection("addMediaItems_chunk_${chunk.size}_count_$currentCount") {
-                        player.addMediaItems(currentPos, chunk)
-                    }
+                    player.addMediaItems(currentPos, chunk)
                 }
                 insertPos += chunk.size
                 delay(50)
@@ -298,24 +289,20 @@ class PlaybackService : MediaSessionService() {
             val window = Timeline.Window()
             val queueEntities = ArrayList<QueueItemEntity>(count)
 
-            traceSection("Service_buildQueueEntities_$count") {
-                for (i in 0 until count) {
-                    timeline.getWindow(i, window)
-                    val songId = window.mediaItem.mediaId
-                    queueEntities.add(
-                        QueueItemEntity(
-                            queueItemId = "$i-$songId",
-                            position = i,
-                            songId = songId,
-                            sourceContext = null
-                        )
+            for (i in 0 until count) {
+                timeline.getWindow(i, window)
+                val songId = window.mediaItem.mediaId
+                queueEntities.add(
+                    QueueItemEntity(
+                        queueItemId = "$i-$songId",
+                        position = i,
+                        songId = songId,
+                        sourceContext = null
                     )
-                }
+                )
             }
 
-            traceSection("Room_replaceQueue_${queueEntities.size}") {
-                queueDao.replaceQueue(queueEntities)
-            }
+            queueDao.replaceQueue(queueEntities)
             playbackStateDao.upsertPlaybackState(
                 PlaybackStateEntity(
                     id = 0,
