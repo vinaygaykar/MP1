@@ -1,7 +1,9 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import android.content.res.Configuration
 import io.github.vinaygaykar.mp1.data.repo.LyricsParser
 import io.github.vinaygaykar.mp1.data.repo.isInstrumental
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -19,6 +21,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
@@ -36,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -54,7 +58,8 @@ fun LyricsScreen(
     playbackState: PlaybackUiState,
     progressState: PlaybackProgressState,
     actions: LyricsControls,
-    onSeek: (Long) -> Unit
+    onSeek: (Long) -> Unit,
+    initialShowSearchDialog: Boolean = false
 ) {
     val lyrics = remember(lyricsState) {
         if (lyricsState is LyricsUiState.Success) {
@@ -62,7 +67,7 @@ fun LyricsScreen(
         } else null
     }
 
-    var showSearchDialog by remember { mutableStateOf(false) }
+    var showSearchDialog by remember { mutableStateOf(initialShowSearchDialog) }
 
     if (showSearchDialog) {
         LyricsSearchDialog(
@@ -185,60 +190,78 @@ fun LyricsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     // Left: Search Button
-                    AssistChip(
+                    FilledTonalButton(
                         onClick = { showSearchDialog = true },
-                        label = { Text("Search") },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Search lyrics",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        shape = CircleShape
-                    )
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Search",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
 
                     // Right: Offline Badge or Save Button
                     Box {
                         if (lyricsState is LyricsUiState.Success && lyricsState.lyrics.isNotBlank()) {
                             if (lyricsState.isLocal) {
-                                AssistChip(
+                                FilledTonalButton(
                                     onClick = {},
-                                    label = { Text("Offline") },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.CloudDone,
-                                            contentDescription = "Offline lyrics",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    },
-                                    colors = AssistChipDefaults.assistChipColors(
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = ButtonDefaults.filledTonalButtonColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        leadingIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                     ),
-                                    border = null,
-                                    shape = CircleShape
-                                )
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier.height(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDone,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Offline",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             } else {
-                                AssistChip(
+                                FilledTonalButton(
                                     onClick = { actions.onSaveLyrics() },
-                                    label = { Text("Save") },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Download,
-                                            contentDescription = "Save lyrics",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    },
-                                    colors = AssistChipDefaults.assistChipColors(
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = ButtonDefaults.filledTonalButtonColors(
                                         containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                     ),
-                                    border = null,
-                                    shape = CircleShape
-                                )
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier.height(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Save",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
@@ -485,5 +508,240 @@ fun LyricsEmptyState(
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+private val samplePreviewPlaybackState = PlaybackUiState(
+    trackTitle = "Midnight City",
+    artist = "M83",
+    album = "Hurry Up, We're Dreaming"
+)
+
+private val samplePreviewProgressState = PlaybackProgressState(
+    positionMs = 30000L,
+    durationMs = 240000L
+)
+
+private val samplePreviewLyricsControls = object : LyricsControls {
+    override fun onLyricsSearch(query: String) {}
+    override fun onSaveLyrics() {}
+}
+
+private val sampleSyncedLyrics = """
+    [00:10.00] You saw me standing alone
+    [00:20.00] Without a dream in my heart
+    [00:30.00] Without a love of my own
+    [00:40.00] ♪
+    [00:50.00] And then there was you
+""".trimIndent()
+
+private val sampleStaticLyrics = """
+    You saw me standing alone
+    Without a dream in my heart
+    Without a love of my own
+    
+    And then there was you
+    The moon turned to gold
+    Here in my arms
+""".trimIndent()
+
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 1: Synced Lyrics Screen
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "1. Lyrics Screen - Synced",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "1. Lyrics Screen - Synced",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "1. Lyrics Screen - Synced",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "1. Lyrics Screen - Synced",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun LyricsScreenSyncedPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            LyricsScreen(
+                lyricsState = LyricsUiState.Success(
+                    lyrics = sampleSyncedLyrics,
+                    isSynced = true,
+                    isLocal = true
+                ),
+                playbackState = samplePreviewPlaybackState,
+                progressState = samplePreviewProgressState,
+                actions = samplePreviewLyricsControls,
+                onSeek = {}
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 2: Static Lyrics Screen
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "2. Lyrics Screen - Static",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "2. Lyrics Screen - Static",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "2. Lyrics Screen - Static",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "2. Lyrics Screen - Static",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun LyricsScreenStaticPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            LyricsScreen(
+                lyricsState = LyricsUiState.Success(
+                    lyrics = sampleStaticLyrics,
+                    isSynced = false,
+                    isLocal = false
+                ),
+                playbackState = samplePreviewPlaybackState,
+                progressState = samplePreviewProgressState,
+                actions = samplePreviewLyricsControls,
+                onSeek = {}
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 3: Empty Lyrics Screen
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "3. Lyrics Screen - Empty",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "3. Lyrics Screen - Empty",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "3. Lyrics Screen - Empty",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "3. Lyrics Screen - Empty",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun LyricsScreenEmptyPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            LyricsScreen(
+                lyricsState = LyricsUiState.None,
+                playbackState = samplePreviewPlaybackState,
+                progressState = samplePreviewProgressState,
+                actions = samplePreviewLyricsControls,
+                onSeek = {}
+            )
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 4: Search Lyrics Dialog Screen
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "4. Lyrics Screen - Search Dialog",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "4. Lyrics Screen - Search Dialog",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "4. Lyrics Screen - Search Dialog",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "4. Lyrics Screen - Search Dialog",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun LyricsScreenSearchDialogPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            LyricsScreen(
+                lyricsState = LyricsUiState.Success(
+                    lyrics = sampleSyncedLyrics,
+                    isSynced = true,
+                    isLocal = true
+                ),
+                playbackState = samplePreviewPlaybackState,
+                progressState = samplePreviewProgressState,
+                actions = samplePreviewLyricsControls,
+                onSeek = {},
+                initialShowSearchDialog = true
+            )
+        }
     }
 }
