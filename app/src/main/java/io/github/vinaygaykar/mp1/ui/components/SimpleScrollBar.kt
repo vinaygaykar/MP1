@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +35,7 @@ import kotlinx.coroutines.launch
 fun SimpleScrollBar(
     listState: LazyListState? = null,
     gridState: LazyGridState? = null,
+    scrollState: ScrollState? = null,
     modifier: Modifier = Modifier,
     thumbColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
     thumbWidth: Dp = 4.dp,
@@ -41,10 +43,11 @@ fun SimpleScrollBar(
     paddingEnd: Dp = 6.dp,
     onInteractingChanged: ((Boolean) -> Unit)? = null
 ) {
-    val needsScrollbar by remember(listState, gridState) {
+    val needsScrollbar by remember(listState, gridState, scrollState) {
         derivedStateOf {
             (listState?.canScrollForward == true || listState?.canScrollBackward == true) ||
-            (gridState?.canScrollForward == true || gridState?.canScrollBackward == true)
+            (gridState?.canScrollForward == true || gridState?.canScrollBackward == true) ||
+            (scrollState?.canScrollForward == true || scrollState?.canScrollBackward == true)
         }
     }
 
@@ -75,6 +78,11 @@ fun SimpleScrollBar(
                 listState?.scrollToItem(targetIndex)
                 gridState?.scrollToItem(targetIndex)
             }
+        } else if (scrollState != null) {
+            coroutineScope.launch {
+                val targetScroll = (fraction.coerceIn(0f, 1f) * scrollState.maxValue).toInt()
+                scrollState.scrollTo(targetScroll)
+            }
         }
     }
 
@@ -83,14 +91,14 @@ fun SimpleScrollBar(
             .fillMaxHeight()
             .padding(end = paddingEnd)
             .width(touchTargetWidth)
-            .pointerInput(listState, gridState) {
+            .pointerInput(listState, gridState, scrollState) {
                 detectTapGestures { offset ->
                     if (size.height > 0) {
                         scrollToFraction(offset.y / size.height)
                     }
                 }
             }
-            .pointerInput(listState, gridState) {
+            .pointerInput(listState, gridState, scrollState) {
                 detectVerticalDragGestures(
                     onDragStart = { offset ->
                         isDragging = true
@@ -115,32 +123,29 @@ fun SimpleScrollBar(
                 .fillMaxHeight()
                 .width(animatedWidth)
         ) {
-            val totalItems: Int
-            val firstVisibleIndex: Int
-            val firstVisibleScrollOffset: Int
             val estimatedTotalHeight: Float
             val currentScrollPx: Float
 
             if (listState != null) {
                 val layoutInfo = listState.layoutInfo
-                totalItems = layoutInfo.totalItemsCount
+                val totalItems = layoutInfo.totalItemsCount
                 val visibleItems = layoutInfo.visibleItemsInfo
                 if (totalItems == 0 || visibleItems.isEmpty()) return@Canvas
 
-                firstVisibleIndex = listState.firstVisibleItemIndex
-                firstVisibleScrollOffset = listState.firstVisibleItemScrollOffset
+                val firstVisibleIndex = listState.firstVisibleItemIndex
+                val firstVisibleScrollOffset = listState.firstVisibleItemScrollOffset
 
                 val averageItemSize = visibleItems.sumOf { it.size }.toFloat() / visibleItems.size.coerceAtLeast(1)
                 estimatedTotalHeight = averageItemSize * totalItems
                 currentScrollPx = (firstVisibleIndex * averageItemSize) + firstVisibleScrollOffset
             } else if (gridState != null) {
                 val layoutInfo = gridState.layoutInfo
-                totalItems = layoutInfo.totalItemsCount
+                val totalItems = layoutInfo.totalItemsCount
                 val visibleItems = layoutInfo.visibleItemsInfo
                 if (totalItems == 0 || visibleItems.isEmpty()) return@Canvas
 
-                firstVisibleIndex = gridState.firstVisibleItemIndex
-                firstVisibleScrollOffset = gridState.firstVisibleItemScrollOffset
+                val firstVisibleIndex = gridState.firstVisibleItemIndex
+                val firstVisibleScrollOffset = gridState.firstVisibleItemScrollOffset
 
                 val numColumns = visibleItems.maxOfOrNull { it.column + 1 }?.coerceAtLeast(1) ?: 1
                 val totalRows = (totalItems + numColumns - 1) / numColumns
@@ -149,6 +154,12 @@ fun SimpleScrollBar(
 
                 estimatedTotalHeight = averageRowSize * totalRows
                 currentScrollPx = (currentRow * averageRowSize) + firstVisibleScrollOffset
+            } else if (scrollState != null) {
+                val viewportHeightPx = size.height
+                if (viewportHeightPx <= 0f) return@Canvas
+
+                estimatedTotalHeight = scrollState.maxValue.toFloat() + viewportHeightPx
+                currentScrollPx = scrollState.value.toFloat()
             } else {
                 return@Canvas
             }
