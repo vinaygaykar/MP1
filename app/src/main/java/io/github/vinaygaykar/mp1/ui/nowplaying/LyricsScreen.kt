@@ -34,13 +34,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -82,45 +85,61 @@ fun LyricsScreen(
         )
     }
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    if (isLandscape) {
+        LyricsLandscapeContent(
+            lyricsState = lyricsState,
+            lyrics = lyrics,
+            playbackState = playbackState,
+            progressState = progressState,
+            actions = actions,
+            onSeek = onSeek,
+            onSearchClick = { showSearchDialog = true },
+            onDismiss = onDismiss
+        )
+    } else {
+        LyricsPortraitContent(
+            lyricsState = lyricsState,
+            lyrics = lyrics,
+            playbackState = playbackState,
+            progressState = progressState,
+            actions = actions,
+            onSeek = onSeek,
+            onSearchClick = { showSearchDialog = true },
+            onDismiss = onDismiss
+        )
+    }
+}
+
+@Composable
+private fun LyricsPortraitContent(
+    lyricsState: LyricsUiState,
+    lyrics: Lyrics?,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    actions: LyricsControls,
+    onSeek: (Long) -> Unit,
+    onSearchClick: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .pointerInput(Unit) {
                 detectVerticalDragGestures { _, _ -> }
             }
     ) {
         // Content Layer
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surfaceContainer
-        ) {
-            when {
-                lyricsState is LyricsUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                lyrics == null || (lyrics.content.isEmpty() && lyrics.lines.isEmpty()) -> {
-                    LyricsEmptyState(
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                lyrics.isSynced -> {
-                    SyncedLyrics(
-                        lyrics = lyrics,
-                        currentPositionMs = progressState.positionMs,
-                        onSeek = onSeek,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                else -> {
-                    StaticLyrics(
-                        content = lyrics.content,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-        }
+        LyricsBodyContent(
+            lyricsState = lyricsState,
+            lyrics = lyrics,
+            progressState = progressState,
+            onSeek = onSeek,
+            modifier = Modifier.fillMaxSize()
+        )
 
         // Sticky Top Header (Dynamic surface color from seed palette, no alpha)
         Surface(
@@ -195,82 +214,321 @@ fun LyricsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Left: Search Button
-                    FilledTonalButton(
-                        onClick = { showSearchDialog = true },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                        modifier = Modifier.height(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Search",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    LyricsSearchButton(onClick = onSearchClick)
+                    LyricsSaveOfflineButton(
+                        lyricsState = lyricsState,
+                        onSaveLyrics = { actions.onSaveLyrics() }
+                    )
+                }
+            }
+        }
+    }
+}
 
-                    // Right: Offline Badge or Save Button
-                    Box {
-                        if (lyricsState is LyricsUiState.Success && lyricsState.lyrics.isNotBlank()) {
-                            if (lyricsState.isLocal) {
-                                FilledTonalButton(
-                                    onClick = {},
-                                    shape = RoundedCornerShape(20.dp),
-                                    colors = ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                    modifier = Modifier.height(40.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudDone,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Offline",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            } else {
-                                FilledTonalButton(
-                                    onClick = { actions.onSaveLyrics() },
-                                    shape = RoundedCornerShape(20.dp),
-                                    colors = ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                    modifier = Modifier.height(40.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Download,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Save",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
+@Composable
+private fun LyricsLandscapeContent(
+    lyricsState: LyricsUiState,
+    lyrics: Lyrics?,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    actions: LyricsControls,
+    onSeek: (Long) -> Unit,
+    onSearchClick: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { _, _ -> }
+                }
+        ) {
+            // Left Pane (30% screen width)
+            Surface(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(0.3f)
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    AsyncImage(
+                        model = playbackState.artworkUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = playbackState.trackTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = playbackState.album,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Middle Pane (fill available width)
+            LyricsBodyContent(
+                lyricsState = lyricsState,
+                lyrics = lyrics,
+                progressState = progressState,
+                onSeek = onSeek,
+                syncedContentPadding = PaddingValues(start = 24.dp, end = 24.dp),
+                staticTopPadding = 0.dp,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(0.7f)
+            )
+
+            // Right Pane (required width as per elements)
+            Surface(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .wrapContentWidth()
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    DismissIconButton(onDismiss = onDismiss)
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    LyricsSearchButton(
+                        onClick = onSearchClick,
+                        iconOnly = true
+                    )
+
+                    if (lyricsState is LyricsUiState.Success && lyricsState.lyrics.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        LyricsSaveOfflineButton(
+                            lyricsState = lyricsState,
+                            onSaveLyrics = { actions.onSaveLyrics() },
+                            iconOnly = true
+                        )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LyricsBodyContent(
+    lyricsState: LyricsUiState,
+    lyrics: Lyrics?,
+    progressState: PlaybackProgressState,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    syncedContentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp),
+    staticTopPadding: Dp = 180.dp
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        when {
+            lyricsState is LyricsUiState.Loading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            lyrics == null || (lyrics.content.isEmpty() && lyrics.lines.isEmpty()) -> {
+                LyricsEmptyState(
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            lyrics.isSynced -> {
+                SyncedLyrics(
+                    lyrics = lyrics,
+                    currentPositionMs = progressState.positionMs,
+                    onSeek = onSeek,
+                    contentPadding = syncedContentPadding,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            else -> {
+                StaticLyrics(
+                    content = lyrics.content,
+                    topPadding = staticTopPadding,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LyricsSearchButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconOnly: Boolean = false
+) {
+    if (iconOnly) {
+        FilledTonalIconButton(
+            onClick = onClick,
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = modifier
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search"
+            )
+        }
+    } else {
+        FilledTonalButton(
+            onClick = onClick,
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            modifier = modifier.height(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Search",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun LyricsSaveOfflineButton(
+    lyricsState: LyricsUiState,
+    onSaveLyrics: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconOnly: Boolean = false
+) {
+    if (lyricsState is LyricsUiState.Success && lyricsState.lyrics.isNotBlank()) {
+        if (lyricsState.isLocal) {
+            if (iconOnly) {
+                FilledTonalIconButton(
+                    onClick = {},
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = modifier
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDone,
+                        contentDescription = "Offline"
+                    )
+                }
+            } else {
+                FilledTonalButton(
+                    onClick = {},
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = modifier.height(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDone,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Offline",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        } else {
+            if (iconOnly) {
+                FilledTonalIconButton(
+                    onClick = onSaveLyrics,
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    modifier = modifier
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Save"
+                    )
+                }
+            } else {
+                FilledTonalButton(
+                    onClick = onSaveLyrics,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = modifier.height(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Save",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
@@ -298,8 +556,6 @@ private fun DismissIconButton(
         )
     }
 }
-
-
 
 @Composable
 fun LyricsSearchDialog(
@@ -363,7 +619,8 @@ fun SyncedLyrics(
     lyrics: Lyrics,
     currentPositionMs: Long,
     onSeek: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp)
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -387,7 +644,7 @@ fun SyncedLyrics(
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp),
+        contentPadding = contentPadding,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         itemsIndexed(lyrics.lines) { index, line ->
@@ -495,7 +752,11 @@ fun BouncingMusicalNotes(
 }
 
 @Composable
-fun StaticLyrics(content: String, modifier: Modifier = Modifier) {
+fun StaticLyrics(
+    content: String,
+    modifier: Modifier = Modifier,
+    topPadding: Dp = 180.dp
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -503,7 +764,7 @@ fun StaticLyrics(content: String, modifier: Modifier = Modifier) {
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(180.dp))
+        Spacer(modifier = Modifier.height(topPadding))
         Text(
             text = content,
             style = MaterialTheme.typography.bodyLarge.copy(
