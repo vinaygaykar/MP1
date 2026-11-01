@@ -66,7 +66,8 @@ fun NowPlayingOverlays(
             playbackState = playbackState,
             progressState = progressState,
             actions = lyricsControls,
-            onSeek = { playbackControls.onSeek(it) }
+            onSeek = { playbackControls.onSeek(it) },
+            onDismiss = { state.showLyrics = false }
         )
     }
 

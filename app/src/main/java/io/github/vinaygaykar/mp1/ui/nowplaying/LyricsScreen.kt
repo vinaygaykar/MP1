@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,7 +60,8 @@ fun LyricsScreen(
     progressState: PlaybackProgressState,
     actions: LyricsControls,
     onSeek: (Long) -> Unit,
-    initialShowSearchDialog: Boolean = false
+    initialShowSearchDialog: Boolean = false,
+    onDismiss: () -> Unit = {}
 ) {
     val lyrics = remember(lyricsState) {
         if (lyricsState is LyricsUiState.Success) {
@@ -177,6 +179,10 @@ fun LyricsScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    DismissIconButton(onDismiss = onDismiss)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -268,6 +274,28 @@ fun LyricsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DismissIconButton(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FilledTonalIconButton(
+        onClick = onDismiss,
+        modifier = modifier.size(32.dp),
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.KeyboardArrowDown,
+            contentDescription = "Dismiss",
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
