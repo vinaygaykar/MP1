@@ -31,6 +31,12 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE queue_items ADD COLUMN originalRank REAL")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideMusicDatabase(@ApplicationContext context: Context): MusicDatabase {
@@ -38,7 +44,7 @@ object DatabaseModule {
             context,
             MusicDatabase::class.java,
             "music_db"
-        ).addMigrations(MIGRATION_8_9)
+        ).addMigrations(MIGRATION_8_9, MIGRATION_10_11)
             .fallbackToDestructiveMigration()
             .build()
     }

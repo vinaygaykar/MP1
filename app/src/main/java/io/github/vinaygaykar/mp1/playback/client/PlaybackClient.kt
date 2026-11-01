@@ -19,9 +19,8 @@ class PlaybackClient @Inject constructor(
 
     /**
      * Replaces the queue with [songs] and starts playing.
-     * @param startAt song to start from (defaults to the first one)
-     * @param shuffle when non-null, sets shuffle mode and (if true) starts from a random song;
-     *                null leaves the current shuffle mode untouched
+     * @param startAt song to start from (first song, or random if shuffling, when null)
+     * @param shuffle true/false switches shuffle on/off for this list; null keeps the current setting
      */
     suspend fun play(songs: List<Song>, startAt: Song? = null, shuffle: Boolean? = null) =
         withContext(Dispatchers.Main.immediate) {
@@ -30,11 +29,8 @@ class PlaybackClient @Inject constructor(
                 startAt?.let { controller.playSingle(it) }
                 return@withContext
             }
-            shuffle?.let { controller.shuffleModeEnabled = it }
-            val start = when {
-                shuffle == true -> songs.indices.random()
-                else -> songs.indexOfFirst { it.id == startAt?.id }.coerceAtLeast(0)
-            }
+            // The service owns queue order and shuffle: it queues the list, applies the shuffle
+            // setting and picks the start song (random when shuffling with no start song).
             controller.sendCustomCommand(
                 PlaybackSessionContract.PlayListCommand,
                 Bundle().apply {
@@ -42,7 +38,18 @@ class PlaybackClient @Inject constructor(
                         PlaybackSessionContract.EXTRA_SONG_IDS,
                         ArrayList(songs.map { it.id }),
                     )
-                    putInt(PlaybackSessionContract.EXTRA_START_INDEX, start)
+                    putInt(
+                        PlaybackSessionContract.EXTRA_START_INDEX,
+                        songs.indexOfFirst { it.id == startAt?.id },
+                    )
+                    putInt(
+                        PlaybackSessionContract.EXTRA_SHUFFLE_MODE,
+                        when (shuffle) {
+                            null -> PlaybackSessionContract.SHUFFLE_KEEP
+                            true -> PlaybackSessionContract.SHUFFLE_ON
+                            false -> PlaybackSessionContract.SHUFFLE_OFF
+                        },
+                    )
                 },
             ).await()
         }

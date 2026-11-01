@@ -63,6 +63,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.playback.QueueControls
 import io.github.vinaygaykar.mp1.playback.QueueUiState
+import io.github.vinaygaykar.mp1.playback.session.queueUid
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -271,16 +272,7 @@ private fun ColumnScope.QueueItemList(
             }
         }
 
-        val itemKeys = remember(queueState.items) {
-            val counts = mutableMapOf<Int, Int>()
-            queueState.items.map { item ->
-                val identity = System.identityHashCode(item)
-                val count = counts.getOrDefault(identity, 0)
-                counts[identity] = count + 1
-                val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
-                if (count == 0) "${baseId}_$identity" else "${baseId}_${identity}_$count"
-            }
-        }
+        val itemKeys = remember(queueState.items) { stableQueueKeys(queueState.items) }
 
         val isSelectionMode = selectedIndices.isNotEmpty()
 
@@ -1479,6 +1471,22 @@ private fun QueueMultiSelectBottomSheetPreview() {
                     selectedItems = samplePreviewQueueItems.take(2)
                 )
             }
+        }
+    }
+}
+
+/**
+ * Keys must survive queue rebuilds (which hand us new MediaItem instances), otherwise every row is
+ * recreated on each change and an in-flight drag is lost. Each queue entry carries its own uid.
+ */
+private fun stableQueueKeys(items: List<MediaItem>): List<String> {
+    val seen = HashMap<String, Int>()
+    return items.map { item ->
+        item.queueUid() ?: run {
+            val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
+            val occurrence = seen.getOrDefault(baseId, 0)
+            seen[baseId] = occurrence + 1
+            "${baseId}_$occurrence"
         }
     }
 }

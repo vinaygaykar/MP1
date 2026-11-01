@@ -79,9 +79,6 @@ class PlayerViewModel @Inject constructor(
     private var activeArtworkUri: Uri? = null
     private var activeMediaId: String? = null
 
-    @Volatile
-    private var currentWindowIndices: List<Int> = emptyList()
-
     init {
         viewModelScope.launch {
             scannerRepository.isScanning.collect { isScanning ->
@@ -195,14 +192,7 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
-        val currentWindowIndex = player.currentMediaItemIndex
-        val windowIndices = currentWindowIndices
-        val uiCurrentIndex = if (windowIndices.isNotEmpty()) {
-            val found = windowIndices.indexOf(currentWindowIndex)
-            if (found != -1) found else currentWindowIndex.coerceIn(0, (windowIndices.size - 1).coerceAtLeast(0))
-        } else {
-            currentWindowIndex
-        }
+        val uiCurrentIndex = player.currentMediaItemIndex
 
         _playbackState.update {
             it.copy(
@@ -256,7 +246,6 @@ class PlayerViewModel @Inject constructor(
     private fun updateQueueFromTimeline(timeline: Timeline, forceRebuild: Boolean = false) {
         if (timeline.isEmpty) {
             queueUpdateJob?.cancel()
-            currentWindowIndices = emptyList()
             _queueState.update { QueueUiState(items = persistentListOf(), currentIndex = -1) }
             return
         }
@@ -273,11 +262,10 @@ class PlayerViewModel @Inject constructor(
                 timeline = timeline,
                 isShuffleOn = isShuffleOn,
                 currentWindowIndex = currentWindowIndex,
-                currentWindowIndices = currentWindowIndices,
+                currentQueueSize = _queueState.value.items.size,
                 forceRebuild = forceRebuild || _playbackState.value.isShuffleOn != isShuffleOn
             )
 
-            currentWindowIndices = result.windowIndices
             _playbackState.update { it.copy(isShuffleOn = result.isShuffleOn) }
             _queueState.update { current ->
                 if (result.items.isNotEmpty()) {
@@ -515,54 +503,36 @@ class PlayerViewModel @Inject constructor(
 
     override fun onSkipToQueueItem(index: Int) {
         val player = controller ?: return
-        val windowIndices = currentWindowIndices
-        val targetWindowIndex = windowIndices.getOrNull(index) ?: index
-        if (targetWindowIndex in 0 until player.mediaItemCount) {
-            player.seekTo(targetWindowIndex, 0L)
+        if (index in 0 until player.mediaItemCount) {
+            player.seekTo(index, 0L)
             player.play()
         }
     }
 
     override fun removeFromQueue(index: Int) {
-        val player = controller ?: return
-        val windowIndices = currentWindowIndices
-        val targetWindowIndex = windowIndices.getOrNull(index) ?: index
-        if (targetWindowIndex in 0 until player.mediaItemCount) {
-            val currentItems = _queueState.value.items
-            if (index in currentItems.indices) {
-                val newItems = currentItems.toMutableList().apply { removeAt(index) }
-                val newWindowIndices = currentWindowIndices.toMutableList().apply { removeAt(index) }
-                    .map { w -> if (w > targetWindowIndex) w - 1 else w }
-
-                currentWindowIndices = newWindowIndices
-                val uiCurrentIndex = player.currentMediaItemIndex.let { cur ->
-                    val found = newWindowIndices.indexOf(cur)
-                    if (found != -1) found else _queueState.value.currentIndex.coerceIn(0, (newItems.size - 1).coerceAtLeast(0))
-                }
-
-                _queueState.update {
-                    QueueUiState(
-                        items = newItems.toPersistentList(),
-                        currentIndex = uiCurrentIndex
-                    )
-                }
-            }
-            player.removeMediaItem(targetWindowIndex)
-        }
+        removeIndicesFromQueue(setOf(index))
     }
 
     override fun moveQueueItem(fromIndex: Int, toIndex: Int) {
         val player = controller ?: return
-        val windowIndices = currentWindowIndices
-        val fromWindow = windowIndices.getOrNull(fromIndex) ?: fromIndex
-        val toWindow = windowIndices.getOrNull(toIndex) ?: toIndex
+        val items = _queueState.value.items
+        if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
+        if (items.size != player.mediaItemCount) return
 
-        if (fromWindow in 0 until player.mediaItemCount && toWindow in 0 until player.mediaItemCount && fromWindow != toWindow) {
-            if (player.shuffleModeEnabled) {
-                player.shuffleModeEnabled = false
-            }
-            player.moveMediaItem(fromWindow, toWindow)
+        // Optimistic update so the list reflects the move immediately; the timeline rebuild confirms it.
+        val current = _queueState.value.currentIndex
+        val newCurrent = when {
+            current == fromIndex -> toIndex
+            fromIndex < toIndex && current in (fromIndex + 1)..toIndex -> current - 1
+            fromIndex > toIndex && current in toIndex until fromIndex -> current + 1
+            else -> current
         }
+        val newItems = items.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+        _queueState.update {
+            QueueUiState(items = newItems.toPersistentList(), currentIndex = newCurrent)
+        }
+
+        player.moveMediaItem(fromIndex, toIndex)
     }
 
     override fun clearQueue() {
@@ -584,43 +554,20 @@ class PlayerViewModel @Inject constructor(
 
     override fun removeIndicesFromQueue(indices: Set<Int>) {
         val player = controller ?: return
-        val sortedUiIndices = indices.filter { it in _queueState.value.items.indices }.sortedDescending()
-        if (sortedUiIndices.isEmpty()) return
+        val items = _queueState.value.items
+        val toRemove = indices.filter { it in items.indices && it < player.mediaItemCount }.sortedDescending()
+        if (toRemove.isEmpty()) return
 
-        val newItems = _queueState.value.items.toMutableList()
-        val newWindowIndices = currentWindowIndices.toMutableList()
+        // Optimistic update so the list reacts immediately; the timeline rebuild confirms it.
+        val newItems = items.toMutableList().apply { toRemove.forEach { removeAt(it) } }
+        val current = _queueState.value.currentIndex
+        val newCurrent = (current - toRemove.count { it < current })
+            .coerceIn(0, (newItems.size - 1).coerceAtLeast(0))
 
-        val targetWindowIndices = mutableListOf<Int>()
-        for (uiIndex in sortedUiIndices) {
-            val targetWindow = newWindowIndices.getOrNull(uiIndex) ?: uiIndex
-            if (targetWindow in 0 until player.mediaItemCount) {
-                targetWindowIndices.add(targetWindow)
-                newItems.removeAt(uiIndex)
-                newWindowIndices.removeAt(uiIndex)
-                for (i in newWindowIndices.indices) {
-                    if (newWindowIndices[i] > targetWindow) {
-                        newWindowIndices[i] = newWindowIndices[i] - 1
-                    }
-                }
-            }
-        }
+        _queueState.update { QueueUiState(items = newItems.toPersistentList(), currentIndex = newCurrent) }
 
-        currentWindowIndices = newWindowIndices
-        val uiCurrentIndex = player.currentMediaItemIndex.let { cur ->
-            val found = newWindowIndices.indexOf(cur)
-            if (found != -1) found else _queueState.value.currentIndex.coerceIn(0, (newItems.size - 1).coerceAtLeast(0))
-        }
-
-        _queueState.update {
-            QueueUiState(
-                items = newItems.toPersistentList(),
-                currentIndex = uiCurrentIndex
-            )
-        }
-
-        for (wIndex in targetWindowIndices.sortedDescending()) {
-            player.removeMediaItem(wIndex)
-        }
+        // Highest index first, so the lower ones stay valid while removing.
+        toRemove.forEach { player.removeMediaItem(it) }
     }
 
     override fun removeOthersFromQueue(indicesToKeep: Set<Int>) {
@@ -634,8 +581,7 @@ class PlayerViewModel @Inject constructor(
         queueManager.executePlayNext(
             player = player,
             currentIdx = player.currentMediaItemIndex,
-            indices = indices,
-            windowIndices = currentWindowIndices
+            indices = indices
         )
         updateState()
     }

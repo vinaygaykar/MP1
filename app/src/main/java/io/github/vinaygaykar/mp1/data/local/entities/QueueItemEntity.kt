@@ -19,5 +19,7 @@ data class QueueItemEntity(
     @PrimaryKey val queueItemId: String,
     val position: Int,
     val songId: String,
-    val sourceContext: String?
+    val sourceContext: String?,
+    /** Position in the pre-shuffle order. Only set while shuffle is on; null otherwise. */
+    val originalRank: Double? = null
 )
