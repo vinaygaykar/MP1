@@ -1,10 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import android.app.Activity
 import android.content.res.Configuration
-import io.github.vinaygaykar.mp1.data.repo.LyricsParser
-import io.github.vinaygaykar.mp1.data.repo.isInstrumental
-import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
-
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,8 +11,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,6 +29,9 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.*
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,15 +49,19 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import io.github.vinaygaykar.mp1.data.repo.LyricsParser
+import io.github.vinaygaykar.mp1.data.repo.isInstrumental
 import io.github.vinaygaykar.mp1.domain.models.Lyrics
 import io.github.vinaygaykar.mp1.playback.LyricsControls
 import io.github.vinaygaykar.mp1.playback.LyricsUiState
 import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun LyricsScreen(
     lyricsState: LyricsUiState,
@@ -77,7 +82,7 @@ fun LyricsScreen(
 
     if (showSearchDialog) {
         LyricsSearchDialog(
-            initialQuery = "${playbackState.trackTitle} ${playbackState.artist}",
+            initialQuery = "${playbackState.trackTitle} - ${playbackState.artist}",
             onSearch = { query ->
                 actions.onLyricsSearch(query)
                 showSearchDialog = false
@@ -86,10 +91,18 @@ fun LyricsScreen(
         )
     }
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
 
-    if (isLandscape) {
+    val isWideWindow = if (windowSizeClass != null) {
+        windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
+    } else {
+        val configuration = LocalConfiguration.current
+        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
+
+    if (isWideWindow) {
         LyricsLandscapeContent(
             lyricsState = lyricsState,
             lyrics = lyrics,
@@ -872,6 +885,20 @@ private val sampleStaticLyrics = """
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
 )
+@Preview(
+    name = "Portrait Split",
+    group = "1. Lyrics Screen - Synced",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "1. Lyrics Screen - Synced",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
 @Composable
 private fun LyricsScreenSyncedPreview() {
     MusicPlayerTheme(dynamicColor = false) {
@@ -922,6 +949,20 @@ private fun LyricsScreenSyncedPreview() {
     showBackground = true,
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split",
+    group = "2. Lyrics Screen - Static",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "2. Lyrics Screen - Static",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Composable
 private fun LyricsScreenStaticPreview() {
@@ -974,6 +1015,20 @@ private fun LyricsScreenStaticPreview() {
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
 )
+@Preview(
+    name = "Portrait Split",
+    group = "3. Lyrics Screen - Empty",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "3. Lyrics Screen - Empty",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
 @Composable
 private fun LyricsScreenEmptyPreview() {
     MusicPlayerTheme(dynamicColor = false) {
@@ -1020,6 +1075,20 @@ private fun LyricsScreenEmptyPreview() {
     showBackground = true,
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split",
+    group = "4. Lyrics Screen - Search Dialog",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "4. Lyrics Screen - Search Dialog",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Composable
 private fun LyricsScreenSearchDialogPreview() {
