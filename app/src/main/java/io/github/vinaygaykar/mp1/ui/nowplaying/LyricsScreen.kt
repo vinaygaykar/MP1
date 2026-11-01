@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.*
@@ -95,35 +96,146 @@ fun LyricsScreen(
     val activity = context as? Activity
     val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
 
-    val isWideWindow = if (windowSizeClass != null) {
-        windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
+    val widthClass = windowSizeClass?.widthSizeClass
+    val heightClass = windowSizeClass?.heightSizeClass
+
+    val isWideWindow = if (widthClass != null) {
+        widthClass != WindowWidthSizeClass.Compact
     } else {
         val configuration = LocalConfiguration.current
         configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     }
 
-    if (isWideWindow) {
-        LyricsLandscapeContent(
-            lyricsState = lyricsState,
-            lyrics = lyrics,
-            playbackState = playbackState,
-            progressState = progressState,
-            actions = actions,
-            onSeek = onSeek,
-            onSearchClick = { showSearchDialog = true },
-            onDismiss = onDismiss
-        )
+    val isCompactHeight = if (heightClass != null) {
+        heightClass == WindowHeightSizeClass.Compact
     } else {
-        LyricsPortraitContent(
-            lyricsState = lyricsState,
-            lyrics = lyrics,
-            playbackState = playbackState,
-            progressState = progressState,
-            actions = actions,
-            onSeek = onSeek,
-            onSearchClick = { showSearchDialog = true },
-            onDismiss = onDismiss
-        )
+        val configuration = LocalConfiguration.current
+        configuration.screenHeightDp < 500
+    }
+
+    when {
+        isWideWindow -> {
+            LyricsLandscapeContent(
+                lyricsState = lyricsState,
+                lyrics = lyrics,
+                playbackState = playbackState,
+                progressState = progressState,
+                actions = actions,
+                onSeek = onSeek,
+                onSearchClick = { showSearchDialog = true },
+                onDismiss = onDismiss
+            )
+        }
+        isCompactHeight -> {
+            LyricsCompactContent(
+                lyricsState = lyricsState,
+                lyrics = lyrics,
+                playbackState = playbackState,
+                progressState = progressState,
+                actions = actions,
+                onSeek = onSeek,
+                onSearchClick = { showSearchDialog = true },
+                onDismiss = onDismiss
+            )
+        }
+        else -> {
+            LyricsPortraitContent(
+                lyricsState = lyricsState,
+                lyrics = lyrics,
+                playbackState = playbackState,
+                progressState = progressState,
+                actions = actions,
+                onSeek = onSeek,
+                onSearchClick = { showSearchDialog = true },
+                onDismiss = onDismiss
+            )
+        }
+    }
+}
+
+@Composable
+private fun LyricsHeader(
+    playbackState: PlaybackUiState,
+    lyricsState: LyricsUiState,
+    actions: LyricsControls,
+    onSearchClick: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconOnly: Boolean = false
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = playbackState.artworkUri,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(if (iconOnly) 48.dp else 56.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                val displayArtist = remember(playbackState.artist, playbackState.trackTitle) {
+                    collectArtistNames(playbackState.artist, playbackState.trackTitle).joinArtistsForDisplay()
+                }
+
+                Text(
+                    text = playbackState.trackTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.basicMarquee()
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = displayArtist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            DismissIconButton(onDismiss = onDismiss)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            LyricsSearchButton(
+                onClick = onSearchClick,
+                iconOnly = iconOnly
+            )
+            LyricsSaveOfflineButton(
+                lyricsState = lyricsState,
+                onSaveLyrics = { actions.onSaveLyrics() },
+                iconOnly = iconOnly
+            )
+        }
     }
 }
 
@@ -146,7 +258,6 @@ private fun LyricsPortraitContent(
                 detectVerticalDragGestures { _, _ -> }
             }
     ) {
-        // Content Layer
         LyricsBodyContent(
             lyricsState = lyricsState,
             lyrics = lyrics,
@@ -155,7 +266,6 @@ private fun LyricsPortraitContent(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Sticky Top Header (Dynamic surface color from seed palette, no alpha)
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -163,79 +273,56 @@ private fun LyricsPortraitContent(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
-            ) {
-                // Top Track Metadata Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = playbackState.artworkUri,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        val displayArtist = remember(playbackState.artist, playbackState.trackTitle) {
-                            collectArtistNames(playbackState.artist, playbackState.trackTitle).joinArtistsForDisplay()
-                        }
-
-                        Text(
-                            text = playbackState.trackTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier.basicMarquee()
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = displayArtist,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    DismissIconButton(onDismiss = onDismiss)
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Actions Row (Left: Search Button, Right: Offline Badge or Save Button)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    LyricsSearchButton(onClick = onSearchClick)
-                    LyricsSaveOfflineButton(
-                        lyricsState = lyricsState,
-                        onSaveLyrics = { actions.onSaveLyrics() }
-                    )
-                }
-            }
+            LyricsHeader(
+                playbackState = playbackState,
+                lyricsState = lyricsState,
+                actions = actions,
+                onSearchClick = onSearchClick,
+                onDismiss = onDismiss,
+                iconOnly = false
+            )
         }
+    }
+}
+
+@Composable
+private fun LyricsCompactContent(
+    lyricsState: LyricsUiState,
+    lyrics: Lyrics?,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    actions: LyricsControls,
+    onSeek: (Long) -> Unit,
+    onSearchClick: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, _ -> }
+            },
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        LyricsBodyContent(
+            lyricsState = lyricsState,
+            lyrics = lyrics,
+            progressState = progressState,
+            onSeek = onSeek,
+            headerContent = {
+                LyricsHeader(
+                    playbackState = playbackState,
+                    lyricsState = lyricsState,
+                    actions = actions,
+                    onSearchClick = onSearchClick,
+                    onDismiss = onDismiss,
+                    iconOnly = true
+                )
+            },
+            contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp, start = 24.dp, end = 24.dp),
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 
@@ -373,6 +460,7 @@ private fun LyricsBodyContent(
     progressState: PlaybackProgressState,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    headerContent: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp)
 ) {
     Surface(
@@ -387,6 +475,7 @@ private fun LyricsBodyContent(
             }
             lyrics == null || (lyrics.content.isEmpty() && lyrics.lines.isEmpty()) -> {
                 LyricsEmptyState(
+                    headerContent = headerContent,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -395,6 +484,7 @@ private fun LyricsBodyContent(
                     lyrics = lyrics,
                     currentPositionMs = progressState.positionMs,
                     onSeek = onSeek,
+                    headerContent = headerContent,
                     contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -402,6 +492,7 @@ private fun LyricsBodyContent(
             else -> {
                 StaticLyrics(
                     content = lyrics.content,
+                    headerContent = headerContent,
                     contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -634,6 +725,7 @@ fun SyncedLyrics(
     currentPositionMs: Long,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    headerContent: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp)
 ) {
     val listState = rememberLazyListState()
@@ -644,11 +736,13 @@ fun SyncedLyrics(
         if (index == -1) 0 else index
     }
 
+    val headerOffset = if (headerContent != null) 1 else 0
+
     LaunchedEffect(activeIndex) {
         coroutineScope.launch {
             if (activeIndex >= 0) {
                 listState.animateScrollToItem(
-                    index = (activeIndex - 2).coerceAtLeast(0),
+                    index = (activeIndex + headerOffset - 2).coerceAtLeast(0),
                     scrollOffset = 0
                 )
             }
@@ -661,6 +755,13 @@ fun SyncedLyrics(
         contentPadding = contentPadding,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (headerContent != null) {
+            item(key = "compact_header") {
+                headerContent()
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
         itemsIndexed(lyrics.lines) { index, line ->
             val isActive = index == activeIndex
 
@@ -776,6 +877,7 @@ fun BouncingMusicalNotes(
 fun StaticLyrics(
     content: String,
     modifier: Modifier = Modifier,
+    headerContent: (@Composable () -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp)
 ) {
     Column(
@@ -785,6 +887,10 @@ fun StaticLyrics(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (headerContent != null) {
+            headerContent()
+            Spacer(modifier = Modifier.height(16.dp))
+        }
         Text(
             text = content,
             style = MaterialTheme.typography.bodyLarge.copy(
@@ -801,21 +907,32 @@ fun StaticLyrics(
 
 @Composable
 fun LyricsEmptyState(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    headerContent: (@Composable () -> Unit)? = null
 ) {
-    Box(
+    Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 32.dp),
-        contentAlignment = Alignment.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Lyrics not found",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
-        )
+        if (headerContent != null) {
+            headerContent()
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Lyrics not found",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
