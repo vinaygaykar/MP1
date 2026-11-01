@@ -118,16 +118,19 @@ fun NowPlayingScreenBackground(
             Box(modifier = Modifier.fillMaxSize()) {
                 content()
 
-                if (state.progress > 0.8f) {
-                    val controlsAlpha = ((state.progress - 0.8f) / 0.2f).coerceIn(0f, 1f)
-                    NowPlayingCollapseHandle(
-                        onCollapse = { state.collapse() },
-                        currentColorScheme = state.currentColorScheme,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 16.dp)
-                            .alpha(controlsAlpha)
-                    )
+                if (state.progress > 0.8f && !state.showQueue && !state.showLyrics && !state.showArtistsDialog) {
+                    val overlayAlpha = (1f - state.queueProgress).coerceIn(0f, 1f)
+                    val controlsAlpha = ((state.progress - 0.8f) / 0.2f).coerceIn(0f, 1f) * overlayAlpha
+                    if (controlsAlpha > 0f) {
+                        NowPlayingCollapseHandle(
+                            onCollapse = { state.collapse() },
+                            currentColorScheme = state.currentColorScheme,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 16.dp)
+                                .alpha(controlsAlpha)
+                        )
+                    }
                 }
             }
         }
