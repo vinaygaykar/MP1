@@ -147,7 +147,6 @@ fun LibraryScreen(
     val albums by viewModel.albums.collectAsState()
     val artists by viewModel.artists.collectAsState()
     val genres by viewModel.genres.collectAsState()
-    val useCleanAlbumGrid by viewModel.useCleanAlbumGrid.collectAsState()
 
     val isScanning by remember(playerViewModel) {
         playerViewModel.playbackState.map { it.isScanInProgress }.distinctUntilChanged()
@@ -161,7 +160,6 @@ fun LibraryScreen(
         albums = albums,
         artists = artists,
         genres = genres,
-        useCleanAlbumGrid = useCleanAlbumGrid,
         bottomPadding = bottomPadding,
         isPlayerActive = isPlayerActive,
         miniPlayerTargetOffset = miniPlayerTargetOffset,
@@ -195,7 +193,6 @@ fun LibraryContent(
     albums: List<Album>,
     artists: List<Artist>,
     genres: List<Genre> = emptyList(),
-    useCleanAlbumGrid: Boolean = false,
     bottomPadding: Dp = 0.dp,
     initialScrolledDown: Boolean = false,
     isPlayerActive: Boolean = false,
@@ -741,7 +738,6 @@ fun LibraryContent(
 
                         2 -> AlbumsTab(
                             albums = albums,
-                            useCleanAlbumGrid = useCleanAlbumGrid,
                             contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
                         )
 

@@ -25,16 +25,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    private val _useCleanAlbumGrid = MutableStateFlow(
-        prefs.getBoolean(KEY_USE_CLEAN_ALBUM_GRID, false),
-    )
-    val useCleanAlbumGrid: StateFlow<Boolean> = _useCleanAlbumGrid.asStateFlow()
-
-    fun setUseCleanAlbumGrid(enabled: Boolean) {
-        prefs.edit { putBoolean(KEY_USE_CLEAN_ALBUM_GRID, enabled) }
-        _useCleanAlbumGrid.value = enabled
-    }
-
     private val _playbackWave = MutableStateFlow(
         PlaybackWaveType.fromName(prefs.getString(KEY_PLAYBACK_WAVE, PlaybackWaveType.ENERGY.name)),
     )
@@ -46,7 +36,6 @@ class SettingsRepository @Inject constructor(
     }
 
     companion object {
-        private const val KEY_USE_CLEAN_ALBUM_GRID = "use_clean_album_grid"
         private const val KEY_PLAYBACK_WAVE = "playback_wave"
     }
 }

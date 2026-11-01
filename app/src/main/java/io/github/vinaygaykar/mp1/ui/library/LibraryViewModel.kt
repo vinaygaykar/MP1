@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.vinaygaykar.mp1.data.repo.ArtistImageRepository
-import io.github.vinaygaykar.mp1.data.repo.SettingsRepository
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.domain.models.Genre
@@ -29,12 +28,9 @@ import javax.inject.Inject
 class LibraryViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
     private val playlistRepository: PlaylistRepository,
-    private val settingsRepository: SettingsRepository,
     private val artistImageRepository: ArtistImageRepository,
     private val playback: PlaybackClient,
 ) : ViewModel() {
-
-    val useCleanAlbumGrid: StateFlow<Boolean> = settingsRepository.useCleanAlbumGrid
 
     private var prefetchJob: Job? = null
 

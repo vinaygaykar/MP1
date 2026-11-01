@@ -27,12 +27,6 @@ class SettingsViewModel @Inject constructor(
         scannerRepository.checkAndTriggerMigrationScan()
     }
 
-    val useCleanAlbumGrid: StateFlow<Boolean> = settingsRepository.useCleanAlbumGrid
-
-    fun setUseCleanAlbumGrid(enabled: Boolean) {
-        settingsRepository.setUseCleanAlbumGrid(enabled)
-    }
-
     val playbackWave: StateFlow<PlaybackWaveType> = settingsRepository.playbackWave
 
     fun setPlaybackWave(wave: PlaybackWaveType) {

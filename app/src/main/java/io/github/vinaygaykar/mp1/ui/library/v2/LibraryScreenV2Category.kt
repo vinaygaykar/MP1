@@ -28,7 +28,6 @@ data class LibraryUiState(
     val songs: List<Song> = emptyList(),
     val albums: List<Album> = emptyList(),
     val artists: List<Artist> = emptyList(),
-    val useCleanAlbumGrid: Boolean = false,
     val isScanning: Boolean = false,
     val currentFolder: String? = null,
     val importError: String? = null

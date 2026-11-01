@@ -20,26 +20,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.NavigateNext
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -65,25 +58,19 @@ fun SettingsScreen(
     onNavigateToScanLocations: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val useCleanAlbumGrid by viewModel.useCleanAlbumGrid.collectAsState()
-
     SettingsContent(
-        useCleanAlbumGrid = useCleanAlbumGrid,
         bottomPadding = bottomPadding,
         onBack = onBack,
         onNavigateToScanLocations = onNavigateToScanLocations,
-        onSetUseCleanAlbumGrid = { viewModel.setUseCleanAlbumGrid(it) },
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsContent(
-    useCleanAlbumGrid: Boolean,
     bottomPadding: Dp = 0.dp,
     onBack: () -> Unit = {},
     onNavigateToScanLocations: () -> Unit = {},
-    onSetUseCleanAlbumGrid: (Boolean) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val collapsedFraction = scrollBehavior.state.collapsedFraction.coerceIn(0f, 1f)
@@ -160,44 +147,7 @@ fun SettingsContent(
                 )
             }
 
-            // Section 2: Layout
-            SettingsSectionHeader(title = "LAYOUT")
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                ExpressiveSettingsItem(
-                    title = "Clean Album Grid",
-                    titleIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Science,
-                            contentDescription = "Experimental Feature",
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                    subtitle = "Toggle between clean square grid and classic layout",
-                    icon = Icons.Default.GridView,
-                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    trailingContent = {
-                        Switch(
-                            checked = useCleanAlbumGrid,
-                            onCheckedChange = onSetUseCleanAlbumGrid,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { onSetUseCleanAlbumGrid(!useCleanAlbumGrid) },
-                )
-            }
-
-            // Section 3: About
+            // Section 2: About
             SettingsSectionHeader(title = "ABOUT")
             Card(
                 colors = CardDefaults.cardColors(
@@ -227,38 +177,6 @@ fun SettingsContent(
                         }
                     },
                 )
-            }
-
-            // Material 3 Expressive Divider above legend
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                thickness = 1.dp,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-
-            // Legend Card
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Science,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Features marked with this icon are experimental and may be modified or deleted at any time in the future.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(bottomPadding + 16.dp))
@@ -350,7 +268,6 @@ private fun ExpressiveSettingsItem(
 private fun SettingsScreenLightPreview() {
     MusicPlayerTheme(darkTheme = false) {
         SettingsContent(
-            useCleanAlbumGrid = true,
             bottomPadding = 80.dp,
         )
     }
@@ -361,7 +278,6 @@ private fun SettingsScreenLightPreview() {
 private fun SettingsScreenDarkPreview() {
     MusicPlayerTheme(darkTheme = true) {
         SettingsContent(
-            useCleanAlbumGrid = false,
             bottomPadding = 80.dp,
         )
     }

@@ -299,7 +299,6 @@ internal fun CategoryDetailScreen(
                     LibraryCategory.ALBUMS -> {
                         AlbumsTab(
                             albums = uiState.albums,
-                            useCleanAlbumGrid = uiState.useCleanAlbumGrid,
                             contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
                         )
                     }
