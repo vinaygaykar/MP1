@@ -202,7 +202,7 @@ fun AlbumGridCompact(
 /**
  * Album title text row for Compact view.
  * - Non-selected: 100% width, 1 line, muted font.
- * - Selected: 60% width, up to 3 lines, bright font.
+ * - Selected: 54% width (leaving space before artwork), up to 3 lines, bright font.
  */
 @Composable
 fun CompactAlbumTitleItem(
@@ -215,7 +215,9 @@ fun CompactAlbumTitleItem(
         modifier = modifier
             .then(
                 if (isSelected) {
-                    Modifier.fillMaxWidth(0.60f)
+                    Modifier
+                        .fillMaxWidth(0.54f)
+                        .padding(end = 8.dp)
                 } else {
                     Modifier.fillMaxWidth()
                 }
