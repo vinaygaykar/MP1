@@ -34,3 +34,74 @@ fun AlbumsTab(
         contentPadding = contentPadding
     )
 }
+
+private val sampleAlbums = listOf(
+    Album(
+        id = "1",
+        name = "Abbey Road",
+        artist = "The Beatles",
+        year = 1969,
+        artworkUri = null,
+        trackCount = 17
+    ),
+    Album(
+        id = "2",
+        name = "Back in Black",
+        artist = "AC/DC",
+        year = 1980,
+        artworkUri = null,
+        trackCount = 10
+    ),
+    Album(
+        id = "3",
+        name = "Dark Side of the Moon",
+        artist = "Pink Floyd",
+        year = 1973,
+        artworkUri = null,
+        trackCount = 10
+    ),
+    Album(
+        id = "4",
+        name = "Hotel California",
+        artist = "Eagles",
+        year = 1976,
+        artworkUri = null,
+        trackCount = 9
+    )
+)
+
+@Preview(
+    name = "Portrait Light",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun AlbumsTabPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            AlbumsTab(
+                albums = sampleAlbums
+            )
+        }
+    }
+}
+
