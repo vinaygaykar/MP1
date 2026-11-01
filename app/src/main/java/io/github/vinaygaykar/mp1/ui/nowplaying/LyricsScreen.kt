@@ -14,8 +14,10 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -34,7 +36,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -247,12 +248,13 @@ private fun LyricsLandscapeContent(
                 .pointerInput(Unit) {
                     detectVerticalDragGestures { _, _ -> }
                 }
+                .displayCutoutPadding()
         ) {
             // Left Pane (30% screen width)
             Surface(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.3f)
+                    .weight(0.2f)
                     .statusBarsPadding()
                     .navigationBarsPadding(),
                 color = MaterialTheme.colorScheme.surface
@@ -262,13 +264,14 @@ private fun LyricsLandscapeContent(
                         .fillMaxSize()
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Top
                 ) {
                     AsyncImage(
                         model = playbackState.artworkUri,
                         contentDescription = null,
                         modifier = Modifier
-                            .size(120.dp)
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop
                     )
@@ -280,7 +283,7 @@ private fun LyricsLandscapeContent(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
-                        maxLines = 2,
+                        maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
                     )
@@ -292,7 +295,7 @@ private fun LyricsLandscapeContent(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.secondary,
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
                     )
@@ -305,8 +308,7 @@ private fun LyricsLandscapeContent(
                 lyrics = lyrics,
                 progressState = progressState,
                 onSeek = onSeek,
-                syncedContentPadding = PaddingValues(start = 24.dp, end = 24.dp),
-                staticTopPadding = 0.dp,
+                contentPadding = PaddingValues(horizontal = 48.dp),
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(0.7f)
@@ -358,8 +360,7 @@ private fun LyricsBodyContent(
     progressState: PlaybackProgressState,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
-    syncedContentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp),
-    staticTopPadding: Dp = 180.dp
+    contentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp)
 ) {
     Surface(
         modifier = modifier,
@@ -381,14 +382,14 @@ private fun LyricsBodyContent(
                     lyrics = lyrics,
                     currentPositionMs = progressState.positionMs,
                     onSeek = onSeek,
-                    contentPadding = syncedContentPadding,
+                    contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize()
                 )
             }
             else -> {
                 StaticLyrics(
                     content = lyrics.content,
-                    topPadding = staticTopPadding,
+                    contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -669,14 +670,17 @@ fun SyncedLyrics(
                     text = line.text,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                        fontSize = if (isActive) 28.sp else 20.sp,
-                        lineHeight = if (isActive) 36.sp else 28.sp
+                        fontSize = if (isActive) 28.sp else 18.sp,
+                        lineHeight = if (isActive) 36.sp else 34.sp
                     ),
                     color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onSeek(line.timestampMs) }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onSeek(line.timestampMs) }
                         .padding(vertical = 12.dp)
                         .graphicsLayer {
                             scaleX = scale
@@ -699,7 +703,11 @@ fun BouncingMusicalNotes(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -755,16 +763,15 @@ fun BouncingMusicalNotes(
 fun StaticLyrics(
     content: String,
     modifier: Modifier = Modifier,
-    topPadding: Dp = 180.dp
+    contentPadding: PaddingValues = PaddingValues(top = 180.dp, bottom = 100.dp, start = 36.dp, end = 36.dp)
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 36.dp)
+            .padding(contentPadding)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(topPadding))
         Text(
             text = content,
             style = MaterialTheme.typography.bodyLarge.copy(
@@ -776,7 +783,6 @@ fun StaticLyrics(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(48.dp))
     }
 }
 
