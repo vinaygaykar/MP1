@@ -63,7 +63,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.playback.QueueControls
 import io.github.vinaygaykar.mp1.playback.QueueUiState
-import io.github.vinaygaykar.mp1.playback.session.queueUid
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -272,15 +271,25 @@ private fun ColumnScope.QueueItemList(
             }
         }
 
-        val itemKeys = remember(queueState.items) { stableQueueKeys(queueState.items) }
+        val itemKeys = remember(queueState.items) {
+            val counts = mutableMapOf<Int, Int>()
+            queueState.items.map { item ->
+                val identity = System.identityHashCode(item)
+                val count = counts.getOrDefault(identity, 0)
+                counts[identity] = count + 1
+                val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
+                if (count == 0) "${baseId}_$identity" else "${baseId}_${identity}_$count"
+            }
+        }
 
         val isSelectionMode = selectedIndices.isNotEmpty()
 
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .then(modifier)
                 .then(
                     if (nestedScrollConnection != null) {
                         Modifier.nestedScroll(nestedScrollConnection)
@@ -623,7 +632,6 @@ private fun QueueLandscapeContent(
     Row(
         modifier = modifier
             .fillMaxSize()
-            .statusBarsPadding()
     ) {
         // Left Pane (occupy all available space)
         Column(
@@ -634,12 +642,11 @@ private fun QueueLandscapeContent(
             // Header Surface (Playing Queue Title Row)
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     AnimatedVisibility(
                         visible = isTitleVisible,
@@ -649,6 +656,8 @@ private fun QueueLandscapeContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .statusBarsPadding()
+                                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start))
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -664,18 +673,25 @@ private fun QueueLandscapeContent(
                 actions = actions,
                 selectedIndices = selectedIndices,
                 onToggleSelection = ::toggleSelection,
-                onTitleVisibilityChange = { isTitleVisible = it }
+                onTitleVisibilityChange = { isTitleVisible = it },
+                modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start))
             )
         }
 
         // Right Pane (occupy only required space)
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .wrapContentWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxHeight()
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .wrapContentWidth()
+                    .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End))
+                    .padding(16.dp)
+                    .statusBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             // Dismiss Chevron Down Button (first icon in landscape right pane)
             DismissIconButton(onDismiss = onDismiss)
 
@@ -812,6 +828,7 @@ private fun QueueLandscapeContent(
             }
         }
     }
+}
 
     QueueMultiSelectionSheetHost(
         showSheet = showQueueMultiSelectionSheet,
@@ -825,7 +842,6 @@ private fun QueueLandscapeContent(
     Spacer(modifier = Modifier.navigationBarsPadding())
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QueueItemRow(
     item: MediaItem,
@@ -1471,22 +1487,6 @@ private fun QueueMultiSelectBottomSheetPreview() {
                     selectedItems = samplePreviewQueueItems.take(2)
                 )
             }
-        }
-    }
-}
-
-/**
- * Keys must survive queue rebuilds (which hand us new MediaItem instances), otherwise every row is
- * recreated on each change and an in-flight drag is lost. Each queue entry carries its own uid.
- */
-private fun stableQueueKeys(items: List<MediaItem>): List<String> {
-    val seen = HashMap<String, Int>()
-    return items.map { item ->
-        item.queueUid() ?: run {
-            val baseId = item.mediaId.ifEmpty { item.mediaMetadata.title?.toString() ?: "item" }
-            val occurrence = seen.getOrDefault(baseId, 0)
-            seen[baseId] = occurrence + 1
-            "${baseId}_$occurrence"
         }
     }
 }
