@@ -6,6 +6,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,15 +39,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.vinaygaykar.mp1.R
 import io.github.vinaygaykar.mp1.domain.models.Playlist
 import io.github.vinaygaykar.mp1.ui.components.NoticeBanner
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -203,17 +209,36 @@ private fun CategoryMenuPortraitContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                Text(
-                    text = "MP.1",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = fontSize,
-                        fontWeight = FontWeight.ExtraBold,
-                        platformStyle = PlatformTextStyle(includeFontPadding = false)
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    softWrap = false
-                )
+                Column(
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF121212)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = "App Icon",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "MP.1",
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontSize = fontSize,
+                            fontWeight = FontWeight.ExtraBold,
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -325,17 +350,36 @@ private fun CategoryMenuLandscapeContent(
             val maxH = this.maxHeight
             val fontSize = minOf(maxW.value * 0.22f, maxH.value * 0.45f, 76f).sp
 
-            Text(
-                text = "MP.1",
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = fontSize,
-                    fontWeight = FontWeight.ExtraBold,
-                    platformStyle = PlatformTextStyle(includeFontPadding = false)
-                ),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                softWrap = false
-            )
+            Column(
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF121212)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = "App Icon",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "MP.1",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontSize = fontSize,
+                        fontWeight = FontWeight.ExtraBold,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
         }
 
         // 2nd Pane: Category List Content
