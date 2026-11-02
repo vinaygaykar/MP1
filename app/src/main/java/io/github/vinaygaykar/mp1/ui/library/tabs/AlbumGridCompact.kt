@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,12 +34,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,6 +59,7 @@ import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 /**
  * AlbumGridCompact renders a vertical list of album titles with typographic focus on the centered album.
@@ -81,6 +94,8 @@ fun AlbumGridCompact(
     }
 
     val lazyListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState)
 
     // Find the item index closest to the vertical center of the viewport
     val centerIndex by remember {
@@ -113,7 +128,7 @@ fun AlbumGridCompact(
         // 1. Titles LazyColumn
         LazyColumn(
             state = lazyListState,
-            flingBehavior = rememberSnapFlingBehavior(lazyListState),
+            flingBehavior = snapFlingBehavior,
             contentPadding = PaddingValues(
                 top = topPadding,
                 bottom = bottomPadding,
@@ -152,7 +167,30 @@ fun AlbumGridCompact(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RectangleShape)
-                        .clickable { onAlbumClick(targetAlbum) },
+                        .semantics {
+                            role = Role.Button
+                            onClick(label = "View album details") {
+                                onAlbumClick(targetAlbum)
+                                true
+                            }
+                        }
+                        .pointerInput(targetAlbum, lazyListState) {
+                            detectTapOrScroll(
+                                onTap = { onAlbumClick(targetAlbum) },
+                                onScrollDelta = { delta ->
+                                    lazyListState.dispatchRawDelta(delta)
+                                },
+                                onFling = { velocity ->
+                                    coroutineScope.launch {
+                                        lazyListState.scroll {
+                                            with(snapFlingBehavior) {
+                                                performFling(velocity)
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        },
                     shape = RectangleShape,
                     elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
                     colors = CardDefaults.cardColors(
@@ -294,3 +332,52 @@ fun CompactAlbumTitleItemPreview() {
         }
     }
 }
+
+private suspend fun PointerInputScope.detectTapOrScroll(
+    onTap: () -> Unit,
+    onScrollDelta: (Float) -> Unit,
+    onFling: (Float) -> Unit
+) {
+    val touchSlop = viewConfiguration.touchSlop
+    val velocityTracker = VelocityTracker()
+
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        velocityTracker.resetTracking()
+        velocityTracker.addPosition(down.uptimeMillis, down.position)
+
+        val pointerId = down.id
+        var totalDragY = 0f
+        var isDragging = false
+
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Main)
+            val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+
+            velocityTracker.addPosition(change.uptimeMillis, change.position)
+
+            if (change.changedToUp()) {
+                if (isDragging) {
+                    val velocity = velocityTracker.calculateVelocity().y
+                    onFling(-velocity)
+                } else {
+                    change.consume()
+                    onTap()
+                }
+                break
+            }
+
+            val dragDeltaY = change.position.y - change.previousPosition.y
+            totalDragY += dragDeltaY
+
+            if (abs(totalDragY) > touchSlop || isDragging) {
+                if (!isDragging) {
+                    isDragging = true
+                }
+                change.consume()
+                onScrollDelta(-dragDeltaY)
+            }
+        }
+    }
+}
+
