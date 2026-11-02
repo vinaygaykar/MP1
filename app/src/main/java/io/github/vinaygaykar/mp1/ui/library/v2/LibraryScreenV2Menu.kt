@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,7 +39,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -216,8 +214,7 @@ private fun CategoryMenuPortraitContent(
                     Box(
                         modifier = Modifier
                             .size(56.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF121212)),
+                            .clip(CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -357,8 +354,7 @@ private fun CategoryMenuLandscapeContent(
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF121212)),
+                        .clip(CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
