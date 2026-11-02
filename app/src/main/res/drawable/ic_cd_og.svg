@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%">
+  <defs>
+    <!-- 1. Master Cutout Mask: Transparent outside r=450 and inside center spindle hole r=60 -->
+    <mask id="cd-cutout">
+      <rect width="1000" height="1000" fill="black" />
+      <circle cx="500" cy="500" r="450" fill="white" />
+      <circle cx="500" cy="500" r="60" fill="black" />
+    </mask>
+
+    <!-- 2. Clear Center Plastic Mask: Strictly clips the blurred rainbow and metallic base at r=142 -->
+    <mask id="clear-hub-cutout">
+      <rect width="1000" height="1000" fill="white" />
+      <circle cx="500" cy="500" r="142" fill="black" />
+    </mask>
+
+    <!-- 3. Inner Hub Ring Mask: Confines the hybrid clear plastic & glare between r=60 and r=142 -->
+    <mask id="hub-ring-mask">
+      <rect width="1000" height="1000" fill="black" />
+      <circle cx="500" cy="500" r="142" fill="white" />
+      <circle cx="500" cy="500" r="60" fill="black" />
+    </mask>
+
+    <!-- 4. Gaussian Blur Filters -->
+    <filter id="iridescent-blend" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="24" />
+    </filter>
+
+    <filter id="soft-glow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="12" />
+    </filter>
+
+    <filter id="glare-blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" />
+    </filter>
+
+    <!-- 5. Subtle Radial Lighting Overlay (for 3D metallic sheen on data area) -->
+    <radialGradient id="metallic-depth" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.3" />
+      <stop offset="30%" stop-color="#ffffff" stop-opacity="0.0" />
+      <stop offset="65%" stop-color="#d0d5dd" stop-opacity="0.15" />
+      <stop offset="92%" stop-color="#ffffff" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#9ca3af" stop-opacity="0.35" />
+    </radialGradient>
+
+    <!-- 6. Subtle Diagonal Surface Sheen for the Clear Polycarbonate Hub -->
+    <linearGradient id="plastic-rim-sheen" x1="25%" y1="15%" x2="75%" y2="85%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25" />
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.02" />
+      <stop offset="65%" stop-color="#ffffff" stop-opacity="0.02" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.20" />
+    </linearGradient>
+  </defs>
+
+  <!-- MASTER CD GROUP (Transparent background and transparent r=60 center hole) -->
+  <g mask="url(#cd-cutout)">
+
+    <!-- A. METALLIC & IRIDESCENT DATA AREA (Strictly clipped outside r=142 so it never bleeds into the clear hub) -->
+    <g mask="url(#clear-hub-cutout)">
+
+      <!-- Base Metallic Disc Layer -->
+      <circle cx="500" cy="500" r="455" fill="#b4b8bf" />
+
+      <!-- Circumferential / Arc-to-Arc Iridescent Sectors -->
+      <g filter="url(#iridescent-blend)">
+        <!-- 265° to 285° (Top: Soft Peach / Warm White) -->
+        <path d="M500,500 L452,-48 A550,550 0 0,1 642,-31 Z" fill="#f5d5c8" />
+        <!-- 285° to 302° (Top-Right: Pale Lavender / Silver) -->
+        <path d="M500,500 L642,-31 A550,550 0 0,1 791,34 Z" fill="#ced4e2" />
+        <!-- 302° to 316° (Upper-Right: Bright Aqua / Cyan) -->
+        <path d="M500,500 L791,34 A550,550 0 0,1 895,118 Z" fill="#5ce8e6" />
+        <!-- 316° to 328° (Upper-Right: Lime / Yellow-Green) -->
+        <path d="M500,500 L895,118 A550,550 0 0,1 966,209 Z" fill="#98f56c" />
+        <!-- 328° to 342° (Right-Upper: Golden Amber / Peach) -->
+        <path d="M500,500 L966,209 A550,550 0 0,1 1023,330 Z" fill="#f7b267" />
+        <!-- 342° to 15° (Right: Brushed Metallic Grey / Silver) -->
+        <path d="M500,500 L1023,330 A550,550 0 0,1 1031,642 Z" fill="#9a9da6" />
+        <!-- 15° to 32° (Lower-Right: Pastel Lilac / Pink) -->
+        <path d="M500,500 L1031,642 A550,550 0 0,1 966,791 Z" fill="#f582d7" />
+        <!-- 32° to 46° (Bottom-Right: Soft Yellow / Mint) -->
+        <path d="M500,500 L966,791 A550,550 0 0,1 882,895 Z" fill="#d9f970" />
+        <!-- 46° to 62° (Bottom-Right: Bright Cyan / Sky Blue) -->
+        <path d="M500,500 L758,986 A550,550 0 0,1 758,986 Z" fill="#56d8ff" />
+        <!-- 62° to 80° (Bottom-Right-Center: Vivid Magenta / Hot Pink) -->
+        <path d="M500,500 L758,986 A550,550 0 0,1 595,1042 Z" fill="#ff3eb5" />
+        <!-- 80° to 96° (Bottom: Warm Peach / Cream) -->
+        <path d="M500,500 L595,1042 A550,550 0 0,1 442,1047 Z" fill="#f4cbb8" />
+        <!-- 96° to 112° (Bottom-Left: Turquoise / Aqua) -->
+        <path d="M500,500 L442,1047 A550,550 0 0,1 294,1010 Z" fill="#52e5e7" />
+        <!-- 112° to 126° (Bottom-Left: Silver / Lavender) -->
+        <path d="M500,500 L294,1010 A550,550 0 0,1 177,945 Z" fill="#b8b5cf" />
+        <!-- 126° to 140° (Lower-Left: Neon Green / Yellow) -->
+        <path d="M500,500 L177,945 A550,550 0 0,1 79,853 Z" fill="#7cf768" />
+        <!-- 140° to 156° (Lower-Left: Warm Orange / Coral Red) -->
+        <path d="M500,500 L79,853 A550,550 0 0,1 -2,724 Z" fill="#ff8563" />
+        <!-- 156° to 192° (Left: Brushed Metallic Silver-Grey) -->
+        <path d="M500,500 L-2,724 A550,550 0 0,1 -38,386 Z" fill="#9699a1" />
+        <!-- 192° to 206° (Upper-Left: Pink / Orchid) -->
+        <path d="M500,500 L-38,386 A550,550 0 0,1 6,259 Z" fill="#f28ce2" />
+        <!-- 206° to 228° (Top-Left: Electric Blue / Cyan) -->
+        <path d="M500,500 L6,259 A550,550 0 0,1 132,91 Z" fill="#5cb3ff" />
+        <!-- 228° to 248° (Top-Left: Vivid Magenta / Violet) -->
+        <path d="M500,500 L132,91 A550,550 0 0,1 294,-10 Z" fill="#ff3be2" />
+        <!-- 248° to 265° (Top-Left-Center: Soft Rose / Peach) -->
+        <path d="M500,500 L294,-10 A550,550 0 0,1 452,-48 Z" fill="#ff94d6" />
+      </g>
+
+      <!-- Fine Secondary Iridescent Streaks -->
+      <g filter="url(#soft-glow)" opacity="0.55">
+        <path d="M500,500 L215,35 A540,540 0 0,1 285,-5 Z" fill="#ff2a9d" />
+        <path d="M500,500 L65,195 A540,540 0 0,1 115,120 Z" fill="#70f2ff" />
+        <path d="M500,500 L820,85 A540,540 0 0,1 875,145 Z" fill="#4fffb0" />
+        <path d="M500,500 L630,1025 A540,540 0 0,1 555,1040 Z" fill="#ff2ad4" />
+        <path d="M500,500 L145,910 A540,540 0 0,1 95,860 Z" fill="#fffb66" />
+      </g>
+
+      <!-- Subtle Radial Surface Sheen -->
+      <circle cx="500" cy="500" r="450" fill="url(#metallic-depth)" />
+    </g>
+
+    <!-- B. HYBRID CLEAR POLYCARBONATE INNER CLAMPING HUB (r=60 to r=142) -->
+    <!-- Combines Option 1's steady translucent body with Option 2's soft angled specular reflections -->
+    <g mask="url(#hub-ring-mask)">
+      <!-- 1. Option 1 Frosted Base: 14% Opacity Cool White Tint on Inner Flat Clamping Area (r=60 to r=131) -->
+      <path d="M500,369 A131,131 0 1,0 500,631 A131,131 0 1,0 500,369 Z
+               M500,440 A60,60 0 1,1 500,560 A60,60 0 1,1 500,440 Z" fill="#f0f6ff" fill-opacity="0.14" fill-rule="evenodd" />
+
+      <!-- 2. Option 1 Outer Stacking Ring Ridge (r=131 to r=142): 26% Opacity (Slightly denser plastic ridge) -->
+      <path d="M500,358 A142,142 0 1,0 500,642 A142,142 0 1,0 500,358 Z
+               M500,369 A131,131 0 1,1 500,631 A131,131 0 1,1 500,369 Z" fill="#ffffff" fill-opacity="0.26" fill-rule="evenodd" />
+
+      <!-- 3. Option 2 Diagonal Glossy Surface Sheen -->
+      <circle cx="500" cy="500" r="142" fill="url(#plastic-rim-sheen)" />
+
+      <!-- 4. Option 2 Soft Angled Specular Glare Wedges (Aligned with 11 o'clock & 5 o'clock light axis) -->
+      <g filter="url(#glare-blur)">
+        <!-- Top-Left Primary Glare Wedge -->
+        <path d="M500,500 L380,335 A190,190 0 0,1 465,310 Z" fill="#ffffff" fill-opacity="0.24" />
+        <!-- Top-Left Secondary Thin Streak -->
+        <path d="M500,500 L340,385 A190,190 0 0,1 362,355 Z" fill="#ffffff" fill-opacity="0.14" />
+        <!-- Bottom-Right Counter Glare Wedge -->
+        <path d="M500,500 L620,665 A190,190 0 0,1 535,690 Z" fill="#ffffff" fill-opacity="0.20" />
+      </g>
+    </g>
+
+    <!-- C. BLACK CONCENTRIC LINEWORK (Exact match to reference rings) -->
+    <!-- 1. Outermost Black Perimeter Edge -->
+    <circle cx="500" cy="500" r="448" fill="none" stroke="#111111" stroke-width="4" />
+
+    <!-- 2. Just-Inside Outer Rim Line -->
+    <circle cx="500" cy="500" r="434" fill="none" stroke="#111111" stroke-width="3" />
+
+    <!-- 3. Outer Hub / Mirror Band Ring (Iridescence remains visible inside this ring down to r=142) -->
+    <circle cx="500" cy="500" r="168" fill="none" stroke="#111111" stroke-width="3.2" />
+
+    <!-- 4. Clamping Ring Outer Boundary (Double-line border) -->
+    <circle cx="500" cy="500" r="142" fill="none" stroke="#111111" stroke-width="3.2" />
+    <circle cx="500" cy="500" r="131" fill="none" stroke="#111111" stroke-width="2.8" />
+
+    <!-- 5. Center Spindle Hole Black Outline -->
+    <circle cx="500" cy="500" r="61.5" fill="none" stroke="#111111" stroke-width="3.2" />
+
+  </g>
+</svg>
