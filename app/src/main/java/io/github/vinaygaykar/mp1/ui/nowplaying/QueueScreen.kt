@@ -1,5 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import android.app.Activity
 import android.content.res.Configuration
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
@@ -9,43 +10,96 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.ClearAll
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.ShuffleOn
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -117,6 +171,7 @@ fun QueueBottomSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun QueueBottomSheetContent(
     queueState: QueueUiState,
@@ -127,29 +182,63 @@ fun QueueBottomSheetContent(
     onDismiss: () -> Unit = {},
     initialSelectedIndices: Set<Int> = emptySet()
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
 
-    if (isLandscape) {
-        QueueLandscapeContent(
-            queueState = queueState,
-            actions = actions,
-            isShuffleOn = isShuffleOn,
-            onShuffleToggle = onShuffleToggle,
-            modifier = modifier,
-            onDismiss = onDismiss,
-            initialSelectedIndices = initialSelectedIndices
-        )
+    val widthClass = windowSizeClass?.widthSizeClass
+    val heightClass = windowSizeClass?.heightSizeClass
+
+    val isWideWindow = if (widthClass != null) {
+        widthClass != WindowWidthSizeClass.Compact
     } else {
-        QueuePortraitContent(
-            queueState = queueState,
-            actions = actions,
-            isShuffleOn = isShuffleOn,
-            onShuffleToggle = onShuffleToggle,
-            modifier = modifier,
-            onDismiss = onDismiss,
-            initialSelectedIndices = initialSelectedIndices
-        )
+        val configuration = LocalConfiguration.current
+        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
+
+    val isCompactHeight = if (heightClass != null) {
+        heightClass == WindowHeightSizeClass.Compact
+    } else {
+        val configuration = LocalConfiguration.current
+        configuration.screenHeightDp < 500
+    }
+
+    when {
+        isWideWindow -> {
+            QueueLandscapeContent(
+                queueState = queueState,
+                actions = actions,
+                isShuffleOn = isShuffleOn,
+                onShuffleToggle = onShuffleToggle,
+                modifier = modifier,
+                onDismiss = onDismiss,
+                initialSelectedIndices = initialSelectedIndices
+            )
+        }
+
+        isCompactHeight -> {
+            QueueCompactContent(
+                queueState = queueState,
+                actions = actions,
+                isShuffleOn = isShuffleOn,
+                onShuffleToggle = onShuffleToggle,
+                modifier = modifier,
+                onDismiss = onDismiss,
+                initialSelectedIndices = initialSelectedIndices
+            )
+        }
+
+        else -> {
+            QueuePortraitContent(
+                queueState = queueState,
+                actions = actions,
+                isShuffleOn = isShuffleOn,
+                onShuffleToggle = onShuffleToggle,
+                modifier = modifier,
+                onDismiss = onDismiss,
+                initialSelectedIndices = initialSelectedIndices
+            )
+        }
     }
 }
 
@@ -205,14 +294,238 @@ private fun DismissIconButton(
 }
 
 @Composable
+private fun QueueCompactContent(
+    queueState: QueueUiState,
+    actions: QueueControls,
+    isShuffleOn: Boolean = false,
+    onShuffleToggle: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {},
+    initialSelectedIndices: Set<Int> = emptySet()
+) {
+    var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
+    val isSelectionMode = selectedIndices.isNotEmpty()
+    var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
+
+    fun toggleSelection(index: Int) {
+        selectedIndices = if (selectedIndices.contains(index)) {
+            selectedIndices - index
+        } else {
+            selectedIndices + index
+        }
+    }
+
+    BackHandler(enabled = isSelectionMode) {
+        selectedIndices = emptySet()
+    }
+
+    LaunchedEffect(queueState.items.size) {
+        selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
+        QueueItemList(
+            queueState = queueState,
+            actions = actions,
+            selectedIndices = selectedIndices,
+            onToggleSelection = ::toggleSelection,
+            headerContent = {
+                QueueCompactHeader(
+                    count = queueState.items.size,
+                    isSelectionMode = isSelectionMode,
+                    selectedCount = selectedIndices.size,
+                    onSelectAll = { selectedIndices = queueState.items.indices.toSet() },
+                    onDeselect = { selectedIndices = emptySet() },
+                    onOptionsClick = { showQueueMultiSelectionSheet = true },
+                    isShuffleOn = isShuffleOn,
+                    onShuffleToggle = onShuffleToggle,
+                    onClearQueue = { actions.clearQueue() },
+                    hasItems = queueState.items.isNotEmpty(),
+                    onDismiss = onDismiss
+                )
+            }
+        )
+    }
+
+    QueueMultiSelectionSheetHost(
+        showSheet = showQueueMultiSelectionSheet,
+        selectedIndices = selectedIndices,
+        items = queueState.items,
+        actions = actions,
+        onDismissSheet = { showQueueMultiSelectionSheet = false },
+        onClearSelection = { selectedIndices = emptySet() }
+    )
+
+    Spacer(modifier = Modifier.navigationBarsPadding())
+}
+
+@Composable
+private fun QueueCompactHeader(
+    count: Int,
+    isSelectionMode: Boolean,
+    selectedCount: Int,
+    onSelectAll: () -> Unit,
+    onDeselect: () -> Unit,
+    onOptionsClick: () -> Unit,
+    isShuffleOn: Boolean,
+    onShuffleToggle: () -> Unit,
+    onClearQueue: () -> Unit,
+    hasItems: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                QueueHeaderTitle(count = count)
+                DismissIconButton(onDismiss = onDismiss)
+            }
+
+            if (isSelectionMode) {
+                SelectionActionRow(
+                    selectedCount = selectedCount,
+                    onSelectAll = onSelectAll,
+                    onDeselect = onDeselect,
+                    onOptionsClick = onOptionsClick
+                )
+            } else if (hasItems) {
+                QueueActionsRow(
+                    itemCount = count,
+                    isShuffleOn = isShuffleOn,
+                    onShuffleToggle = onShuffleToggle,
+                    onClearQueue = onClearQueue
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueueActionsRow(
+    itemCount: Int,
+    isShuffleOn: Boolean,
+    onShuffleToggle: () -> Unit,
+    onClearQueue: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        val isShuffleEnabled = itemCount > 1
+        val shuffleContainerColor by animateColorAsState(
+            targetValue = if (isShuffleOn) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+            label = "shuffle_btn_bg"
+        )
+        val shuffleContentColor by animateColorAsState(
+            targetValue = if (isShuffleOn) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            label = "shuffle_btn_content"
+        )
+
+        // Clear All Button (Left)
+        FilledTonalButton(
+            onClick = onClearQueue,
+            enabled = itemCount > 1,
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                    alpha = 0.5f
+                ),
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                    alpha = 0.38f
+                )
+            ),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.height(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.ClearAll,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Clear All",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Shuffle Button (Right)
+        FilledTonalButton(
+            onClick = onShuffleToggle,
+            enabled = isShuffleEnabled,
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = shuffleContainerColor,
+                contentColor = shuffleContentColor,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                    alpha = 0.5f
+                ),
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                    alpha = 0.38f
+                )
+            ),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.height(40.dp)
+        ) {
+            Icon(
+                imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
 private fun ColumnScope.QueueItemList(
     queueState: QueueUiState,
     actions: QueueControls,
     selectedIndices: Set<Int>,
     onToggleSelection: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    onTitleVisibilityChange: ((Boolean) -> Unit)? = null
+    onTitleVisibilityChange: ((Boolean) -> Unit)? = null,
+    headerContent: (@Composable () -> Unit)? = null
 ) {
+    val headerOffset = if (headerContent != null) 1 else 0
+
     if (queueState.items.isEmpty()) {
         Box(
             modifier = modifier
@@ -220,11 +533,26 @@ private fun ColumnScope.QueueItemList(
                 .weight(1f),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "No items in queue",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (headerContent != null) {
+                    headerContent()
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No items in queue",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     } else {
         val lazyListState = rememberLazyListState()
@@ -237,7 +565,10 @@ private fun ColumnScope.QueueItemList(
         val nestedScrollConnection = remember(onTitleVisibilityChange) {
             if (onTitleVisibilityChange != null) {
                 object : NestedScrollConnection {
-                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    override fun onPreScroll(
+                        available: Offset,
+                        source: NestedScrollSource
+                    ): Offset {
                         val delta = available.y
                         if (draggedKey == null) {
                             if (delta < -8f) {
@@ -266,7 +597,9 @@ private fun ColumnScope.QueueItemList(
 
         LaunchedEffect(queueState.currentIndex, queueState.items.size) {
             if (!hasScrolledToInitialPosition && queueState.currentIndex in queueState.items.indices) {
-                lazyListState.scrollToItem(index = queueState.currentIndex)
+                val targetIndex =
+                    if (queueState.currentIndex == 0) 0 else queueState.currentIndex + headerOffset
+                lazyListState.scrollToItem(index = targetIndex)
                 hasScrolledToInitialPosition = true
             }
         }
@@ -299,8 +632,17 @@ private fun ColumnScope.QueueItemList(
             LazyColumn(
                 state = lazyListState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)
+                contentPadding = PaddingValues(
+                    top = if (headerContent != null) 0.dp else 8.dp,
+                    bottom = 88.dp
+                )
             ) {
+                if (headerContent != null) {
+                    item(key = "queue_header_content") {
+                        headerContent()
+                    }
+                }
+
                 itemsIndexed(
                     items = queueState.items,
                     key = { index, _ -> itemKeys.getOrElse(index) { "item_$index" } }
@@ -341,23 +683,24 @@ private fun ColumnScope.QueueItemList(
 
                                 if (dragOffsetY > threshold && currentIndex < visibleItems.size - 1) {
                                     val targetItem = visibleItems[currentIndex + 1]
-                                    val fromIdx = currentItemInfo.index
-                                    val toIdx = targetItem.index
+                                    val fromIdx = currentItemInfo.index - headerOffset
+                                    val toIdx = targetItem.index - headerOffset
                                     if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
                                         actions.moveQueueItem(fromIdx, toIdx)
                                         dragOffsetY -= currentItemInfo.size
                                     }
                                 } else if (dragOffsetY < -threshold && currentIndex > 0) {
                                     val targetItem = visibleItems[currentIndex - 1]
-                                    val fromIdx = currentItemInfo.index
-                                    val toIdx = targetItem.index
+                                    val fromIdx = currentItemInfo.index - headerOffset
+                                    val toIdx = targetItem.index - headerOffset
                                     if (fromIdx in queueState.items.indices && toIdx in queueState.items.indices) {
                                         actions.moveQueueItem(fromIdx, toIdx)
                                         dragOffsetY += currentItemInfo.size
                                     }
                                 }
 
-                                val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                                val viewportHeight =
+                                    layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
                                 val topBounds = currentItemInfo.offset + dragOffsetY
                                 val bottomBounds = topBounds + currentItemInfo.size
 
@@ -494,85 +837,12 @@ private fun QueuePortraitContent(
                         onOptionsClick = { showQueueMultiSelectionSheet = true }
                     )
                 } else if (queueState.items.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val isShuffleEnabled = queueState.items.size > 1
-                        val shuffleContainerColor by animateColorAsState(
-                            targetValue = if (isShuffleOn) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerHigh
-                            },
-                            label = "shuffle_btn_bg"
-                        )
-                        val shuffleContentColor by animateColorAsState(
-                            targetValue = if (isShuffleOn) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            label = "shuffle_btn_content"
-                        )
-
-                        // Clear All Button (Left)
-                        FilledTonalButton(
-                            onClick = { actions.clearQueue() },
-                            enabled = queueState.items.size > 1,
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                            ),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                            modifier = Modifier.height(40.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.ClearAll,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Clear All",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-
-                        // Shuffle Button (Right)
-                        FilledTonalButton(
-                            onClick = { onShuffleToggle() },
-                            enabled = isShuffleEnabled,
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = shuffleContainerColor,
-                                contentColor = shuffleContentColor,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                            ),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                            modifier = Modifier.height(40.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
+                    QueueActionsRow(
+                        itemCount = queueState.items.size,
+                        isShuffleOn = isShuffleOn,
+                        onShuffleToggle = onShuffleToggle,
+                        onClearQueue = { actions.clearQueue() }
+                    )
                 }
             }
         }
@@ -657,7 +927,11 @@ private fun QueueLandscapeContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .statusBarsPadding()
-                                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start))
+                                .windowInsetsPadding(
+                                    WindowInsets.displayCutout.only(
+                                        WindowInsetsSides.Start
+                                    )
+                                )
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -674,7 +948,11 @@ private fun QueueLandscapeContent(
                 selectedIndices = selectedIndices,
                 onToggleSelection = ::toggleSelection,
                 onTitleVisibilityChange = { isTitleVisible = it },
-                modifier = Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Start))
+                modifier = Modifier.windowInsetsPadding(
+                    WindowInsets.displayCutout.only(
+                        WindowInsetsSides.Start
+                    )
+                )
             )
         }
 
@@ -692,143 +970,150 @@ private fun QueueLandscapeContent(
                     .statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-            // Dismiss Chevron Down Button (first icon in landscape right pane)
-            DismissIconButton(onDismiss = onDismiss)
+                // Dismiss Chevron Down Button (first icon in landscape right pane)
+                DismissIconButton(onDismiss = onDismiss)
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            if (isSelectionMode) {
-                // Multi-select controls in Right Pane
-                // 1. Vertical pill button containing kebab icon (top) and count (below)
-                Surface(
-                    onClick = { showQueueMultiSelectionSheet = true },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.width(48.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
+                if (isSelectionMode) {
+                    // Multi-select controls in Right Pane
+                    // 1. Vertical pill button containing kebab icon (top) and count (below)
+                    Surface(
+                        onClick = { showQueueMultiSelectionSheet = true },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.width(48.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(
+                                4.dp,
+                                Alignment.CenterVertically
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = "More Options",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "${selectedIndices.size}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+
+                    // Spacer to push All and None buttons to the bottom of the right pane
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // 2. Select All button (icon only)
+                    FilledTonalIconButton(
+                        onClick = { selectedIndices = queueState.items.indices.toSet() },
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.MoreHoriz,
-                            contentDescription = "More Options",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "${selectedIndices.size}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            imageVector = Icons.Default.SelectAll,
+                            contentDescription = "Select All",
+                            modifier = Modifier.size(24.dp)
                         )
                     }
-                }
 
-                // Spacer to push All and None buttons to the bottom of the right pane
-                Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                // 2. Select All button (icon only)
-                FilledTonalIconButton(
-                    onClick = { selectedIndices = queueState.items.indices.toSet() },
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    // 3. Deselect button (icon only, at bottom)
+                    FilledTonalIconButton(
+                        onClick = { selectedIndices = emptySet() },
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Deselect,
+                            contentDescription = "Deselect",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else {
+                    // Standard controls in Right Pane (Clear All & Shuffle)
+                    val isShuffleEnabled = queueState.items.size > 1
+                    val isClearEnabled = queueState.items.size > 1
+
+                    val shuffleContainerColor by animateColorAsState(
+                        targetValue = if (isShuffleOn) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        label = "shuffle_btn_bg_land"
                     )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SelectAll,
-                        contentDescription = "Select All",
-                        modifier = Modifier.size(24.dp)
+                    val shuffleContentColor by animateColorAsState(
+                        targetValue = if (isShuffleOn) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        label = "shuffle_btn_content_land"
                     )
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.weight(1f))
 
-                // 3. Deselect button (icon only, at bottom)
-                FilledTonalIconButton(
-                    onClick = { selectedIndices = emptySet() },
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Deselect,
-                        contentDescription = "Deselect",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            } else {
-                // Standard controls in Right Pane (Clear All & Shuffle)
-                val isShuffleEnabled = queueState.items.size > 1
-                val isClearEnabled = queueState.items.size > 1
+                    // Clear All Button (top)
+                    FilledTonalIconButton(
+                        onClick = { actions.clearQueue() },
+                        enabled = isClearEnabled,
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                                alpha = 0.5f
+                            ),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ClearAll,
+                            contentDescription = "Clear All",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
-                val shuffleContainerColor by animateColorAsState(
-                    targetValue = if (isShuffleOn) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    },
-                    label = "shuffle_btn_bg_land"
-                )
-                val shuffleContentColor by animateColorAsState(
-                    targetValue = if (isShuffleOn) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    label = "shuffle_btn_content_land"
-                )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Clear All Button (top)
-                FilledTonalIconButton(
-                    onClick = { actions.clearQueue() },
-                    enabled = isClearEnabled,
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.ClearAll,
-                        contentDescription = "Clear All",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Shuffle Button
-                FilledTonalIconButton(
-                    onClick = { onShuffleToggle() },
-                    enabled = isShuffleEnabled,
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = shuffleContainerColor,
-                        contentColor = shuffleContentColor,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
-                        contentDescription = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
-                        modifier = Modifier.size(24.dp)
-                    )
+                    // Shuffle Button
+                    FilledTonalIconButton(
+                        onClick = { onShuffleToggle() },
+                        enabled = isShuffleEnabled,
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = shuffleContainerColor,
+                            contentColor = shuffleContentColor,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                                alpha = 0.5f
+                            ),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                            contentDescription = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
     }
-}
 
     QueueMultiSelectionSheetHost(
         showSheet = showQueueMultiSelectionSheet,
@@ -863,7 +1148,8 @@ private fun QueueItemRow(
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val view = LocalView.current
 
-    val itemShape = if (isCurrent || isSelected || isBeingDragged) CircleShape else RoundedCornerShape(12.dp)
+    val itemShape =
+        if (isCurrent || isSelected || isBeingDragged) CircleShape else RoundedCornerShape(12.dp)
 
     val containerColor by animateColorAsState(
         targetValue = when {
@@ -907,7 +1193,10 @@ private fun QueueItemRow(
                 style = MaterialTheme.typography.bodyMedium,
                 color = when {
                     isSelected -> MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                    isCurrent || isBeingDragged -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    isCurrent || isBeingDragged -> MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                        alpha = 0.8f
+                    )
+
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 maxLines = 1,
@@ -1384,6 +1673,20 @@ private val samplePreviewQueueActions = object : QueueControls {
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
 )
+@Preview(
+    name = "Portrait Split",
+    group = "1. Queue Screen - Standard",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "1. Queue Screen - Standard",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
 @Composable
 private fun QueueScreenStandardPreview() {
     MusicPlayerTheme(dynamicColor = false) {
@@ -1428,6 +1731,20 @@ private fun QueueScreenStandardPreview() {
     showBackground = true,
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split",
+    group = "2. Queue Screen - Multi Select Mode",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "2. Queue Screen - Multi Select Mode",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Composable
 private fun QueueScreenMultiSelectPreview() {
@@ -1474,6 +1791,20 @@ private fun QueueScreenMultiSelectPreview() {
     showBackground = true,
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split",
+    group = "3. Multi Select Bottom Sheet",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "3. Multi Select Bottom Sheet",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Composable
 private fun QueueMultiSelectBottomSheetPreview() {
