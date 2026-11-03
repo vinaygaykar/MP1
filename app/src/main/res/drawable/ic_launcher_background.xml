@@ -1,10 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="1000"
     android:viewportHeight="1000">
 
+    <!-- 1. FULL-BLEED IRIDESCENT RAINBOW SWEEP (Covers entire 1000x1000 canvas) -->
     <path
-        android:fillColor="#00000000"
-        android:pathData="M0,0h1000v1000h-1000z" />
+        android:pathData="M0,0 h1000 v1000 h-1000 z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="500"
+                android:centerY="500"
+                android:type="sweep">
+                <item android:color="#FF9A9DA6" android:offset="0.00" />
+                <item android:color="#FFF582D7" android:offset="0.06" />
+                <item android:color="#FFD9F970" android:offset="0.11" />
+                <item android:color="#FF56D8FF" android:offset="0.15" />
+                <item android:color="#FFFF3EB5" android:offset="0.20" />
+                <item android:color="#FFF4CBB8" android:offset="0.25" />
+                <item android:color="#FF52E5E7" android:offset="0.29" />
+                <item android:color="#FFB8B5CF" android:offset="0.33" />
+                <item android:color="#FF7CF768" android:offset="0.37" />
+                <item android:color="#FFFF8563" android:offset="0.41" />
+                <item android:color="#FF9699A1" android:offset="0.48" />
+                <item android:color="#FF9699A1" android:offset="0.52" />
+                <item android:color="#FFF28CE2" android:offset="0.56" />
+                <item android:color="#FF5CB3FF" android:offset="0.61" />
+                <item android:color="#FFFF3BE2" android:offset="0.66" />
+                <item android:color="#FFFF94D6" android:offset="0.71" />
+                <item android:color="#FFF5D5C8" android:offset="0.76" />
+                <item android:color="#FFCED4E2" android:offset="0.82" />
+                <item android:color="#FF5CE8E6" android:offset="0.86" />
+                <item android:color="#FF98F56C" android:offset="0.89" />
+                <item android:color="#FFF7B267" android:offset="0.94" />
+                <item android:color="#FF9A9DA6" android:offset="1.00" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 2. OVERSIZED BRIGHT TRUE-BLUE CENTER WITH RADIAL GLOW (r=165 for Parallax Safety) -->
+    <path
+        android:pathData="M500,335 A165,165 0 1,0 500,665 A165,165 0 1,0 500,335 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="500"
+                android:centerY="500"
+                android:gradientRadius="165"
+                android:type="radial">
+                <!-- Bright true blue center spindle hole -->
+                <item android:color="#FF0047AB" android:offset="0.00" />
+                <item android:color="#FF0056D2" android:offset="0.25" />
+                <!-- Vibrant electric blue radial glow behind polycarbonate hub -->
+                <item android:color="#FF2563EB" android:offset="0.52" />
+                <!-- Rich true blue near clamping ring boundary -->
+                <item android:color="#FF1D4ED8" android:offset="0.78" />
+                <!-- True blue buffer zone hidden beneath foreground's opaque rainbow -->
+                <item android:color="#FF0047AB" android:offset="1.00" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
 </vector>
