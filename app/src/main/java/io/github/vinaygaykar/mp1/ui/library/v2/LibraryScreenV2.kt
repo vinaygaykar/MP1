@@ -416,12 +416,11 @@ fun LibraryContentV2(
                     if (isCurrentCategoryShared && detailProgress < 1f && effectiveActionBarExpanded) 0f else 1f
             }
             .onGloballyPositioned { coords ->
-                if (coords.isAttached && isCurrentCategoryShared) {
+                if (coords.isAttached && isCurrentCategoryShared && detailProgress >= 0.99f) {
                     val windowOffset = coords.positionInRoot()
                     val localOffset = windowOffset - rootOffsetInWindow
-                    val unshiftedX = localOffset.x - dragOffset
                     val rect = Rect(
-                        offset = Offset(unshiftedX, localOffset.y),
+                        offset = localOffset,
                         size = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
                     )
                     if (level2TitleBoundsMap[currentCategory] != rect) {
@@ -459,7 +458,8 @@ fun LibraryContentV2(
                 libraryState = libraryState,
                 displayFolder = displayFolder,
                 bottomPadding = bottomPadding,
-                dragOffset = dragOffset,
+                detailProgress = detailProgress,
+                pivotOffset = level1TitleBoundsMap[currentCategory]?.center,
                 isPlayerActive = isPlayerActive,
                 scrollBehavior = scrollBehavior,
                 onOpenCategoryMenu = { openCategoryMenu() },

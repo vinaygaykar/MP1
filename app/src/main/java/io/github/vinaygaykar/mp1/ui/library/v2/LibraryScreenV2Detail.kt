@@ -42,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -76,7 +78,8 @@ internal fun CategoryDetailScreen(
     libraryState: LibraryState,
     displayFolder: String?,
     bottomPadding: Dp,
-    dragOffset: Float,
+    detailProgress: Float,
+    pivotOffset: Offset? = null,
     isPlayerActive: Boolean,
     scrollBehavior: TopAppBarScrollBehavior,
     onOpenCategoryMenu: () -> Unit,
@@ -119,7 +122,16 @@ internal fun CategoryDetailScreen(
         modifier = modifier
             .fillMaxSize()
             .graphicsLayer {
-                translationX = dragOffset
+                val pivotX = pivotOffset?.x ?: (size.width / 2f)
+                val pivotY = pivotOffset?.y ?: (size.height / 2f)
+                transformOrigin = TransformOrigin(
+                    pivotFractionX = if (size.width > 0f) (pivotX / size.width).coerceIn(0f, 1f) else 0.5f,
+                    pivotFractionY = if (size.height > 0f) (pivotY / size.height).coerceIn(0f, 1f) else 0.5f
+                )
+                scaleX = detailProgress
+                scaleY = detailProgress
+                alpha = detailProgress.coerceIn(0f, 1f)
+                clip = true
             }
     ) {
         Column(

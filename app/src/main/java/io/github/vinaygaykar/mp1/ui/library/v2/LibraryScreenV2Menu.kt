@@ -38,7 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -202,28 +201,20 @@ private fun CategoryMenuPortraitContent(
             val maxH = this.maxHeight
             val fontSize = minOf(maxW.value * 0.22f, maxH.value * 0.45f, 76f).sp
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.Bottom
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Start
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                            contentDescription = "App Icon",
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_icon_og),
+                        contentDescription = "App Icon",
+                        modifier = Modifier.size(72.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "MP.1",
                         style = MaterialTheme.typography.displayLarge.copy(
@@ -240,7 +231,9 @@ private fun CategoryMenuPortraitContent(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 6.dp)
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(bottom = 6.dp)
                 ) {
                     Surface(
                         onClick = { onOpenCategory(LibraryCategory.SEARCH) },
@@ -351,18 +344,11 @@ private fun CategoryMenuLandscapeContent(
                 horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.Bottom
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                        contentDescription = "App Icon",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.ic_icon_og),
+                    contentDescription = "App Icon",
+                    modifier = Modifier.size(72.dp)
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "MP.1",
@@ -495,32 +481,6 @@ private fun CategoryMenuLandscapeContent(
                     }
                 }
             }
-        }
-    }
-}
-
-@Preview(
-    name = "Category Menu - Landscape Direct Preview",
-    showBackground = true,
-    device = "spec:width=891dp,height=411dp,orientation=landscape",
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Composable
-private fun CategoryMenuLandscapePreview() {
-    MusicPlayerTheme(dynamicColor = false) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            CategoryMenuLandscapeContent(
-                uiState = LibraryUiState(
-                    playlists = listOf(Playlist(id = 1L, name = "Favorites", songCount = 12)),
-                    isScanning = false
-                ),
-                displayFolder = null,
-                bottomPadding = 0.dp,
-                onOpenCategory = {},
-                onSettingsClick = {},
-                onOpenScanLocations = {},
-                categoryTitleModifiers = emptyMap()
-            )
         }
     }
 }
