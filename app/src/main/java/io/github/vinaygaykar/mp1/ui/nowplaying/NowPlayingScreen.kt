@@ -1,20 +1,25 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import android.annotation.SuppressLint
-import android.content.res.Configuration
+import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,7 +27,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,13 +51,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -53,9 +75,12 @@ import io.github.vinaygaykar.mp1.playback.QueueControls
 import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.ui.library.DragValue
 import io.github.vinaygaykar.mp1.utils.AudioEnergyExtractor
+import io.github.vinaygaykar.mp1.utils.collectArtistNames
+import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @SuppressLint("DiscouragedApi", "InternalInsetResource")
 @Composable
 fun NowPlayingScreen(
@@ -152,30 +177,49 @@ fun NowPlayingScreen(
         val startPadding = lerp(rawStartPadding, 0.dp, state.progress)
         val endPadding = lerp(rawEndPadding, 0.dp, state.progress)
 
-        val isLandscape = screenWidth > screenHeight
+        val activity = context as? Activity
+        val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
+
+        val widthClass = windowSizeClass?.widthSizeClass
+        val heightClass = windowSizeClass?.heightSizeClass
+
+        val isWideWindow = if (widthClass != null) {
+            widthClass != WindowWidthSizeClass.Compact
+        } else {
+            screenWidth > screenHeight
+        }
+
+        val isCompactHeight = if (heightClass != null) {
+            heightClass == WindowHeightSizeClass.Compact
+        } else {
+            screenHeight < 500.dp
+        }
+
+        val rightPaneWidth = if (isWideWindow) 64.dp else 0.dp
+        val availableWidth = if (isWideWindow) screenWidth - rightPaneWidth else screenWidth
+        val leftPaneWidth = if (isWideWindow) availableWidth * 0.5f else screenWidth
 
         val cornerRadius = lerp(50.dp, 0.dp, state.progress)
         val sheetShadowElevation = lerp(8.dp, 0.dp, state.progress)
 
-        val targetRecordSize = if (isLandscape) {
-            min(screenHeight * 0.72f, screenWidth * 0.42f)
-        } else {
-            screenWidth * 0.85f
+        val targetRecordSize = when {
+            isWideWindow -> min(screenHeight * 0.72f, leftPaneWidth * 0.85f)
+            isCompactHeight -> min(screenHeight * 0.75f, 260.dp)
+            else -> screenWidth * 0.85f
         }
         val recordSize = lerp(56.dp, targetRecordSize, state.progress)
         val artworkSize = lerp(56.dp, min(210.dp, recordSize * 0.6f), state.progress)
 
-        val targetRecordX = if (isLandscape) {
-            screenWidth * 0.50f + (screenWidth * 0.50f - targetRecordSize) / 2
-        } else {
-            (screenWidth - targetRecordSize) / 2 - horizontalPadding
+        val targetRecordX = when {
+            isWideWindow -> leftPaneWidth + (leftPaneWidth - targetRecordSize) / 2
+            else -> (screenWidth - targetRecordSize) / 2 - horizontalPadding
         }
         val recordX = lerp(screenWidth - recordSize - 8.dp - horizontalPadding, targetRecordX, state.progress)
 
-        val targetRecordY = if (isLandscape) {
-            (screenHeight - targetRecordSize) / 2
-        } else {
-            screenHeight * 0.44f
+        val targetRecordY = when {
+            isWideWindow -> (screenHeight - targetRecordSize) / 2
+            isCompactHeight -> screenHeight - (targetRecordSize * 0.5f)
+            else -> screenHeight * 0.44f
         }
         val recordY = lerp(8.dp, targetRecordY, state.progress)
 
@@ -222,63 +266,331 @@ fun NowPlayingScreen(
                 val controlsAlpha = ((state.progress - 0.8f) / 0.2f).coerceIn(0f, 1f)
                 val expandedAlpha = ((state.progress - 0.05f) / 0.15f).coerceIn(0f, 1f)
 
-                if (isLandscape) {
-                    NowPlayingLandscapeContent(
-                        state = state,
-                        playbackState = playbackState,
-                        progressState = progressState,
-                        queueState = queueState,
-                        lyricsState = lyricsState,
-                        playbackControls = playbackControls,
-                        queueControls = queueControls,
-                        lyricsControls = lyricsControls,
-                        visualizerState = visualizerState,
-                        recordSize = recordSize,
-                        artworkSize = artworkSize,
-                        startPadding = startPadding,
-                        endPadding = endPadding,
-                        recordX = recordX,
-                        recordY = recordY,
-                        screenWidth = screenWidth,
-                        screenHeight = screenHeight,
-                        peekHeight = peekHeight,
-                        overlayAlpha = overlayAlpha,
-                        scrubFactor = scrubFactor,
-                        controlsAlpha = controlsAlpha,
-                        expandedAlpha = expandedAlpha,
-                        onMiniPlayerPositioned = onMiniPlayerPositioned,
-                        view = view
+                when {
+                    isWideWindow -> {
+                        NowPlayingLandscapeContent(
+                            state = state,
+                            playbackState = playbackState,
+                            progressState = progressState,
+                            queueState = queueState,
+                            lyricsState = lyricsState,
+                            playbackControls = playbackControls,
+                            queueControls = queueControls,
+                            lyricsControls = lyricsControls,
+                            visualizerState = visualizerState,
+                            recordSize = recordSize,
+                            artworkSize = artworkSize,
+                            startPadding = startPadding,
+                            endPadding = endPadding,
+                            recordX = recordX,
+                            recordY = recordY,
+                            screenWidth = screenWidth,
+                            leftPaneWidth = leftPaneWidth,
+                            peekHeight = peekHeight,
+                            overlayAlpha = overlayAlpha,
+                            scrubFactor = scrubFactor,
+                            controlsAlpha = controlsAlpha,
+                            expandedAlpha = expandedAlpha,
+                            onMiniPlayerPositioned = onMiniPlayerPositioned,
+                            view = view
+                        )
+                    }
+                    isCompactHeight -> {
+                        NowPlayingCompactContent(
+                            state = state,
+                            playbackState = playbackState,
+                            progressState = progressState,
+                            queueState = queueState,
+                            lyricsState = lyricsState,
+                            playbackControls = playbackControls,
+                            queueControls = queueControls,
+                            lyricsControls = lyricsControls,
+                            visualizerState = visualizerState,
+                            recordSize = recordSize,
+                            artworkSize = artworkSize,
+                            startPadding = startPadding,
+                            endPadding = endPadding,
+                            recordX = recordX,
+                            recordY = recordY,
+                            screenWidth = screenWidth,
+                            peekHeight = peekHeight,
+                            overlayAlpha = overlayAlpha,
+                            scrubFactor = scrubFactor,
+                            controlsAlpha = controlsAlpha,
+                            expandedAlpha = expandedAlpha,
+                            onMiniPlayerPositioned = onMiniPlayerPositioned,
+                            view = view
+                        )
+                    }
+                    else -> {
+                        NowPlayingPortraitContent(
+                            state = state,
+                            playbackState = playbackState,
+                            progressState = progressState,
+                            queueState = queueState,
+                            lyricsState = lyricsState,
+                            playbackControls = playbackControls,
+                            queueControls = queueControls,
+                            lyricsControls = lyricsControls,
+                            visualizerState = visualizerState,
+                            recordSize = recordSize,
+                            artworkSize = artworkSize,
+                            startPadding = startPadding,
+                            endPadding = endPadding,
+                            recordX = recordX,
+                            recordY = recordY,
+                            screenWidth = screenWidth,
+                            peekHeight = peekHeight,
+                            rowWidthFraction = rowWidthFraction,
+                            overlayAlpha = overlayAlpha,
+                            scrubFactor = scrubFactor,
+                            controlsAlpha = controlsAlpha,
+                            expandedAlpha = expandedAlpha,
+                            onMiniPlayerPositioned = onMiniPlayerPositioned,
+                            view = view
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DismissIconButton(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FilledTonalIconButton(
+        onClick = onDismiss,
+        modifier = modifier.size(32.dp),
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.KeyboardArrowDown,
+            contentDescription = "Dismiss",
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun NowPlayingCompactContent(
+    state: NowPlayingScreenState,
+    playbackState: PlaybackUiState,
+    progressState: PlaybackProgressState,
+    queueState: QueueUiState,
+    lyricsState: LyricsUiState,
+    playbackControls: PlaybackControls,
+    queueControls: QueueControls,
+    lyricsControls: LyricsControls,
+    visualizerState: VisualizerState,
+    recordSize: Dp,
+    artworkSize: Dp,
+    startPadding: Dp,
+    endPadding: Dp,
+    recordX: Dp,
+    recordY: Dp,
+    screenWidth: Dp,
+    peekHeight: Dp,
+    overlayAlpha: Float,
+    scrubFactor: Float,
+    controlsAlpha: Float,
+    expandedAlpha: Float,
+    onMiniPlayerPositioned: ((Offset) -> Unit)?,
+    view: android.view.View
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .displayCutoutPadding()
+            .pointerInput(state.progress, state.showQueue, state.showLyrics, state.showArtistsDialog, state.totalRange) {
+                if (state.progress > 0.8f && !state.showQueue && !state.showLyrics && !state.showArtistsDialog) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            val currentPlayerOffset = try {
+                                state.anchoredDraggableState.requireOffset()
+                            } catch (_: Exception) { 0f }
+                            if (dragAmount > 0f) {
+                                if (currentPlayerOffset < state.totalRange) {
+                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtMost(state.totalRange)
+                                    state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                    change.consume()
+                                }
+                            } else if (dragAmount < 0f) {
+                                if (currentPlayerOffset > 0f) {
+                                    val newOffset = (currentPlayerOffset + dragAmount).coerceAtLeast(0f)
+                                    state.anchoredDraggableState.dispatchRawDelta(newOffset - currentPlayerOffset)
+                                    change.consume()
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            val currentPlayerOffset = try { state.anchoredDraggableState.requireOffset() } catch (_: Exception) { 0f }
+                            if (currentPlayerOffset > 0f) {
+                                if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
+                            }
+                        },
+                        onDragCancel = {
+                            val currentPlayerOffset = try { state.anchoredDraggableState.requireOffset() } catch (_: Exception) { 0f }
+                            if (currentPlayerOffset > 0f) {
+                                if (currentPlayerOffset > state.totalRange * 0.4f) state.collapse() else state.expand()
+                            }
+                        }
                     )
-                } else {
-                    NowPlayingPortraitContent(
-                        state = state,
-                        playbackState = playbackState,
-                        progressState = progressState,
-                        queueState = queueState,
-                        lyricsState = lyricsState,
-                        playbackControls = playbackControls,
-                        queueControls = queueControls,
-                        lyricsControls = lyricsControls,
-                        visualizerState = visualizerState,
-                        recordSize = recordSize,
-                        artworkSize = artworkSize,
-                        startPadding = startPadding,
-                        endPadding = endPadding,
-                        recordX = recordX,
-                        recordY = recordY,
-                        screenWidth = screenWidth,
-                        peekHeight = peekHeight,
-                        rowWidthFraction = rowWidthFraction,
-                        overlayAlpha = overlayAlpha,
+                }
+            }
+    ) {
+        if (state.progress > 0.05f) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 12.dp)
+                    .alpha(expandedAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 1. Show action buttons and sheet dismiss button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    NowPlayingActionRow(
+                        repeatMode = playbackState.repeatMode,
+                        onLyricsClick = { state.showLyrics = true },
+                        onRepeatToggle = { playbackControls.onRepeatToggle() },
+                        onQueueClick = { state.showQueue = true }
+                    )
+
+                    DismissIconButton(
+                        onDismiss = { state.collapse() }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 2. Show track title and artists (no album title) both 1 liner, track title will marquee and artists text will overflow with ellipses
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    val displayArtist = remember(playbackState.artist, playbackState.trackTitle) {
+                        collectArtistNames(playbackState.artist, playbackState.trackTitle).joinArtistsForDisplay()
+                    }
+
+                    Text(
+                        text = playbackState.trackTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee()
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = displayArtist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { state.showArtistsDialog = true }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 3. Show current timestamp bar
+                if (state.progress > 0.8f) {
+                    val displayPosition = if (state.isDraggingScrub) state.draggedPosition else progressState.positionMs
+                    val (currentEnergy, currentEnergyDelta) = calculateEnergy(visualizerState, displayPosition)
+                    PlayerTimestampBar(
+                        displayPositionMs = displayPosition,
+                        durationMs = progressState.durationMs,
+                        isPlaying = playbackState.isPlaying,
                         scrubFactor = scrubFactor,
-                        controlsAlpha = controlsAlpha,
-                        expandedAlpha = expandedAlpha,
-                        onMiniPlayerPositioned = onMiniPlayerPositioned,
-                        view = view
+                        rowWidthFraction = 1f,
+                        recordY = null,
+                        progress = controlsAlpha,
+                        energy = currentEnergy,
+                        energyDelta = currentEnergyDelta,
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
                     )
                 }
             }
         }
+
+        // Collapsed View Content
+        if (state.progress < 0.2f) {
+            val miniPlayerAlpha = ((0.2f - state.progress) / 0.2f).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(peekHeight)
+                    .alpha(miniPlayerAlpha)
+                    .clickable { state.expand() }
+            ) {
+                NowPlayingCollapsedView(
+                    playbackState = playbackState,
+                    progressState = progressState,
+                    queueState = queueState,
+                    actions = playbackControls,
+                    showRecord = false,
+                    rotation = { state.visualRotation },
+                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) },
+                    onClick = { state.expand() }
+                )
+            }
+        }
+
+        // 4. Show vinyl record, but only 50% rest is off screen below
+        NowPlayingVinylPager(
+            state = state,
+            playbackState = playbackState,
+            progressState = progressState,
+            playbackControls = playbackControls,
+            recordSize = recordSize,
+            artworkSize = artworkSize,
+            startPadding = startPadding,
+            endPadding = endPadding,
+            recordX = recordX,
+            recordY = recordY,
+            screenWidth = screenWidth,
+            overlayAlpha = overlayAlpha,
+            onMiniPlayerPositioned = onMiniPlayerPositioned
+        )
+
+        // Overlays
+        NowPlayingOverlays(
+            state = state,
+            playbackState = playbackState,
+            progressState = progressState,
+            queueState = queueState,
+            lyricsState = lyricsState,
+            playbackControls = playbackControls,
+            queueControls = queueControls,
+            lyricsControls = lyricsControls,
+            view = view
+        )
     }
 }
 
@@ -371,19 +683,34 @@ private fun NowPlayingPortraitContent(
                 }
             }
     ) {
-        // Track Content
+        // Track Content & Top Dismiss Row
         if (state.progress > 0.05f) {
-            NowPlayingTrackInfo(
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 64.dp)
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
                     .padding(horizontal = 24.dp)
-                    .alpha(expandedAlpha),
-                playbackState = playbackState,
-                queueState = queueState,
-                pagerState = state.pagerState
+                    .alpha(expandedAlpha)
             ) {
-                state.showArtistsDialog = true
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    DismissIconButton(
+                        onDismiss = { state.collapse() }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                NowPlayingTrackInfo(
+                    playbackState = playbackState,
+                    queueState = queueState,
+                    pagerState = state.pagerState
+                ) {
+                    state.showArtistsDialog = true
+                }
             }
         }
 
@@ -486,7 +813,7 @@ private fun NowPlayingLandscapeContent(
     recordX: Dp,
     recordY: Dp,
     screenWidth: Dp,
-    screenHeight: Dp,
+    leftPaneWidth: Dp,
     peekHeight: Dp,
     overlayAlpha: Float,
     scrubFactor: Float,
@@ -536,13 +863,14 @@ private fun NowPlayingLandscapeContent(
                 }
             }
     ) {
-        // Left 50% Column (Track Content & Waveform directly below with 12dp margin)
+        // Left Pane Column (Track Content & Waveform)
         if (state.progress > 0.05f) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(screenWidth * 0.50f)
+                    .width(leftPaneWidth)
                     .padding(top = 48.dp)
+                    .displayCutoutPadding()
                     .alpha(expandedAlpha)
             ) {
                 NowPlayingTrackInfo(
@@ -578,7 +906,7 @@ private fun NowPlayingLandscapeContent(
                         waveCycles = landscapeWaveCycles,
                         contentAlignment = Alignment.CenterStart,
                         modifier = Modifier
-                            .padding(12.dp)
+                            .padding(horizontal = 24.dp, vertical = 12.dp)
                             .fillMaxWidth()
                     )
                 }
@@ -608,7 +936,7 @@ private fun NowPlayingLandscapeContent(
             }
         }
 
-        // Action Buttons (Left 50% Pane, bottom left)
+        // Action Buttons (Left Pane, bottom left)
         NowPlayingActionButtons(
             state = state,
             playbackState = playbackState,
@@ -616,7 +944,7 @@ private fun NowPlayingLandscapeContent(
             isLandscape = true
         )
 
-        // Vinyl Record Pager (Floating in Right 50% Pane)
+        // Middle Pane: Vinyl Record Pager (Floating in Middle Pane)
         NowPlayingVinylPager(
             state = state,
             playbackState = playbackState,
@@ -632,6 +960,24 @@ private fun NowPlayingLandscapeContent(
             overlayAlpha = overlayAlpha,
             onMiniPlayerPositioned = onMiniPlayerPositioned
         )
+
+        // Right Pane (Rightmost pane with Dismiss Sheet Icon)
+        if (state.progress > 0.05f) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .wrapContentWidth()
+                    .align(Alignment.TopEnd)
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .displayCutoutPadding()
+                    .alpha(expandedAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                DismissIconButton(
+                    onDismiss = { state.collapse() }
+                )
+            }
+        }
 
         // Overlays
         NowPlayingOverlays(

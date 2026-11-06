@@ -1,11 +1,9 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import android.content.res.Configuration
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.media3.common.MediaItem
@@ -97,25 +95,11 @@ private val sampleQueueState = QueueUiState()
     uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Preview(
-    name = "Portrait Split Dark",
-    group = "1. Now Playing Screen - Playing",
-    showBackground = true,
-    device = "spec:width=411dp,height=445dp,orientation=portrait",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
-@Preview(
     name = "Landscape Split Light",
     group = "1. Now Playing Screen - Playing",
     showBackground = true,
     device = "spec:width=445dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "Landscape Split Dark",
-    group = "1. Now Playing Screen - Playing",
-    showBackground = true,
-    device = "spec:width=445dp,height=411dp,orientation=landscape",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
 )
 @Composable
 private fun NowPlayingScreenPlayingPreview() {
@@ -175,25 +159,11 @@ private fun NowPlayingScreenPlayingPreview() {
     uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Preview(
-    name = "Portrait Split Dark",
-    group = "2. Now Playing Screen - Paused",
-    showBackground = true,
-    device = "spec:width=411dp,height=445dp,orientation=portrait",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
-@Preview(
     name = "Landscape Split Light",
     group = "2. Now Playing Screen - Paused",
     showBackground = true,
     device = "spec:width=445dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "Landscape Split Dark",
-    group = "2. Now Playing Screen - Paused",
-    showBackground = true,
-    device = "spec:width=445dp,height=411dp,orientation=landscape",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
 )
 @Composable
 private fun NowPlayingScreenPausedPreview() {
@@ -209,85 +179,6 @@ private fun NowPlayingScreenPausedPreview() {
                 onProgressUpdate = {},
                 initialExpanded = true
             )
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// PREVIEW CATEGORY 3: Collapsed View
-// -----------------------------------------------------------------------------
-
-@Preview(
-    name = "Portrait Light",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=411dp,height=891dp,orientation=portrait",
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "Portrait Dark",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=411dp,height=891dp,orientation=portrait",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
-@Preview(
-    name = "Landscape Light",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=891dp,height=411dp,orientation=landscape",
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "Landscape Dark",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=891dp,height=411dp,orientation=landscape",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
-@Preview(
-    name = "Portrait Split Light",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=411dp,height=445dp,orientation=portrait",
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "Portrait Split Dark",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=411dp,height=445dp,orientation=portrait",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
-@Preview(
-    name = "Landscape Split Light",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=445dp,height=411dp,orientation=landscape",
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "Landscape Split Dark",
-    group = "3. Now Playing Collapsed View",
-    showBackground = true,
-    device = "spec:width=445dp,height=411dp,orientation=landscape",
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
-@Composable
-private fun NowPlayingCollapsedViewPreview() {
-    MusicPlayerTheme(dynamicColor = false) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                NowPlayingCollapsedView(
-                    playbackState = samplePlaybackState,
-                    progressState = sampleProgressState,
-                    queueState = sampleQueueState,
-                    actions = samplePlaybackControls
-                )
-            }
         }
     }
 }
