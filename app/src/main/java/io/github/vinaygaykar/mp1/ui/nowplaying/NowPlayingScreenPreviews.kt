@@ -1,12 +1,14 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
+import android.content.res.Configuration
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.media3.common.MediaItem
-import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.playback.LyricsControls
 import io.github.vinaygaykar.mp1.playback.PlaybackControls
 import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
@@ -39,10 +41,10 @@ private val sampleLyricsControls = object : LyricsControls {
 }
 
 private val samplePlaybackState = PlaybackUiState(
-    trackTitle = "Midnight City",
-    artist = "M83",
-    album = "Hurry Up, We're Dreaming",
-    albumId = "sample_album_1",
+    trackTitle = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua",
+    artist = "Consectetur Adipiscing, Sed Do Eiusmod, Tempor Incididunt",
+    album = "Excepteur Sint Occaecat Cupidatat Non Proident Sunt In Culpa",
+    albumId = "sample_album_lorem",
     isPlaying = true,
     hasNext = true,
     hasPrevious = true
@@ -55,67 +57,69 @@ private val sampleProgressState = PlaybackProgressState(
 
 private val sampleQueueState = QueueUiState()
 
-@Preview(showBackground = true, name = "Portrait Phone Expanded", device = "spec:width=411dp,height=891dp,orientation=portrait")
-@Composable
-fun NowPlayingScreenPortraitExpandedPreview() {
-    MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState,
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 1: Playing State
+// -----------------------------------------------------------------------------
 
-@Preview(showBackground = true, name = "Landscape Phone Expanded", device = "spec:width=891dp,height=411dp,orientation=landscape")
+@Preview(
+    name = "Portrait Light",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split Light",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Split Dark",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Split Light",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split Dark",
+    group = "1. Now Playing Screen - Playing",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
 @Composable
-fun NowPlayingScreenLandscapeExpandedPreview() {
-    MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState,
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Foldable / Tablet Expanded", device = "spec:width=800dp,height=800dp")
-@Composable
-fun NowPlayingScreenFoldableExpandedPreview() {
-    MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState,
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Playing State", device = "id:pixel_7")
-@Composable
-fun NowPlayingScreenPlayingPreview() {
-    MusicPlayerTheme {
+private fun NowPlayingScreenPlayingPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
             NowPlayingScreen(
                 playbackState = samplePlaybackState.copy(isPlaying = true),
@@ -131,10 +135,69 @@ fun NowPlayingScreenPlayingPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Paused State", device = "id:pixel_7")
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 2: Paused State
+// -----------------------------------------------------------------------------
+
+@Preview(
+    name = "Portrait Light",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split Light",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Split Dark",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Split Light",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split Dark",
+    group = "2. Now Playing Screen - Paused",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
 @Composable
-fun NowPlayingScreenPausedStatePreview() {
-    MusicPlayerTheme {
+private fun NowPlayingScreenPausedPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
             NowPlayingScreen(
                 playbackState = samplePlaybackState.copy(isPlaying = false),
@@ -150,120 +213,81 @@ fun NowPlayingScreenPausedStatePreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Short / Medium Title", device = "id:pixel_7")
-@Composable
-fun NowPlayingScreenShortTitlePreview() {
-    MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState.copy(trackTitle = "Midnight City"),
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
+// -----------------------------------------------------------------------------
+// PREVIEW CATEGORY 3: Collapsed View
+// -----------------------------------------------------------------------------
 
-@Preview(showBackground = true, name = "Long Multi-line Title", device = "id:pixel_7")
+@Preview(
+    name = "Portrait Light",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split Light",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Split Dark",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Split Light",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split Dark",
+    group = "3. Now Playing Collapsed View",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
 @Composable
-fun NowPlayingScreenLongTitlePreview() {
-    MusicPlayerTheme {
+private fun NowPlayingCollapsedViewPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState.copy(
-                    trackTitle = "Supercalifragilisticexpialidocious Long Track Title That Needs Auto Resizing To Fit On Two Lines"
-                ),
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Multiple Artists", device = "id:pixel_7")
-@Composable
-fun NowPlayingScreenMultipleArtistsPreview() {
-    MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState.copy(
-                    artist = "M83, Anthony Gonzalez, Morgan Kibby"
-                ),
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Energy Waveform", device = "id:pixel_7")
-@Composable
-fun NowPlayingScreenEnergyWaveformPreview() {
-    MusicPlayerTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState.copy(playbackWave = PlaybackWaveType.ENERGY),
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Light Theme", device = "id:pixel_7")
-@Composable
-fun NowPlayingScreenLightThemePreview() {
-    MusicPlayerTheme(darkTheme = false) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState,
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Dark Theme", device = "id:pixel_7")
-@Composable
-fun NowPlayingScreenDarkThemePreview() {
-    MusicPlayerTheme(darkTheme = true) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NowPlayingScreen(
-                playbackState = samplePlaybackState,
-                progressState = sampleProgressState,
-                queueState = sampleQueueState,
-                playbackControls = samplePlaybackControls,
-                queueControls = sampleQueueControls,
-                lyricsControls = sampleLyricsControls,
-                onProgressUpdate = {},
-                initialExpanded = true
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                NowPlayingCollapsedView(
+                    playbackState = samplePlaybackState,
+                    progressState = sampleProgressState,
+                    queueState = sampleQueueState,
+                    actions = samplePlaybackControls
+                )
+            }
         }
     }
 }
