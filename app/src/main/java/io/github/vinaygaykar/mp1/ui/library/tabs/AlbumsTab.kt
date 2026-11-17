@@ -41,8 +41,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
+import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
+
+private const val EMPTY_STATE_MESSAGE = "No Albums found.\nScan a folder from Settings."
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
@@ -52,6 +55,14 @@ fun AlbumsTab(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
+    if (albums.isEmpty()) {
+        EmptyState(
+            message = EMPTY_STATE_MESSAGE,
+            modifier = Modifier.padding(contentPadding)
+        )
+        return
+    }
+
     val context = LocalContext.current
     val activity = context as? Activity
     val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }

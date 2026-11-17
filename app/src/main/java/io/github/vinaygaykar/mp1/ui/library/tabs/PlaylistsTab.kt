@@ -64,7 +64,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Playlist
+import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
+
+private const val EMPTY_STATE_MESSAGE = "No Playlists found.\nScan a folder from Settings."
 
 @Composable
 fun PlaylistGrid(
@@ -172,18 +175,12 @@ fun PlaylistGrid(
 
         if (playlists.isEmpty()) {
             item {
-                Box(
+                EmptyState(
+                    message = EMPTY_STATE_MESSAGE,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No playlists created yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                        .padding(vertical = 32.dp)
+                )
             }
         } else {
             items(
@@ -404,18 +401,12 @@ fun PlaylistPickerBottomSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (playlists.isEmpty()) {
-                Box(
+                EmptyState(
+                    message = EMPTY_STATE_MESSAGE,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No playlists found",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                        .padding(vertical = 32.dp)
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier

@@ -51,6 +51,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
+import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.library.LibraryViewModel
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -59,6 +60,8 @@ import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+
+private const val EMPTY_STATE_MESSAGE = "No Artists found.\nScan a folder from Settings."
 
 @Composable
 fun ArtistGrid(
@@ -75,18 +78,15 @@ fun ArtistGrid(
         playerViewModel?.playbackState?.map { it.album }?.distinctUntilChanged() ?: flowOf("")
     }.collectAsState(initial = "")
     val isPlaying by remember(playerViewModel) {
-        playerViewModel?.playbackState?.map { it.isPlaying }?.distinctUntilChanged() ?: flowOf(false)
+        playerViewModel?.playbackState?.map { it.isPlaying }?.distinctUntilChanged()
+            ?: flowOf(false)
     }.collectAsState(initial = false)
 
     if (artists.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No artists found.")
-        }
+        EmptyState(
+            message = EMPTY_STATE_MESSAGE,
+            modifier = Modifier.padding(contentPadding)
+        )
     } else {
         val gridState = rememberLazyGridState()
         val mergedPadding = PaddingValues(
@@ -111,7 +111,12 @@ fun ArtistGrid(
                         playingAlbum = playingAlbum,
                         isPlaying = isPlaying,
                         onClick = { offset, size -> onArtistClick(artist, offset, size) },
-                        onFetchImageUrl = { name, id -> libraryViewModel?.getArtistImageUrl(name, id) }
+                        onFetchImageUrl = { name, id ->
+                            libraryViewModel?.getArtistImageUrl(
+                                name,
+                                id
+                            )
+                        }
                     )
                 }
             }

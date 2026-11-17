@@ -83,24 +83,13 @@ import kotlin.math.abs
  */
 const val USE_NEW_FAST_GRID = true
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlbumGridPunk(
     albums: List<Album>,
     onAlbumClick: (Album) -> Unit,
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
-    if (albums.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No albums found.")
-        }
-        return
-    }
+    if (albums.isEmpty()) return
 
     val lazyListState = rememberLazyListState()
     val lazyGridState = rememberLazyGridState()

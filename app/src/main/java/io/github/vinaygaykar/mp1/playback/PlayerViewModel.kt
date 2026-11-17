@@ -15,6 +15,9 @@ import io.github.vinaygaykar.mp1.data.repo.SettingsRepository
 import io.github.vinaygaykar.mp1.domain.models.PlaybackWaveType
 import io.github.vinaygaykar.mp1.domain.models.VisualizerState
 import io.github.vinaygaykar.mp1.domain.repository.AudioVisualizerRepository
+import io.github.vinaygaykar.mp1.domain.repository.LyricsHttpException
+import io.github.vinaygaykar.mp1.domain.repository.LyricsNetworkException
+import io.github.vinaygaykar.mp1.domain.repository.LyricsNotFoundException
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
@@ -302,7 +305,7 @@ class PlayerViewModel @Inject constructor(
             lyricsRepository.getLyrics(song)
                 .onSuccess { lyrics ->
                     if (controller?.currentMediaItem?.mediaId == songId) {
-                        val isLocal = lyricsRepository.isLocalOrEmbeddedLyrics(song, lyrics.content)
+                        val isLocal = lyricsRepository.isLocalOrEmbeddedLyrics(song)
                         _lyricsState.update {
                             LyricsUiState.Success(
                                 lyrics = lyrics.content,
@@ -314,7 +317,13 @@ class PlayerViewModel @Inject constructor(
                 }
                 .onFailure { error ->
                     if (controller?.currentMediaItem?.mediaId == songId) {
-                        _lyricsState.update { LyricsUiState.Error(error.message ?: "Failed to load lyrics") }
+                        val msg = when (error) {
+                            is LyricsNotFoundException -> "No lyrics found"
+                            is LyricsNetworkException -> "No internet connection or offline lyrics"
+                            is LyricsHttpException -> "Failed to fetch lyrics"
+                            else -> error.message ?: "No lyrics found"
+                        }
+                        _lyricsState.update { LyricsUiState.Error(msg) }
                     }
                 }
         }
@@ -459,7 +468,7 @@ class PlayerViewModel @Inject constructor(
                     if (controller?.currentMediaItem?.mediaId == songId) {
                         val song = musicRepository.getSongById(songId)
                         val isLocal = if (song != null) {
-                            lyricsRepository.isLocalOrEmbeddedLyrics(song, lyrics.content)
+                            lyricsRepository.isLocalOrEmbeddedLyrics(song)
                         } else false
                         _lyricsState.update {
                             LyricsUiState.Success(
@@ -472,7 +481,13 @@ class PlayerViewModel @Inject constructor(
                 }
                 .onFailure { error ->
                     if (controller?.currentMediaItem?.mediaId == songId) {
-                        _lyricsState.update { LyricsUiState.Error(error.message ?: "Lyrics search failed") }
+                        val msg = when (error) {
+                            is LyricsNotFoundException -> "No lyrics found"
+                            is LyricsNetworkException -> "No internet connection or offline lyrics"
+                            is LyricsHttpException -> "Failed to fetch lyrics"
+                            else -> error.message ?: "Failed to fetch lyrics"
+                        }
+                        _lyricsState.update { LyricsUiState.Error(msg) }
                     }
                 }
         }

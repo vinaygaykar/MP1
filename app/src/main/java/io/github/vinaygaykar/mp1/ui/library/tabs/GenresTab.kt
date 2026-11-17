@@ -24,8 +24,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Genre
+import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
+
+private const val EMPTY_STATE_MESSAGE = "No Genres found.\nScan a folder from Settings."
 
 @Composable
 fun GenreList(
@@ -34,14 +37,10 @@ fun GenreList(
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     if (genres.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No genres found.")
-        }
+        EmptyState(
+            message = EMPTY_STATE_MESSAGE,
+            modifier = Modifier.padding(contentPadding)
+        )
     } else {
         val listState = rememberLazyListState()
         Box(modifier = Modifier.fillMaxSize()) {

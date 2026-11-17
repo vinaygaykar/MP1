@@ -57,6 +57,7 @@ import io.github.vinaygaykar.mp1.playback.LyricsControls
 import io.github.vinaygaykar.mp1.playback.LyricsUiState
 import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
+import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
@@ -473,8 +474,16 @@ private fun LyricsBodyContent(
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
+            lyricsState is LyricsUiState.Error -> {
+                LyricsEmptyState(
+                    message = lyricsState.message,
+                    headerContent = headerContent,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             lyrics == null || (lyrics.content.isEmpty() && lyrics.lines.isEmpty()) -> {
                 LyricsEmptyState(
+                    message = "No lyrics found",
                     headerContent = headerContent,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -907,6 +916,7 @@ fun StaticLyrics(
 
 @Composable
 fun LyricsEmptyState(
+    message: String = "No lyrics found",
     modifier: Modifier = Modifier,
     headerContent: (@Composable () -> Unit)? = null
 ) {
@@ -919,20 +929,10 @@ fun LyricsEmptyState(
         if (headerContent != null) {
             headerContent()
         }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Lyrics not found",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-        }
+        EmptyState(
+            message = message,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

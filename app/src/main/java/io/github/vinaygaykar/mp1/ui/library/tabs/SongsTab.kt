@@ -43,7 +43,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -54,8 +53,11 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
 import io.github.vinaygaykar.mp1.domain.models.Song
+import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
+
+private const val EMPTY_STATE_MESSAGE = "No Songs found.\nScan a folder from Settings."
 
 private class Ref<T>(var value: T)
 
@@ -73,24 +75,14 @@ fun SongList(
     if (songs.isEmpty()) {
         val topPadding = contentPadding.calculateTopPadding()
         val bottomPadding = contentPadding.calculateBottomPadding()
-        Box(
+        EmptyState(
+            message = EMPTY_STATE_MESSAGE,
             modifier = Modifier
-                .fillMaxSize()
                 .padding(
                     top = topPadding,
-                    bottom = bottomPadding + headerHeight + topPadding,
-                    start = 32.dp,
-                    end = 32.dp
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "No songs found. Try scanning a folder in Settings.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
+                    bottom = bottomPadding + headerHeight + topPadding
+                )
+        )
     } else {
         val listState = rememberLazyListState()
         Box(modifier = Modifier.fillMaxSize()) {
@@ -131,7 +123,6 @@ fun SongList(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongListItem(
     song: Song,

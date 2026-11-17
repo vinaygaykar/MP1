@@ -10,6 +10,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.vinaygaykar.mp1.data.network.LrcLibService
 import io.github.vinaygaykar.mp1.domain.models.Lyrics
 import io.github.vinaygaykar.mp1.domain.models.Song
+import io.github.vinaygaykar.mp1.domain.repository.LyricsHttpException
+import io.github.vinaygaykar.mp1.domain.repository.LyricsNetworkException
+import io.github.vinaygaykar.mp1.domain.repository.LyricsNotFoundException
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,7 +24,16 @@ class LyricsRepositoryImpl @Inject constructor(
     private val lrcLibService: LrcLibService
 ) : LyricsRepository {
 
-    override suspend fun getLyrics(song: Song): Result<Lyrics> {
+    override suspend fun getLyrics(song: Song): Result<Lyrics> = withContext(Dispatchers.IO) {
+        val localLyrics = readLocalOrEmbeddedLyrics(song)
+        if (localLyrics != null && (localLyrics.content.isNotBlank() || localLyrics.lines.isNotEmpty())) {
+            return@withContext Result.success(localLyrics)
+        }
+
+        return@withContext fetchFromLrcLib(song)
+    }
+
+    private suspend fun fetchFromLrcLib(song: Song): Result<Lyrics> {
         return try {
             val duration = if (song.durationMs > 0) (song.durationMs / 1000).toInt() else null
             val response = lrcLibService.getLyrics(
@@ -42,17 +54,108 @@ class LyricsRepositoryImpl @Inject constructor(
                         val instrumentalText = "[Instrumental]"
                         Result.success(Lyrics(content = instrumentalText, isSynced = false))
                     } else {
-                        Result.failure(Exception("Lyrics not found"))
+                        Result.failure(LyricsNotFoundException())
                     }
                 } else {
-                    Result.failure(Exception("Lyrics not found"))
+                    Result.failure(LyricsNotFoundException())
                 }
+            } else if (response.code() == 404) {
+                Result.failure(LyricsNotFoundException())
             } else {
-                Result.failure(Exception("API error: ${response.code()}"))
+                Result.failure(LyricsHttpException(response.code()))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            if (e is LyricsNotFoundException || e is LyricsHttpException) {
+                Result.failure(e)
+            } else {
+                Result.failure(LyricsNetworkException())
+            }
         }
+    }
+
+    private suspend fun readLocalOrEmbeddedLyrics(song: Song): Lyrics? = withContext(Dispatchers.IO) {
+        val songUriString = song.uri.toString()
+        val fileName = song.fileName
+        val uri = try { Uri.parse(songUriString) } catch (_: Exception) { null } ?: return@withContext null
+
+        val lrcFileName = if (fileName.contains(".")) {
+            fileName.substringBeforeLast(".") + ".lrc"
+        } else {
+            "$fileName.lrc"
+        }
+
+        var localContent: String? = null
+
+        try {
+            if (uri.scheme == "file") {
+                val file = File(uri.path ?: "")
+                val parent = file.parentFile
+                if (parent != null) {
+                    val lrcFile = File(parent, lrcFileName)
+                    if (lrcFile.exists()) {
+                        localContent = lrcFile.readText()
+                    }
+                }
+            } else if (uri.scheme == "content") {
+                if (DocumentsContract.isDocumentUri(context, uri)) {
+                    val docId = DocumentsContract.getDocumentId(uri)
+                    val lrcDocId = if (docId.contains(".")) {
+                        docId.substringBeforeLast(".") + ".lrc"
+                    } else {
+                        "$docId.lrc"
+                    }
+                    val lrcUri = DocumentsContract.buildDocumentUriUsingTree(uri, lrcDocId)
+                    localContent = context.contentResolver.openInputStream(lrcUri)?.use { input ->
+                        input.bufferedReader().readText()
+                    }
+                }
+
+                if (localContent.isNullOrBlank()) {
+                    val projection = arrayOf(MediaStore.Audio.Media.DATA)
+                    context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val dataIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                            if (dataIdx != -1) {
+                                val path = cursor.getString(dataIdx)
+                                if (!path.isNullOrBlank()) {
+                                    val audioFile = File(path)
+                                    val parent = audioFile.parentFile
+                                    if (parent != null && parent.exists()) {
+                                        val lrcFile = File(parent, lrcFileName)
+                                        if (lrcFile.exists()) {
+                                            localContent = lrcFile.readText()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        if (localContent.isNullOrBlank()) {
+            try {
+                val retriever = MediaMetadataRetriever()
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    retriever.setDataSource(pfd.fileDescriptor)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val embedded = retriever.extractMetadata(35) // METADATA_KEY_LYRICS
+                        if (!embedded.isNullOrBlank()) {
+                            localContent = embedded
+                        }
+                    }
+                }
+                retriever.release()
+            } catch (_: Exception) {}
+        }
+
+        if (!localContent.isNullOrBlank()) {
+            val isSynced = localContent!!.contains(Regex("\\[\\d{2}:\\d{2}\\.\\d{2,3}\\]"))
+            return@withContext LyricsParser.parse(localContent!!, isSynced)
+        }
+
+        return@withContext null
     }
 
     override suspend fun searchLyrics(query: String, songId: String): Result<Lyrics> {
@@ -70,90 +173,27 @@ class LyricsRepositoryImpl @Inject constructor(
                         val instrumentalText = "[Instrumental]"
                         Result.success(Lyrics(content = instrumentalText, isSynced = false))
                     } else {
-                        Result.failure(Exception("Lyrics not found in first result"))
+                        Result.failure(LyricsNotFoundException())
                     }
                 } else {
-                    Result.failure(Exception("No results found for \"$query\""))
+                    Result.failure(LyricsNotFoundException())
                 }
+            } else if (response.code() == 404) {
+                Result.failure(LyricsNotFoundException())
             } else {
-                Result.failure(Exception("API error: ${response.code()}"))
+                Result.failure(LyricsHttpException(response.code()))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            if (e is LyricsNotFoundException || e is LyricsHttpException) {
+                Result.failure(e)
+            } else {
+                Result.failure(LyricsNetworkException())
+            }
         }
     }
 
-    override suspend fun isLocalOrEmbeddedLyrics(song: Song, lyricsContent: String?): Boolean = withContext(Dispatchers.IO) {
-        if (lyricsContent.isNullOrBlank()) return@withContext false
-
-        val songUriString = song.uri.toString()
-        val fileName = song.fileName
-        val uri = try { Uri.parse(songUriString) } catch (_: Exception) { null } ?: return@withContext false
-
-        val lrcFileName = if (fileName.contains(".")) {
-            fileName.substringBeforeLast(".") + ".lrc"
-        } else {
-            "$fileName.lrc"
-        }
-
-        try {
-            if (uri.scheme == "file") {
-                val file = File(uri.path ?: "")
-                val parent = file.parentFile
-                if (parent != null && File(parent, lrcFileName).exists()) {
-                    return@withContext true
-                }
-            } else if (uri.scheme == "content") {
-                if (DocumentsContract.isDocumentUri(context, uri)) {
-                    val docId = DocumentsContract.getDocumentId(uri)
-                    val lrcDocId = if (docId.contains(".")) {
-                        docId.substringBeforeLast(".") + ".lrc"
-                    } else {
-                        "$docId.lrc"
-                    }
-                    val lrcUri = DocumentsContract.buildDocumentUriUsingTree(uri, lrcDocId)
-                    val exists = context.contentResolver.openInputStream(lrcUri)?.use { true } ?: false
-                    if (exists) return@withContext true
-                }
-
-                val projection = arrayOf(MediaStore.Audio.Media.DATA)
-                context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val dataIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
-                        if (dataIdx != -1) {
-                            val path = cursor.getString(dataIdx)
-                            if (!path.isNullOrBlank()) {
-                                val audioFile = File(path)
-                                val parent = audioFile.parentFile
-                                if (parent != null && parent.exists()) {
-                                    if (File(parent, lrcFileName).exists()) {
-                                        return@withContext true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-
-        try {
-            val retriever = MediaMetadataRetriever()
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                retriever.setDataSource(pfd.fileDescriptor)
-                var embedded: String? = null
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    embedded = retriever.extractMetadata(35) // METADATA_KEY_LYRICS
-                }
-                if (!embedded.isNullOrBlank()) {
-                    retriever.release()
-                    return@withContext true
-                }
-            }
-            retriever.release()
-        } catch (_: Exception) {}
-
-        return@withContext false
+    override suspend fun isLocalOrEmbeddedLyrics(song: Song): Boolean = withContext(Dispatchers.IO) {
+        return@withContext readLocalOrEmbeddedLyrics(song) != null
     }
 
     override suspend fun saveLyrics(song: Song, lyricsContent: String): Boolean = withContext(Dispatchers.IO) {

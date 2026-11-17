@@ -54,21 +54,7 @@ fun AlbumGridClean(
     selectedAlbumId: String? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
-    if (albums.isEmpty()) {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(contentPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "No albums found.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        return
-    }
+    if (albums.isEmpty()) return
 
     val lazyGridState = rememberLazyGridState()
 
