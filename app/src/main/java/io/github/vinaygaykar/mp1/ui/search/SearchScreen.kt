@@ -77,7 +77,7 @@ import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
-import io.github.vinaygaykar.mp1.ui.library.tabs.SongListItem
+import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.theme.rememberArtistShape
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -278,8 +278,7 @@ fun SearchScreen(
                     items(results.songs, key = { "song_${it.id}" }) { song ->
                         SongListItem(
                             song = song,
-                            onClick = { viewModel.onSongClick(song) },
-                            onSwipeRightNoArgs = { viewModel.addToQueue(song) }
+                            onClick = { viewModel.onSongClick(song) }
                         )
                     }
                 }
