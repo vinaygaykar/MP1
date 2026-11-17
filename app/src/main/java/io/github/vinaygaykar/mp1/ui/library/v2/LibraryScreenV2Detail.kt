@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -42,8 +44,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -55,7 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import io.github.vinaygaykar.mp1.R
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
@@ -79,30 +80,21 @@ internal fun CategoryDetailScreen(
     displayFolder: String?,
     bottomPadding: Dp,
     detailProgress: Float,
-    pivotOffset: Offset? = null,
     isPlayerActive: Boolean,
     scrollBehavior: TopAppBarScrollBehavior,
     onOpenCategoryMenu: () -> Unit,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
-    onActionBarExpandedChange: (Boolean) -> Unit = {},
     onPlaySong: (Song, List<Song>) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onImportPlaylistLauncher: () -> Unit,
     onAddFlyingArtwork: (FlyingArtworkItem) -> Unit,
-    modifier: Modifier = Modifier,
-    categoryHeaderTitleModifier: Modifier = Modifier
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val view = LocalView.current
     val density = LocalDensity.current
-
-    val collapsedFraction = scrollBehavior.state.collapsedFraction
-
-    LaunchedEffect(collapsedFraction) {
-        onActionBarExpandedChange(collapsedFraction < 0.1f)
-    }
 
     var noticeBannerHeightPx by remember { mutableFloatStateOf(0f) }
 
@@ -122,16 +114,8 @@ internal fun CategoryDetailScreen(
         modifier = modifier
             .fillMaxSize()
             .graphicsLayer {
-                val pivotX = pivotOffset?.x ?: (size.width / 2f)
-                val pivotY = pivotOffset?.y ?: (size.height / 2f)
-                transformOrigin = TransformOrigin(
-                    pivotFractionX = if (size.width > 0f) (pivotX / size.width).coerceIn(0f, 1f) else 0.5f,
-                    pivotFractionY = if (size.height > 0f) (pivotY / size.height).coerceIn(0f, 1f) else 0.5f
-                )
-                scaleX = detailProgress
-                scaleY = detailProgress
-                alpha = detailProgress.coerceIn(0f, 1f)
-                clip = true
+                translationX = (1f - detailProgress) * size.width
+                clip = false
             }
     ) {
         Column(
@@ -179,8 +163,7 @@ internal fun CategoryDetailScreen(
                         text = libraryState.lastOpenedCategory.title,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = categoryHeaderTitleModifier
+                        overflow = TextOverflow.Ellipsis
                     )
                 },
                 actions = {
@@ -378,6 +361,26 @@ internal fun CategoryDetailScreen(
                     }
                 }
             }
+        }
+
+        // Left Side Shadow during Transition
+        if (detailProgress > 0f && detailProgress < 1f) {
+            val shadowAlpha = minOf(detailProgress / 0.05f, (1f - detailProgress) / 0.05f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(12.dp)
+                    .offset(x = (-12).dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.03f * shadowAlpha),
+                                Color.Black.copy(alpha = 0.10f * shadowAlpha)
+                            )
+                        )
+                    )
+            )
         }
     }
 }

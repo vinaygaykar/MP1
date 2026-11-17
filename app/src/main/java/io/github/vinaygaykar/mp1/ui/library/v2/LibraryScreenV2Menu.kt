@@ -61,7 +61,6 @@ internal fun CategoryCardItem(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    titleModifier: Modifier = Modifier,
     @Suppress("UNUSED_PARAMETER") subtitle: String? = null,
     @Suppress("UNUSED_PARAMETER") icon: ImageVector? = null
 ) {
@@ -76,8 +75,7 @@ internal fun CategoryCardItem(
             text = title,
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = titleModifier
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -95,8 +93,7 @@ internal fun CategoryMenuScreen(
     onOpenCategory: (LibraryCategory) -> Unit,
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
-    modifier: Modifier = Modifier,
-    categoryTitleModifiers: Map<LibraryCategory, Modifier> = emptyMap()
+    modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -106,7 +103,6 @@ internal fun CategoryMenuScreen(
             .fillMaxSize()
             .graphicsLayer {
                 translationX = -(detailProgress * screenWidthPx / 3f)
-                alpha = 1f - (detailProgress * 0.3f)
             }
     ) {
         if (isLandscape) {
@@ -116,8 +112,7 @@ internal fun CategoryMenuScreen(
                 bottomPadding = bottomPadding,
                 onOpenCategory = onOpenCategory,
                 onSettingsClick = onSettingsClick,
-                onOpenScanLocations = onOpenScanLocations,
-                categoryTitleModifiers = categoryTitleModifiers
+                onOpenScanLocations = onOpenScanLocations
             )
         } else {
             CategoryMenuPortraitContent(
@@ -126,8 +121,7 @@ internal fun CategoryMenuScreen(
                 bottomPadding = bottomPadding,
                 onOpenCategory = onOpenCategory,
                 onSettingsClick = onSettingsClick,
-                onOpenScanLocations = onOpenScanLocations,
-                categoryTitleModifiers = categoryTitleModifiers
+                onOpenScanLocations = onOpenScanLocations
             )
         }
     }
@@ -141,7 +135,6 @@ private fun CategoryMenuPortraitContent(
     onOpenCategory: (LibraryCategory) -> Unit,
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
-    categoryTitleModifiers: Map<LibraryCategory, Modifier>,
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -277,32 +270,28 @@ private fun CategoryMenuPortraitContent(
 
             CategoryCardItem(
                 title = LibraryCategory.PLAYLISTS.title,
-                onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.PLAYLISTS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             CategoryCardItem(
                 title = LibraryCategory.SONGS.title,
-                onClick = { onOpenCategory(LibraryCategory.SONGS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.SONGS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.SONGS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             CategoryCardItem(
                 title = LibraryCategory.ALBUMS.title,
-                onClick = { onOpenCategory(LibraryCategory.ALBUMS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.ALBUMS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.ALBUMS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             CategoryCardItem(
                 title = LibraryCategory.ARTISTS.title,
-                onClick = { onOpenCategory(LibraryCategory.ARTISTS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.ARTISTS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.ARTISTS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -318,7 +307,6 @@ private fun CategoryMenuLandscapeContent(
     onOpenCategory: (LibraryCategory) -> Unit,
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
-    categoryTitleModifiers: Map<LibraryCategory, Modifier>,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -410,32 +398,28 @@ private fun CategoryMenuLandscapeContent(
 
             CategoryCardItem(
                 title = LibraryCategory.PLAYLISTS.title,
-                onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.PLAYLISTS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.PLAYLISTS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             CategoryCardItem(
                 title = LibraryCategory.SONGS.title,
-                onClick = { onOpenCategory(LibraryCategory.SONGS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.SONGS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.SONGS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             CategoryCardItem(
                 title = LibraryCategory.ALBUMS.title,
-                onClick = { onOpenCategory(LibraryCategory.ALBUMS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.ALBUMS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.ALBUMS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             CategoryCardItem(
                 title = LibraryCategory.ARTISTS.title,
-                onClick = { onOpenCategory(LibraryCategory.ARTISTS) },
-                titleModifier = categoryTitleModifiers[LibraryCategory.ARTISTS] ?: Modifier
+                onClick = { onOpenCategory(LibraryCategory.ARTISTS) }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -529,3 +513,4 @@ private fun CategoryMenuScreenPreview() {
         }
     }
 }
+

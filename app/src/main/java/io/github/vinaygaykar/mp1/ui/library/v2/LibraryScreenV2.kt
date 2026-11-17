@@ -14,12 +14,8 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,29 +28,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
@@ -65,7 +52,6 @@ import io.github.vinaygaykar.mp1.ui.settings.SettingsViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 @Composable
 fun LibraryScreenV2(
@@ -347,87 +333,13 @@ fun LibraryContentV2(
                 ?.trim()
         }
 
-        var level1TitleBoundsMap by remember { mutableStateOf(mapOf<LibraryCategory, Rect>()) }
-        var level2TitleBoundsMap by remember { mutableStateOf(mapOf<LibraryCategory, Rect>()) }
-        var isActionBarExpanded by remember { mutableStateOf(true) }
-        var shouldAnimateTransition by remember { mutableStateOf(true) }
-
         LaunchedEffect(detailProgress) {
-            if (detailProgress == 0f || detailProgress == 1f) {
-                shouldAnimateTransition = scrollBehavior.state.collapsedFraction <= 0.05f
-            }
             if (detailProgress < 0.1f) {
                 onMiniPlayerCollapseChange(true)
             } else if (detailProgress > 0.9f) {
                 onMiniPlayerCollapseChange(false)
             }
         }
-
-        val effectiveActionBarExpanded = isActionBarExpanded && shouldAnimateTransition
-
-        val sharedCategories = remember {
-            setOf(
-                LibraryCategory.PLAYLISTS,
-                LibraryCategory.SONGS,
-                LibraryCategory.ALBUMS,
-                LibraryCategory.ARTISTS
-            )
-        }
-
-        val categoryTitleCardModifiers = remember(
-            libraryState.lastOpenedCategory,
-            detailProgress,
-            rootOffsetInWindow,
-            screenWidthPx,
-            effectiveActionBarExpanded
-        ) {
-            sharedCategories.associateWith { category ->
-                Modifier
-                    .graphicsLayer {
-                        alpha =
-                            if (libraryState.lastOpenedCategory == category && detailProgress > 0f && effectiveActionBarExpanded) 0f else 1f
-                    }
-                    .onGloballyPositioned { coords ->
-                        if (coords.isAttached) {
-                            val windowOffset = coords.positionInRoot()
-                            val localOffset = windowOffset - rootOffsetInWindow
-                            val unshiftedX = localOffset.x + (detailProgress * screenWidthPx / 3f)
-                            val rect = Rect(
-                                offset = Offset(unshiftedX, localOffset.y),
-                                size = Size(
-                                    coords.size.width.toFloat(),
-                                    coords.size.height.toFloat()
-                                )
-                            )
-                            if (level1TitleBoundsMap[category] != rect) {
-                                level1TitleBoundsMap = level1TitleBoundsMap + (category to rect)
-                            }
-                        }
-                    }
-            }
-        }
-
-        val currentCategory = libraryState.lastOpenedCategory
-        val isCurrentCategoryShared = currentCategory in sharedCategories
-
-        val categoryHeaderTitleModifier = Modifier
-            .graphicsLayer {
-                alpha =
-                    if (isCurrentCategoryShared && detailProgress < 1f && effectiveActionBarExpanded) 0f else 1f
-            }
-            .onGloballyPositioned { coords ->
-                if (coords.isAttached && isCurrentCategoryShared && detailProgress >= 0.99f) {
-                    val windowOffset = coords.positionInRoot()
-                    val localOffset = windowOffset - rootOffsetInWindow
-                    val rect = Rect(
-                        offset = localOffset,
-                        size = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
-                    )
-                    if (level2TitleBoundsMap[currentCategory] != rect) {
-                        level2TitleBoundsMap = level2TitleBoundsMap + (currentCategory to rect)
-                    }
-                }
-            }
 
         Box(
             modifier = Modifier
@@ -448,8 +360,7 @@ fun LibraryContentV2(
                 screenWidthPx = screenWidthPx,
                 onOpenCategory = { openCategory(it) },
                 onSettingsClick = onSettingsClick,
-                onOpenScanLocations = onOpenScanLocations,
-                categoryTitleModifiers = categoryTitleCardModifiers
+                onOpenScanLocations = onOpenScanLocations
             )
 
             // LEVEL 2: Detail List Screen
@@ -459,14 +370,12 @@ fun LibraryContentV2(
                 displayFolder = displayFolder,
                 bottomPadding = bottomPadding,
                 detailProgress = detailProgress,
-                pivotOffset = level1TitleBoundsMap[currentCategory]?.center,
                 isPlayerActive = isPlayerActive,
                 scrollBehavior = scrollBehavior,
                 onOpenCategoryMenu = { openCategoryMenu() },
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 onOpenScanLocations = onOpenScanLocations,
-                onActionBarExpandedChange = { isActionBarExpanded = it },
                 onPlaySong = onPlaySong,
                 onAddToQueue = onAddToQueue,
                 onImportPlaylistLauncher = {
@@ -482,62 +391,8 @@ fun LibraryContentV2(
                         )
                     )
                 },
-                onAddFlyingArtwork = { flyingArtworks.add(it) },
-                categoryHeaderTitleModifier = categoryHeaderTitleModifier
+                onAddFlyingArtwork = { flyingArtworks.add(it) }
             )
-        }
-
-        // Shared Element Overlay for title transition (Songs & Albums)
-        val l1Bounds = level1TitleBoundsMap[currentCategory]
-        val l2Bounds = level2TitleBoundsMap[currentCategory]
-        if (isCurrentCategoryShared &&
-            l1Bounds != null &&
-            l2Bounds != null &&
-            detailProgress > 0f &&
-            detailProgress < 1f &&
-            effectiveActionBarExpanded
-        ) {
-            val currentX = lerp(l1Bounds.left, l2Bounds.left, detailProgress)
-            val currentY = lerp(l1Bounds.top, l2Bounds.top, detailProgress)
-            val currentWidth = lerp(l1Bounds.width, l2Bounds.width, detailProgress)
-            val currentHeight = lerp(l1Bounds.height, l2Bounds.height, detailProgress)
-
-            val startFontSize = MaterialTheme.typography.displaySmall.fontSize
-            val endFontSize = MaterialTheme.typography.titleLarge.fontSize
-            val currentFontSize = lerp(startFontSize.value, endFontSize.value, detailProgress).sp
-
-            val currentColor = lerp(
-                MaterialTheme.colorScheme.onSurface,
-                MaterialTheme.colorScheme.onSurface,
-                detailProgress
-            )
-            val currentWeightInt = lerp(
-                FontWeight.Bold.weight,
-                FontWeight.Bold.weight,
-                detailProgress
-            )
-
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(currentX.roundToInt(), currentY.roundToInt()) }
-                    .size(
-                        width = with(density) { currentWidth.toDp() },
-                        height = with(density) { currentHeight.toDp() }
-                    )
-            ) {
-                Text(
-                    text = currentCategory.title,
-                    style = MaterialTheme.typography.displaySmall.copy(
-                        fontSize = currentFontSize,
-                        fontWeight = FontWeight(currentWeightInt)
-                    ),
-                    color = currentColor,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Visible,
-                    modifier = Modifier.wrapContentWidth(align = Alignment.Start, unbounded = true)
-                )
-            }
         }
 
         // Dialogs & Bottom Sheets
@@ -552,3 +407,4 @@ fun LibraryContentV2(
         )
     }
 }
+
