@@ -13,6 +13,9 @@ interface SongDao {
     @Query("SELECT * FROM songs ORDER BY title COLLATE NOCASE ASC")
     fun getAllSongs(): Flow<List<SongEntity>>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM songs)")
+    suspend fun hasAnySongs(): Boolean
+
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun getSongById(id: String): SongEntity?
 

@@ -5,6 +5,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -30,38 +38,45 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dagger.hilt.android.AndroidEntryPoint
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
-import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.library.v2.LibraryScreenV2
+import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.search.SearchScreen
 import io.github.vinaygaykar.mp1.ui.settings.ScanLocationScreen
 import io.github.vinaygaykar.mp1.ui.settings.SettingsScreen
 import io.github.vinaygaykar.mp1.ui.settings.SettingsViewModel
+import io.github.vinaygaykar.mp1.ui.splash.SplashComposeScreen
+import io.github.vinaygaykar.mp1.ui.splash.SplashViewModel
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val splashViewModel: SplashViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        if (savedInstanceState != null || splashViewModel.hasSplashBeenCompleted) {
+            splashViewModel.markSplashCompleted()
+            splashScreen.setKeepOnScreenCondition { false }
+        } else {
+            splashScreen.setKeepOnScreenCondition { !splashViewModel.isReadyToShow }
+        }
+
         enableEdgeToEdge()
         setContent {
             MusicPlayerTheme {
-                MainScreen()
+                MainScreen(splashViewModel = splashViewModel)
             }
         }
     }
@@ -78,7 +93,13 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 fun MainScreen(
     playerViewModel: PlayerViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
+    splashViewModel: SplashViewModel = hiltViewModel(),
 ) {
+    val splashLoading by splashViewModel.isLoading.collectAsState()
+    val splashAlbumArtUris by splashViewModel.albumArtUris.collectAsState()
+    val showSplash by splashViewModel.showSplash.collectAsState()
+    var splashFinished by remember { mutableStateOf(splashViewModel.hasSplashBeenCompleted) }
+
     val navController = rememberNavController()
     val playbackState by playerViewModel.playbackState.collectAsState()
     val progressState by playerViewModel.progressState.collectAsState()
@@ -87,6 +108,11 @@ fun MainScreen(
     val visualizerState by playerViewModel.visualizerState.collectAsState()
     val hasScanFoldersState by settingsViewModel.hasScanFolders.collectAsState()
 
+    // Lets the native splash go away once the first required data is available
+    LaunchedEffect(hasScanFoldersState) {
+        if (hasScanFoldersState != null) splashViewModel.setHostReady()
+    }
+
     if (hasScanFoldersState == null) {
         Box(modifier = Modifier.fillMaxSize())
         return
@@ -94,7 +120,8 @@ fun MainScreen(
 
     val context = LocalContext.current
     val initialHasFolders = remember { hasScanFoldersState == true }
-    val startDestination = if (initialHasFolders) Screen.Library.route else "onboarding_scan_locations"
+    val startDestination =
+        if (initialHasFolders) Screen.Library.route else "onboarding_scan_locations"
 
     val isPlayerActive by remember(playerViewModel) {
         playerViewModel.playbackState.map { it.trackTitle.isNotEmpty() }.distinctUntilChanged()
@@ -134,7 +161,9 @@ fun MainScreen(
             modifier = Modifier.fillMaxSize(),
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)) {
                 SharedTransitionLayout {
                     NavHost(
                         navController = navController,
@@ -144,56 +173,88 @@ fun MainScreen(
                         composable(
                             route = Screen.Library.route,
                             exitTransition = {
-                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeOut(tween(350))
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeOut(tween(350))
                             },
                             popEnterTransition = {
-                                slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeIn(tween(350))
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeIn(tween(350))
                             }
-                        ) { 
+                        ) {
                             LibraryScreenV2(
                                 bottomPadding = bottomPadding,
                                 isPlayerActive = isPlayerActive,
                                 miniPlayerTargetOffset = miniPlayerTargetOffset,
-                                onBulgeMiniPlayer = { miniPlayerBulgeTrigger = System.currentTimeMillis() },
+                                onBulgeMiniPlayer = {
+                                    miniPlayerBulgeTrigger = System.currentTimeMillis()
+                                },
                                 onSearchClick = { navController.navigate(Screen.Search.route) },
                                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                                 onOpenScanLocations = { navController.navigate("scan_locations") },
                                 onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it }
-                            ) 
+                            )
                         }
                         composable(
                             route = Screen.Search.route,
                             enterTransition = {
-                                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(350)) + fadeIn(tween(350))
+                                slideInHorizontally(
+                                    initialOffsetX = { it },
+                                    animationSpec = tween(350)
+                                ) + fadeIn(tween(350))
                             },
                             exitTransition = {
-                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeOut(tween(350))
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeOut(tween(350))
                             },
                             popEnterTransition = {
-                                slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeIn(tween(350))
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeIn(tween(350))
                             },
                             popExitTransition = {
-                                slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(350)) + fadeOut(tween(350))
+                                slideOutHorizontally(
+                                    targetOffsetX = { it },
+                                    animationSpec = tween(350)
+                                ) + fadeOut(tween(350))
                             }
-                        ) { 
+                        ) {
                             SearchScreen(
                                 bottomPadding = bottomPadding,
                                 onBack = { navController.popBackStack() }
-                            ) 
+                            )
                         }
                         composable(
                             route = Screen.Settings.route,
                             enterTransition = {
-                                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(350)) + fadeIn(tween(350))
+                                slideInHorizontally(
+                                    initialOffsetX = { it },
+                                    animationSpec = tween(350)
+                                ) + fadeIn(tween(350))
                             },
                             exitTransition = {
-                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeOut(tween(350))
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeOut(tween(350))
                             },
                             popEnterTransition = {
-                                slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(350)) + fadeIn(tween(350))
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeIn(tween(350))
                             },
                             popExitTransition = {
-                                slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(350)) + fadeOut(tween(350))
+                                slideOutHorizontally(
+                                    targetOffsetX = { it },
+                                    animationSpec = tween(350)
+                                ) + fadeOut(tween(350))
                             }
                         ) {
                             SettingsScreen(
@@ -241,5 +302,17 @@ fun MainScreen(
             bulgeTrigger = miniPlayerBulgeTrigger,
             isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll
         ) { offset -> miniPlayerTargetOffset = offset }
+
+        // Custom Compose Splash Overlay (removed immediately once the logo has left the screen)
+        if (showSplash == true && !splashFinished) {
+            SplashComposeScreen(
+                albumArtUris = splashAlbumArtUris,
+                startAnimation = !splashLoading,
+                onAnimationEnd = {
+                    splashViewModel.markSplashCompleted()
+                    splashFinished = true
+                }
+            )
+        }
     }
 }

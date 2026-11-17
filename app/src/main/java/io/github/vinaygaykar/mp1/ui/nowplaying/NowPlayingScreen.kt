@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
@@ -690,6 +691,8 @@ private fun NowPlayingPortraitContent(
                     .fillMaxWidth()
                     .padding(top = 16.dp)
                     .padding(horizontal = 24.dp)
+                    .displayCutoutPadding()
+                    .statusBarsPadding()
                     .alpha(expandedAlpha)
             ) {
                 Row(
@@ -871,6 +874,7 @@ private fun NowPlayingLandscapeContent(
                     .width(leftPaneWidth)
                     .padding(top = 48.dp)
                     .displayCutoutPadding()
+                    .statusBarsPadding()
                     .alpha(expandedAlpha)
             ) {
                 NowPlayingTrackInfo(
@@ -970,6 +974,7 @@ private fun NowPlayingLandscapeContent(
                     .align(Alignment.TopEnd)
                     .padding(horizontal = 16.dp, vertical = 16.dp)
                     .displayCutoutPadding()
+                    .statusBarsPadding()
                     .alpha(expandedAlpha),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
