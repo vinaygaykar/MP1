@@ -3,12 +3,11 @@ package io.github.vinaygaykar.mp1.ui.library
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -57,6 +55,9 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Song
+import io.github.vinaygaykar.mp1.ui.components.RollingNumberText
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 /**
  * Action row displayed during multi-selection mode.
@@ -148,8 +149,8 @@ fun SelectionActionRow(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "$selectedCount",
+            RollingNumberText(
+                count = selectedCount,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -159,58 +160,14 @@ fun SelectionActionRow(
 }
 
 /**
- * Floating pill showing the count of selected items at top corner.
- */
-@Composable
-fun SelectionCountPill(
-    selectedCount: Int,
-    modifier: Modifier = Modifier
-) {
-    AnimatedVisibility(
-        visible = selectedCount > 0,
-        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn() + scaleIn(initialScale = 0.8f),
-        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut() + scaleOut(targetScale = 0.8f),
-        modifier = modifier
-    ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            shadowElevation = 6.dp,
-            tonalElevation = 2.dp,
-            modifier = Modifier.padding(8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "$selectedCount selected",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-    }
-}
-
-/**
- * Row displaying circular artworks of up to 5 selected songs overlapping each other.
+ * Row displaying circular artworks of up to 3 selected songs overlapping each other.
  */
 @Composable
 fun OverlappingArtworksRow(
     songs: List<Song>,
     modifier: Modifier = Modifier
 ) {
-    val displaySongs = remember(songs) { songs.take(5) }
+    val displaySongs = remember(songs) { songs.take(3) }
     val overlapOffset = 32.dp
     val avatarSize = 56.dp
 
@@ -257,6 +214,97 @@ fun OverlappingArtworksRow(
     }
 }
 
+
+/**
+ * Row displaying circular artworks of up to 3 selected songs overlapping each other inside a pill-shaped container.
+ * Encapsulates AnimatedVisibility top slide animation.
+ * Shows the most recently selected song first (at position 0), pushing older selected songs down,
+ * and dropping the oldest when the selection grows bigger than 3. Also displays the count of selected songs.
+ */
+@Composable
+fun OverlappingArtworksRow2(
+    songs: List<Song>,
+    visible: Boolean = songs.isNotEmpty(),
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
+    val displaySongs = remember(songs) { songs.asReversed().take(3) }
+    val overlapOffset = 32.dp
+    val avatarSize = 56.dp
+
+    AnimatedVisibility(
+        visible = visible && displaySongs.isNotEmpty(),
+        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+        modifier = modifier
+    ) {
+        Surface(
+            onClick = { onClick?.invoke() },
+            enabled = onClick != null,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
+            shadowElevation = 8.dp,
+            tonalElevation = 6.dp,
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(avatarSize + overlapOffset * (displaySongs.size - 1).coerceAtLeast(0))
+                        .height(avatarSize),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    displaySongs.forEachIndexed { index, song ->
+                        Box(
+                            modifier = Modifier
+                                .offset(x = overlapOffset * index)
+                                .size(avatarSize)
+                                .zIndex((displaySongs.size - index).toFloat())
+                                .border(2.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (song.artworkUri != null) {
+                                val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(song.artworkUri)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    error = musicPlaceholder,
+                                    placeholder = musicPlaceholder,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                RollingNumberText(
+                    count = songs.size,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
 /**
  * Bottom sheet triggered by kebab button in multi-selection mode with Expressive M3 styling.
  */
@@ -292,8 +340,8 @@ fun MultiSelectionBottomSheet(
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${selectedSongs.size}",
+                    RollingNumberText(
+                        count = selectedSongs.size,
                         style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -399,6 +447,126 @@ fun MultiSelectionBottomSheet(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+/**
+ * Inline floating action popup triggered when clicking OverlappingArtworksRow2 in multi-selection mode.
+ * Shows each action button ("Play all", "Playlist", "Add to queue") vertically on the same z-index layer
+ * as OverlappingArtworksRow2 without any background scrim/dim.
+ */
+@Composable
+fun MultiSelectionActionPopup(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onPlayAll: () -> Unit = {},
+    onAddToPlaylist: () -> Unit = {},
+    onAddToQueue: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = modifier
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.98f),
+            shadowElevation = 8.dp,
+            tonalElevation = 6.dp,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Row 1: Play all
+                Button(
+                    onClick = {
+                        onPlayAll()
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Play all",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // Row 2: Add to Playlist
+                FilledTonalButton(
+                    onClick = {
+                        onAddToPlaylist()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Playlist",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // Row 3: Add to Queue
+                FilledTonalButton(
+                    onClick = {
+                        onAddToQueue()
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add to queue",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
     }
 }

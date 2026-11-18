@@ -2,6 +2,7 @@ package io.github.vinaygaykar.mp1.ui.library.tabs
 
 import android.content.res.Configuration
 import android.net.Uri
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,10 +11,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -23,7 +29,9 @@ import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
+import io.github.vinaygaykar.mp1.ui.components.SongDetailOverlay
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
+import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 private const val EMPTY_STATE_MESSAGE = "No Songs found.\nScan a folder from Settings."
@@ -32,13 +40,20 @@ private const val EMPTY_STATE_MESSAGE = "No Songs found.\nScan a folder from Set
 fun SongList(
     songs: List<Song>,
     onSongClick: (Song) -> Unit,
-    onSwipeRight: (Song, Offset, IntSize) -> Unit = { _, _, _ -> },
     contentPadding: PaddingValues = PaddingValues(0.dp),
     selectedSongIds: Set<String> = emptySet(),
     isSelectionMode: Boolean = false,
     onSongLongClick: (Song) -> Unit = {},
+    onSongMoreClick: ((Song, Offset, IntSize) -> Unit)? = null,
     headerHeight: Dp = 104.dp
 ) {
+    var internalOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
+    val isInternalActive = onSongMoreClick == null && internalOverlayData != null
+    val blurRadius by animateDpAsState(
+        targetValue = if (isInternalActive) 24.dp else 0.dp,
+        label = "songListBlur"
+    )
+
     if (songs.isEmpty()) {
         val topPadding = contentPadding.calculateTopPadding()
         val bottomPadding = contentPadding.calculateBottomPadding()
@@ -55,7 +70,9 @@ fun SongList(
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier),
                 contentPadding = contentPadding
             ) {
                 items(songs, key = { it.id }) { song ->
@@ -71,7 +88,14 @@ fun SongList(
                         onClick = onClickLambda,
                         isSelected = isSelected,
                         isSelectionMode = isSelectionMode,
-                        onLongClick = onLongClickLambda
+                        onLongClick = onLongClickLambda,
+                        onMoreClick = { offset, size ->
+                            if (onSongMoreClick != null) {
+                                onSongMoreClick(song, offset, size)
+                            } else {
+                                internalOverlayData = SongOverlayData(song, offset, size)
+                            }
+                        }
                     )
                 }
             }
@@ -82,6 +106,15 @@ fun SongList(
                     .padding(bottom = contentPadding.calculateBottomPadding()),
                 listState = listState
             )
+
+            if (isInternalActive && internalOverlayData != null) {
+                SongDetailOverlay(
+                    song = internalOverlayData!!.song,
+                    startOffset = internalOverlayData!!.startOffset,
+                    startSize = internalOverlayData!!.startSize,
+                    onDismiss = { internalOverlayData = null }
+                )
+            }
         }
     }
 }
@@ -164,10 +197,8 @@ private fun SongsTabPreview() {
         Surface(modifier = Modifier.fillMaxSize()) {
             SongList(
                 songs = sampleSongs,
-                onSongClick = {},
-                onSwipeRight = { _, _, _ -> }
+                onSongClick = {}
             )
         }
     }
 }
-

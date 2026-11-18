@@ -122,7 +122,7 @@ fun SettingsContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             // Section 1: Library & Storage
-            SettingsSectionHeader(title = "LIBRARY & STORAGE")
+            SettingsSectionHeader(title = "LIBRARY")
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -158,7 +158,6 @@ fun SettingsContent(
             ) {
                 ExpressiveSettingsItem(
                     title = stringResource(R.string.app_name),
-                    subtitle = "v1.0 • Modern Material 3 Expressive Music Player",
                     icon = Icons.Default.Info,
                     iconContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     iconContentColor = MaterialTheme.colorScheme.primary,
@@ -202,7 +201,7 @@ private fun SettingsSectionHeader(
 @Composable
 private fun ExpressiveSettingsItem(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     icon: ImageVector,
     iconContainerColor: Color,
     iconContentColor: Color,
@@ -249,12 +248,14 @@ private fun ExpressiveSettingsItem(
                 )
                 titleIcon?.invoke()
             }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         if (trailingContent != null) {
             Spacer(modifier = Modifier.width(12.dp))

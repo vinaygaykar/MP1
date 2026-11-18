@@ -284,9 +284,9 @@ fun NowPlayingVinylPager(
                         .size(containerSize)
                         .pointerInput(artworkSize) {
                             detectTapGestures(
-                                onPress = { pressOffset ->
+                                onTap = { tapOffset ->
                                     val localCenter = Offset(size.width / 2f, size.height / 2f)
-                                    val distFromCenter = (pressOffset - localCenter).getDistance()
+                                    val distFromCenter = (tapOffset - localCenter).getDistance()
                                     val artworkRadiusPx = with(state.density) { (artworkSize / 2).toPx() }
                                     if (distFromCenter <= artworkRadiusPx) {
                                         currentPlaybackControls.onPlayPause()

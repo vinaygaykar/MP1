@@ -34,6 +34,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -82,6 +83,7 @@ fun NowPlayingCollapsedView(
     textAlpha: () -> Float = { 1f },
     onClick: (() -> Unit)? = null,
     onPositioned: ((Offset) -> Unit)? = null,
+    state: NowPlayingScreenState? = null,
 ) {
     if (playbackState.trackTitle.isEmpty()) return
 
@@ -159,44 +161,56 @@ fun NowPlayingCollapsedView(
     val currentTrackPageIndex = if (hasPrevPage) 1 else 0
     val totalPageCount = 1 + (if (hasPrevPage) 1 else 0) + (if (hasNextPage) 1 else 0)
 
-    val pagerState = rememberPagerState(
+    val localPagerState = rememberPagerState(
         initialPage = currentTrackPageIndex,
         pageCount = { totalPageCount }
     )
 
-    val boundaryOffsetAnimatable = remember { Animatable(0f) }
+    val pagerState = state?.pagerState ?: localPagerState
 
-    LaunchedEffect(queueState.currentIndex, playbackState.trackTitle, hasPrevPage, hasNextPage) {
-        if (pagerState.currentPage != currentTrackPageIndex) {
-            pagerState.scrollToPage(currentTrackPageIndex)
-        }
-    }
+    val localBoundaryOffsetAnimatable = remember { Animatable(0f) }
+    val boundaryOffsetAnimatable = state?.boundaryOffsetAnimatable ?: localBoundaryOffsetAnimatable
 
-    LaunchedEffect(pagerState.settledPage, currentTrackPageIndex) {
-        if (pagerState.settledPage < currentTrackPageIndex) {
-            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            actions.onPrevious()
-            if (pagerState.currentPage != currentTrackPageIndex) {
-                pagerState.scrollToPage(currentTrackPageIndex)
-            }
-        } else if (pagerState.settledPage > currentTrackPageIndex) {
-            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            actions.onNext()
+    if (state == null) {
+        LaunchedEffect(queueState.currentIndex, playbackState.trackTitle, hasPrevPage, hasNextPage) {
             if (pagerState.currentPage != currentTrackPageIndex) {
                 pagerState.scrollToPage(currentTrackPageIndex)
             }
         }
-    }
 
-    LaunchedEffect(pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress && boundaryOffsetAnimatable.value != 0f) {
-            boundaryOffsetAnimatable.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    stiffness = Spring.StiffnessMediumLow,
-                    dampingRatio = Spring.DampingRatioMediumBouncy
+        var wasUserScrolling by remember { mutableStateOf(false) }
+
+        LaunchedEffect(pagerState.isScrollInProgress) {
+            if (pagerState.isScrollInProgress) {
+                wasUserScrolling = true
+            } else if (boundaryOffsetAnimatable.value != 0f) {
+                boundaryOffsetAnimatable.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        stiffness = Spring.StiffnessMediumLow,
+                        dampingRatio = Spring.DampingRatioMediumBouncy
+                    )
                 )
-            )
+            }
+        }
+
+        LaunchedEffect(pagerState.settledPage, currentTrackPageIndex) {
+            if (wasUserScrolling) {
+                wasUserScrolling = false
+                if (pagerState.settledPage < currentTrackPageIndex) {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    actions.onPrevious()
+                    if (pagerState.currentPage != currentTrackPageIndex) {
+                        pagerState.scrollToPage(currentTrackPageIndex)
+                    }
+                } else if (pagerState.settledPage > currentTrackPageIndex) {
+                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    actions.onNext()
+                    if (pagerState.currentPage != currentTrackPageIndex) {
+                        pagerState.scrollToPage(currentTrackPageIndex)
+                    }
+                }
+            }
         }
     }
 

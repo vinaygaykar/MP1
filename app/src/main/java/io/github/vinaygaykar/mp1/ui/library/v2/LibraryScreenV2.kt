@@ -376,6 +376,7 @@ fun LibraryContentV2(
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 onOpenScanLocations = onOpenScanLocations,
+                onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
                 onPlaySong = onPlaySong,
                 onAddToQueue = onAddToQueue,
                 onImportPlaylistLauncher = {

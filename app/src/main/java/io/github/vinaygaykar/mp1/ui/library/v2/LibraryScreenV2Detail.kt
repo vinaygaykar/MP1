@@ -2,6 +2,7 @@ package io.github.vinaygaykar.mp1.ui.library.v2
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,10 +41,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -61,6 +64,10 @@ import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.NoticeBanner
+import io.github.vinaygaykar.mp1.ui.components.SongDetailOverlay
+import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
+import io.github.vinaygaykar.mp1.ui.library.MultiSelectionActionPopup
+import io.github.vinaygaykar.mp1.ui.library.OverlappingArtworksRow2
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.library.tabs.AlbumsTab
@@ -90,6 +97,7 @@ internal fun CategoryDetailScreen(
     onAddToQueue: (Song) -> Unit,
     onImportPlaylistLauncher: () -> Unit,
     onAddFlyingArtwork: (FlyingArtworkItem) -> Unit,
+    onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -104,9 +112,28 @@ internal fun CategoryDetailScreen(
         }
     }
 
-    val isFloatingVisible by remember(scrollBehavior) {
+    val isFloatingVisible by remember(scrollBehavior, libraryState) {
         derivedStateOf {
-            scrollBehavior.state.collapsedFraction > 0.9f
+            scrollBehavior.state.collapsedFraction > 0.9f &&
+                    !libraryState.isSelectionMode &&
+                    !libraryState.isPlaylistSelectionMode
+        }
+    }
+
+    val songsMap = remember(uiState.songs) { uiState.songs.associateBy { it.id } }
+    val selectedSongsInSelectionOrder = remember(songsMap, libraryState.selectedSongIds) {
+        libraryState.selectedSongIds.mapNotNull { songsMap[it] }
+    }
+
+    var activeOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
+    val blurRadius by animateDpAsState(
+        targetValue = if (activeOverlayData != null) 24.dp else 0.dp,
+        label = "categoryDetailBlur"
+    )
+
+    LaunchedEffect(activeOverlayData != null) {
+        if (activeOverlayData != null) {
+            onMiniPlayerCollapseChange(true)
         }
     }
 
@@ -122,6 +149,7 @@ internal fun CategoryDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier)
         ) {
             // Scan Notice Banner
             AnimatedVisibility(
@@ -190,10 +218,9 @@ internal fun CategoryDetailScreen(
                 scrollBehavior = scrollBehavior,
             )
 
-            // Sticky Selection Row if Active
+            // Sticky Selection Row if Active (Preserved - replaced by floating OverlappingArtworksRow2 for SONGS)
             AnimatedVisibility(
-                visible = (libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode) ||
-                        (libraryState.lastOpenedCategory == LibraryCategory.PLAYLISTS && libraryState.isPlaylistSelectionMode),
+                visible = (libraryState.lastOpenedCategory == LibraryCategory.PLAYLISTS && libraryState.isPlaylistSelectionMode),
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut(),
                 modifier = Modifier
@@ -206,13 +233,6 @@ internal fun CategoryDetailScreen(
                         onSelectAll = { libraryState.selectAllPlaylists(uiState.playlists) },
                         onDeselect = { libraryState.clearPlaylistSelection() },
                         onOptionsClick = { libraryState.showPlaylistMultiSelectionSheet = true }
-                    )
-                } else if (libraryState.lastOpenedCategory == LibraryCategory.SONGS) {
-                    SelectionActionRow(
-                        selectedCount = libraryState.selectedSongIds.size,
-                        onSelectAll = { libraryState.selectAllSongs(uiState.songs) },
-                        onDeselect = { libraryState.clearSongSelection() },
-                        onOptionsClick = { libraryState.showMultiSelectionSheet = true }
                     )
                 }
             }
@@ -272,20 +292,11 @@ internal fun CategoryDetailScreen(
                             onSongLongClick = { song ->
                                 libraryState.toggleSongSelection(song)
                             },
+                            onSongMoreClick = { song, offset, size ->
+                                activeOverlayData = SongOverlayData(song, offset, size)
+                            },
                             selectedSongIds = libraryState.selectedSongIds,
                             isSelectionMode = libraryState.isSelectionMode,
-                            onSwipeRight = { song, offset, size ->
-                                onAddToQueue(song)
-                                if (isPlayerActive) {
-                                    onAddFlyingArtwork(
-                                        FlyingArtworkItem(
-                                            artworkUri = song.artworkUri,
-                                            startOffset = offset,
-                                            startSize = size
-                                        )
-                                    )
-                                }
-                            },
                             contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
                             headerHeight = 104.dp
                         )
@@ -328,8 +339,8 @@ internal fun CategoryDetailScreen(
             }
         }
 
-        // Floating Search Button visible when action bar is hidden
-        if (isFloatingVisible) {
+        // Floating Search Button visible when action bar is hidden (hidden when detail overlay is open)
+        if (isFloatingVisible && activeOverlayData == null) {
             val noticeBannerHeightDp = with(density) {
                 if (uiState.isScanning) noticeBannerHeightPx.toDp() else 0.dp
             }
@@ -363,6 +374,46 @@ internal fun CategoryDetailScreen(
             }
         }
 
+        // OverlappingArtworksRow2 floating overlay when multi-select is active on SONGS
+        val noticeBannerHeightDp = with(density) {
+            if (uiState.isScanning) noticeBannerHeightPx.toDp() else 0.dp
+        }
+        OverlappingArtworksRow2(
+            songs = selectedSongsInSelectionOrder,
+            visible = libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode,
+            onClick = { libraryState.showMultiSelectionSheet = !libraryState.showMultiSelectionSheet },
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(top = noticeBannerHeightDp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .align(Alignment.TopCenter)
+                .zIndex(5f)
+        )
+
+        // MultiSelectionActionPopup sliding in from bottom of screen on the same overlay z-index layer
+        MultiSelectionActionPopup(
+            visible = libraryState.showMultiSelectionSheet && libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode,
+            onDismiss = { libraryState.showMultiSelectionSheet = false },
+            onPlayAll = {
+                if (selectedSongsInSelectionOrder.isNotEmpty()) {
+                    onPlaySong(selectedSongsInSelectionOrder.first(), uiState.songs)
+                    libraryState.clearSongSelection()
+                }
+            },
+            onAddToPlaylist = {
+                libraryState.showMultiSelectionSheet = false
+                libraryState.showPlaylistSelectionSheet = true
+            },
+            onAddToQueue = {
+                selectedSongsInSelectionOrder.forEach { song -> onAddToQueue(song) }
+                libraryState.clearSongSelection()
+            },
+            modifier = Modifier
+                .padding(bottom = bottomPadding + 8.dp)
+                .align(Alignment.BottomCenter)
+                .zIndex(5f)
+        )
+
         // Left Side Shadow during Transition
         if (detailProgress > 0f && detailProgress < 1f) {
             val shadowAlpha = minOf(detailProgress / 0.05f, (1f - detailProgress) / 0.05f, 1f)
@@ -380,6 +431,15 @@ internal fun CategoryDetailScreen(
                             )
                         )
                     )
+            )
+        }
+
+        if (activeOverlayData != null) {
+            SongDetailOverlay(
+                song = activeOverlayData!!.song,
+                startOffset = activeOverlayData!!.startOffset,
+                startSize = activeOverlayData!!.startSize,
+                onDismiss = { activeOverlayData = null }
             )
         }
     }

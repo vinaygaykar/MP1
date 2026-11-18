@@ -100,6 +100,7 @@ fun NowPlayingScreen(
     initialExpanded: Boolean = false,
     bulgeTrigger: Long = 0L,
     isCollapsedOnScroll: Boolean = false,
+    targetState: DragValue? = null,
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
     if (playbackState.trackTitle.isEmpty()) return
@@ -137,6 +138,10 @@ fun NowPlayingScreen(
             bulgeTrigger = bulgeTrigger,
             isCollapsedOnScroll = isCollapsedOnScroll
         )
+
+        LaunchedEffect(targetState) {
+            targetState?.let { state.moveToState(it) }
+        }
 
         BackHandler(
             enabled = state.anchoredDraggableState.currentValue != DragValue.COLLAPSED ||
@@ -543,12 +548,22 @@ private fun NowPlayingCompactContent(
         // Collapsed View Content
         if (state.progress < 0.2f) {
             val miniPlayerAlpha = ((0.2f - state.progress) / 0.2f).coerceIn(0f, 1f)
+            val isMiniState = state.effectiveExpandProgress == 0f
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(peekHeight)
                     .alpha(miniPlayerAlpha)
-                    .clickable { state.expand() }
+                    .clickable {
+                        if (isMiniState) {
+                            if (playbackState.isPlaying) {
+                                playbackControls.pause()
+                            }
+                            state.moveToState(DragValue.COLLAPSED)
+                        } else {
+                            state.expand()
+                        }
+                    }
             ) {
                 NowPlayingCollapsedView(
                     playbackState = playbackState,
@@ -557,8 +572,18 @@ private fun NowPlayingCompactContent(
                     actions = playbackControls,
                     showRecord = false,
                     rotation = { state.visualRotation },
-                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) },
-                    onClick = { state.expand() }
+                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) * state.effectiveTextAlpha },
+                    onClick = {
+                        if (isMiniState) {
+                            if (playbackState.isPlaying) {
+                                playbackControls.pause()
+                            }
+                            state.moveToState(DragValue.COLLAPSED)
+                        } else {
+                            state.expand()
+                        }
+                    },
+                    state = state
                 )
             }
         }
@@ -720,12 +745,22 @@ private fun NowPlayingPortraitContent(
         // Collapsed View Content
         if (state.progress < 0.2f) {
             val miniPlayerAlpha = ((0.2f - state.progress) / 0.2f).coerceIn(0f, 1f)
+            val isMiniState = state.effectiveExpandProgress == 0f
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(peekHeight)
                     .alpha(miniPlayerAlpha)
-                    .clickable { state.expand() }
+                    .clickable {
+                        if (isMiniState) {
+                            if (playbackState.isPlaying) {
+                                playbackControls.pause()
+                            }
+                            state.moveToState(DragValue.COLLAPSED)
+                        } else {
+                            state.expand()
+                        }
+                    }
             ) {
                 NowPlayingCollapsedView(
                     playbackState = playbackState,
@@ -734,8 +769,18 @@ private fun NowPlayingPortraitContent(
                     actions = playbackControls,
                     showRecord = false,
                     rotation = { state.visualRotation },
-                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) },
-                    onClick = { state.expand() }
+                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) * state.effectiveTextAlpha },
+                    onClick = {
+                        if (isMiniState) {
+                            if (playbackState.isPlaying) {
+                                playbackControls.pause()
+                            }
+                            state.moveToState(DragValue.COLLAPSED)
+                        } else {
+                            state.expand()
+                        }
+                    },
+                    state = state
                 )
             }
         }
@@ -920,12 +965,22 @@ private fun NowPlayingLandscapeContent(
         // Collapsed View Content
         if (state.progress < 0.2f) {
             val miniPlayerAlpha = ((0.2f - state.progress) / 0.2f).coerceIn(0f, 1f)
+            val isMiniState = state.effectiveExpandProgress == 0f
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(peekHeight)
                     .alpha(miniPlayerAlpha)
-                    .clickable { state.expand() }
+                    .clickable {
+                        if (isMiniState) {
+                            if (playbackState.isPlaying) {
+                                playbackControls.pause()
+                            }
+                            state.moveToState(DragValue.COLLAPSED)
+                        } else {
+                            state.expand()
+                        }
+                    }
             ) {
                 NowPlayingCollapsedView(
                     playbackState = playbackState,
@@ -934,8 +989,18 @@ private fun NowPlayingLandscapeContent(
                     actions = playbackControls,
                     showRecord = false,
                     rotation = { state.visualRotation },
-                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) },
-                    onClick = { state.expand() }
+                    textAlpha = { ((state.effectiveExpandProgress - 0.15f) / 0.85f).coerceIn(0f, 1f) * state.effectiveTextAlpha },
+                    onClick = {
+                        if (isMiniState) {
+                            if (playbackState.isPlaying) {
+                                playbackControls.pause()
+                            }
+                            state.moveToState(DragValue.COLLAPSED)
+                        } else {
+                            state.expand()
+                        }
+                    },
+                    state = state
                 )
             }
         }

@@ -80,6 +80,7 @@ class NowPlayingScreenState(
     val boundaryNestedScrollConnection: NestedScrollConnection,
     val boundaryOffsetAnimatable: Animatable<Float, AnimationVector1D>,
     val expandAnimProgress: Animatable<Float, AnimationVector1D>,
+    val textAlphaAnimProgress: Animatable<Float, AnimationVector1D>,
     val animatableBulge: Animatable<Float, AnimationVector1D>,
     val rippleProgress: Animatable<Float, AnimationVector1D>,
     val scale: Animatable<Float, AnimationVector1D>,
@@ -125,6 +126,9 @@ class NowPlayingScreenState(
     val effectiveExpandProgress: Float
         get() = if (lastTrackTitle.isEmpty() && expandAnimProgress.value == 1f) 0f else expandAnimProgress.value
 
+    val effectiveTextAlpha: Float
+        get() = if (lastTrackTitle.isEmpty() && textAlphaAnimProgress.value == 1f) 0f else textAlphaAnimProgress.value
+
     var lastTrackTitle by mutableStateOf("")
     var isScreenActive by mutableStateOf(true)
 
@@ -169,12 +173,60 @@ class NowPlayingScreenState(
     var showQueue by mutableStateOf(false)
     var showArtistsDialog by mutableStateOf(false)
 
+    fun moveToState(targetState: DragValue) {
+        scope.launch {
+            when (targetState) {
+                DragValue.MINI -> {
+                    if (anchoredDraggableState.currentValue == DragValue.EXPANDED) {
+                        anchoredDraggableState.animateTo(DragValue.COLLAPSED)
+                    }
+                    // Phase 1: Fade text out
+                    textAlphaAnimProgress.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
+                    )
+                    // Phase 2: Shrink container width
+                    expandAnimProgress.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                    )
+                }
+                DragValue.COLLAPSED -> {
+                    if (anchoredDraggableState.currentValue == DragValue.EXPANDED) {
+                        anchoredDraggableState.animateTo(DragValue.COLLAPSED)
+                    }
+                    // Phase 1: Expand width to full pill
+                    expandAnimProgress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                    )
+                    // Phase 2: Fade text in
+                    textAlphaAnimProgress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
+                    )
+                }
+                DragValue.EXPANDED -> {
+                    if (expandAnimProgress.value < 1f || textAlphaAnimProgress.value < 1f) {
+                        expandAnimProgress.snapTo(1f)
+                        textAlphaAnimProgress.snapTo(1f)
+                    }
+                    anchoredDraggableState.animateTo(DragValue.EXPANDED)
+                }
+            }
+        }
+    }
+
     fun collapse() {
-        scope.launch { anchoredDraggableState.animateTo(DragValue.COLLAPSED) }
+        moveToState(DragValue.COLLAPSED)
     }
 
     fun expand() {
-        scope.launch { anchoredDraggableState.animateTo(DragValue.EXPANDED) }
+        moveToState(DragValue.EXPANDED)
+    }
+
+    fun mini() {
+        moveToState(DragValue.MINI)
     }
 
     fun collapseQueue() {
@@ -289,6 +341,7 @@ fun rememberNowPlayingScreenState(
     }
 
     val expandAnimProgress = remember { Animatable(1f) }
+    val textAlphaAnimProgress = remember { Animatable(1f) }
 
     val animatableBulge = remember { Animatable(1f) }
     LaunchedEffect(bulgeTrigger) {
@@ -375,25 +428,12 @@ fun rememberNowPlayingScreenState(
     }
 
     val targetTrackPageIndex by rememberUpdatedState(currentTrackPageIndex)
-
-    LaunchedEffect(pagerState.settledPage) {
-        if (pagerState.settledPage < targetTrackPageIndex) {
-            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            playbackControls.onPrevious()
-            if (pagerState.currentPage != targetTrackPageIndex) {
-                pagerState.scrollToPage(targetTrackPageIndex)
-            }
-        } else if (pagerState.settledPage > targetTrackPageIndex) {
-            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            playbackControls.onNext()
-            if (pagerState.currentPage != targetTrackPageIndex) {
-                pagerState.scrollToPage(targetTrackPageIndex)
-            }
-        }
-    }
+    var wasUserScrolling by remember { mutableStateOf(false) }
 
     LaunchedEffect(pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress && boundaryOffsetAnimatable.value != 0f) {
+        if (pagerState.isScrollInProgress) {
+            wasUserScrolling = true
+        } else if (boundaryOffsetAnimatable.value != 0f) {
             boundaryOffsetAnimatable.animateTo(
                 targetValue = 0f,
                 animationSpec = spring(
@@ -401,6 +441,25 @@ fun rememberNowPlayingScreenState(
                     stiffness = Spring.StiffnessMedium
                 )
             )
+        }
+    }
+
+    LaunchedEffect(pagerState.settledPage) {
+        if (wasUserScrolling) {
+            wasUserScrolling = false
+            if (pagerState.settledPage < targetTrackPageIndex) {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                playbackControls.onPrevious()
+                if (pagerState.currentPage != targetTrackPageIndex) {
+                    pagerState.scrollToPage(targetTrackPageIndex)
+                }
+            } else if (pagerState.settledPage > targetTrackPageIndex) {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                playbackControls.onNext()
+                if (pagerState.currentPage != targetTrackPageIndex) {
+                    pagerState.scrollToPage(targetTrackPageIndex)
+                }
+            }
         }
     }
 
@@ -518,6 +577,7 @@ fun rememberNowPlayingScreenState(
             boundaryNestedScrollConnection = boundaryNestedScrollConnection,
             boundaryOffsetAnimatable = boundaryOffsetAnimatable,
             expandAnimProgress = expandAnimProgress,
+            textAlphaAnimProgress = textAlphaAnimProgress,
             animatableBulge = animatableBulge,
             rippleProgress = rippleProgress,
             scale = scale,
@@ -553,18 +613,14 @@ fun rememberNowPlayingScreenState(
     LaunchedEffect(playbackState.trackTitle) {
         if (state.lastTrackTitle.isEmpty() && playbackState.trackTitle.isNotEmpty()) {
             expandAnimProgress.snapTo(0f)
+            textAlphaAnimProgress.snapTo(0f)
             delay(2000L)
-            expandAnimProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
-            )
+            state.moveToState(DragValue.COLLAPSED)
         } else if (playbackState.trackTitle.isEmpty()) {
             expandAnimProgress.snapTo(0f)
+            textAlphaAnimProgress.snapTo(0f)
         } else if (state.lastTrackTitle != playbackState.trackTitle) {
-            expandAnimProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
-            )
+            state.moveToState(DragValue.COLLAPSED)
         }
         state.lastTrackTitle = playbackState.trackTitle
     }
@@ -573,15 +629,9 @@ fun rememberNowPlayingScreenState(
     LaunchedEffect(isCollapsedOnScroll) {
         if (playbackState.trackTitle.isNotEmpty() && state.lastTrackTitle.isNotEmpty()) {
             if (isCollapsedOnScroll) {
-                expandAnimProgress.animateTo(
-                    targetValue = 0f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
-                )
+                state.moveToState(DragValue.MINI)
             } else {
-                expandAnimProgress.animateTo(
-                    targetValue = 1f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
-                )
+                state.moveToState(DragValue.COLLAPSED)
             }
         }
     }

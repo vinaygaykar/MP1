@@ -9,6 +9,7 @@ import kotlin.math.PI
 import kotlin.math.atan2
 
 enum class DragValue {
+    MINI,
     COLLAPSED,
     EXPANDED
 }

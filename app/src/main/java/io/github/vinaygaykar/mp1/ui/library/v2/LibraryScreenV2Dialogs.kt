@@ -25,8 +25,9 @@ internal fun LibraryDialogsAndSheets(
     onAddSongsToPlaylist: (Long, List<Song>) -> Unit,
     onCreatePlaylistWithSongs: (String, List<Song>) -> Unit
 ) {
-    val selectedSongs = remember(uiState.songs, libraryState.selectedSongIds) {
-        uiState.songs.filter { libraryState.selectedSongIds.contains(it.id) }
+    val songsMap = remember(uiState.songs) { uiState.songs.associateBy { it.id } }
+    val selectedSongs = remember(songsMap, libraryState.selectedSongIds) {
+        libraryState.selectedSongIds.mapNotNull { songsMap[it] }
     }
     val selectedPlaylists = remember(uiState.playlists, libraryState.selectedPlaylistIds) {
         uiState.playlists.filter { libraryState.selectedPlaylistIds.contains(it.id) }
@@ -72,24 +73,7 @@ internal fun LibraryDialogsAndSheets(
         )
     }
 
-    if (libraryState.showMultiSelectionSheet) {
-        MultiSelectionBottomSheet(
-            selectedSongs = selectedSongs,
-            onDismiss = { libraryState.showMultiSelectionSheet = false },
-            onPlayAll = {
-                if (selectedSongs.isNotEmpty()) {
-                    libraryState.clearSongSelection()
-                }
-            },
-            onAddToPlaylist = {
-                libraryState.showMultiSelectionSheet = false
-                libraryState.showPlaylistSelectionSheet = true
-            },
-            onAddToQueue = {
-                libraryState.clearSongSelection()
-            }
-        )
-    }
+
 
     if (libraryState.showPlaylistSelectionSheet) {
         PlaylistPickerBottomSheet(
