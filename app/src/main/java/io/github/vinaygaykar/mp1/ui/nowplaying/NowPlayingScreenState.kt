@@ -620,7 +620,9 @@ fun rememberNowPlayingScreenState(
             expandAnimProgress.snapTo(0f)
             textAlphaAnimProgress.snapTo(0f)
         } else if (state.lastTrackTitle != playbackState.trackTitle) {
-            state.moveToState(DragValue.COLLAPSED)
+            if (isCollapsedOnScroll || expandAnimProgress.value < 1f || textAlphaAnimProgress.value < 1f) {
+                state.moveToState(DragValue.COLLAPSED)
+            }
         }
         state.lastTrackTitle = playbackState.trackTitle
     }
