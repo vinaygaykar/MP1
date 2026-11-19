@@ -10,6 +10,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -35,9 +36,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
@@ -58,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
@@ -162,7 +166,18 @@ fun SongDetailOverlay(
     val coroutineScope = rememberCoroutineScope()
 
     var isClosing by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(false) }
+
     val animProgress = remember { Animatable(0f) }
+
+    val expandProgress by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "songDetailOverlayExpand"
+    )
 
     // Fetch album artwork embedded from song file
     var embeddedArtworkBytes by remember(song.uri) { mutableStateOf<ByteArray?>(null) }
@@ -207,7 +222,11 @@ fun SongDetailOverlay(
     }
 
     BackHandler {
-        dismissWithAnimation()
+        if (isExpanded) {
+            isExpanded = false
+        } else {
+            dismissWithAnimation()
+        }
     }
 
     val screenWidthDp = configuration.screenWidthDp.dp
@@ -217,10 +236,14 @@ fun SongDetailOverlay(
 
     val p = animProgress.value
 
-    val targetSizeDp = 180.dp
+    val normalTargetSizeDp = 180.dp
+    val expandedTargetSizeDp = 260.dp
+    val targetSizeDp = normalTargetSizeDp + (expandedTargetSizeDp - normalTargetSizeDp) * expandProgress
     val targetSizePx = with(density) { targetSizeDp.toPx() }
     val targetX = (screenWidthPx - targetSizePx) / 2f
     val targetY = with(density) { (56.dp + 48.dp + 20.dp).toPx() }
+
+    val artworkShadowElevation = 18.dp * expandProgress
 
     val startSizePx = if (startSize.width > 0) startSize.width.toFloat() else with(density) { 48.dp.toPx() }
     val initialX = if (startOffset != Offset.Zero) startOffset.x else (screenWidthPx - startSizePx) / 2f
@@ -258,14 +281,17 @@ fun SongDetailOverlay(
                 )
         )
 
-        // Scrollable parent Column wrapping the 2 sub containers
+        // Parent Column wrapping the 2 sub containers (scrollable when collapsed, full height when expanded)
         val artworkAnimTranslationX = (initialX - targetX) * (1f - p)
         val artworkAnimTranslationY = (initialY - targetY) * (1f - p)
+
+        val scrollState = rememberScrollState()
+        val scrollModifier = if (!isExpanded) Modifier.verticalScroll(scrollState) else Modifier
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .then(scrollModifier)
                 .padding(horizontal = 24.dp)
                 .padding(top = 56.dp)
                 .navigationBarsPadding()
@@ -276,24 +302,36 @@ fun SongDetailOverlay(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Sub container 1: Song title, album artwork, texts and other metadata
+            val firstContainerScale = 1f + (0.05f * expandProgress)
+            val firstContainerModifier = if (isExpanded) {
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            } else {
+                Modifier.fillMaxWidth()
+            }
+
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = firstContainerModifier
+                    .graphicsLayer {
+                        scaleX = firstContainerScale
+                        scaleY = firstContainerScale
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Song Title (Moved above album artwork)
+                // 1. Song Title (Constant headlineSmall typography)
                 Text(
                     text = song.title.ifBlank { "Unknown Title" },
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
 
-                // 2. Animated Circular Artwork (Using embedded picture if available)
+                // 2. Animated Circular Artwork (With dynamic scale & shadow on expand)
                 Box(
                     modifier = Modifier
                         .graphicsLayer {
@@ -301,6 +339,11 @@ fun SongDetailOverlay(
                             translationY = artworkAnimTranslationY
                         }
                         .size(currentSizeDp)
+                        .shadow(
+                            elevation = artworkShadowElevation,
+                            shape = CircleShape,
+                            clip = false
+                        )
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     contentAlignment = Alignment.Center
@@ -319,7 +362,7 @@ fun SongDetailOverlay(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
 
                 // 3. Album Name
                 val displayAlbum = remember(song.album) { song.album.ifBlank { "Unknown Album" } }
@@ -340,14 +383,14 @@ fun SongDetailOverlay(
                     Text(
                         text = displayAlbum,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
 
                 // 4. List of Artists
                 val displayArtists = remember(song.artistsDisplayString, song.artist) {
@@ -361,9 +404,9 @@ fun SongDetailOverlay(
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
 
-                // Metadata Info Row (Track Duration, File Format, Offline Lyrics)
+                // Metadata Info Row (Track Duration, File Format, Offline Lyrics, Expand Button)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -442,133 +485,159 @@ fun SongDetailOverlay(
                             }
                         }
                     }
+
+                    // Expand / Collapse Layout Button (Right side, icon only)
+                    Surface(
+                        onClick = { isExpanded = !isExpanded },
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isExpanded) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = if (isExpanded) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
+                                contentDescription = if (isExpanded) "Collapse layout" else "Expand layout",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Sub container 2: Action Buttons
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Play Next Button
-                Button(
-                    onClick = {
-                        onPlayNext?.invoke(song)
-                        dismissWithAnimation()
-                    },
+            // Sub container 2: Action Buttons (Fade out / slide down when expanded)
+            val buttonsAlpha = (1f - expandProgress * 1.5f).coerceIn(0f, 1f)
+            if (buttonsAlpha > 0.01f) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                        .padding(horizontal = 8.dp)
+                        .graphicsLayer {
+                            alpha = buttonsAlpha
+                            translationY = with(density) { (30.dp * expandProgress).toPx() }
+                        },
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Play next",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                    // Play Next Button
+                    Button(
+                        onClick = {
+                            onPlayNext?.invoke(song)
+                            dismissWithAnimation()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(26.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Play next",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
 
-                // Add to Queue Button
-                FilledTonalButton(
-                    onClick = {
-                        onAddToQueue?.invoke(song)
-                        dismissWithAnimation()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Add to queue",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                    // Add to Queue Button
+                    FilledTonalButton(
+                        onClick = {
+                            onAddToQueue?.invoke(song)
+                            dismissWithAnimation()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(26.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Add to queue",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
 
-                // Add to Playlist Button
-                FilledTonalButton(
-                    onClick = {
-                        onAddToPlaylist?.invoke(song)
-                        dismissWithAnimation()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Add to playlist",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                    // Add to Playlist Button
+                    FilledTonalButton(
+                        onClick = {
+                            onAddToPlaylist?.invoke(song)
+                            dismissWithAnimation()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(26.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Add to playlist",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
 
-                // Show File Button
-                FilledTonalButton(
-                    onClick = {
-                        if (onShowFile != null) {
-                            onShowFile(song)
-                        } else {
-                            openSongParentFolder(context, song)
-                        }
-                        dismissWithAnimation()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = "Show file",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Show file",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    // Show File Button
+                    FilledTonalButton(
+                        onClick = {
+                            if (onShowFile != null) {
+                                onShowFile(song)
+                            } else {
+                                openSongParentFolder(context, song)
+                            }
+                            dismissWithAnimation()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(26.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = "Show file",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Show file",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }
