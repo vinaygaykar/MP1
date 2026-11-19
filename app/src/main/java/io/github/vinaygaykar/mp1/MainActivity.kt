@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -134,6 +135,7 @@ fun MainScreen(
     var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
     var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
     var isMiniPlayerCollapsedOnScroll by remember { mutableStateOf(false) }
+    var nowPlayingOffsetY by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(playbackState.trackTitle) {
         isMiniPlayerCollapsedOnScroll = false
@@ -195,7 +197,8 @@ fun MainScreen(
                                 onSearchClick = { navController.navigate(Screen.Search.route) },
                                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                                 onOpenScanLocations = { navController.navigate("scan_locations") },
-                                onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it }
+                                onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
+                                onNowPlayingOffsetYChange = { nowPlayingOffsetY = it }
                             )
                         }
                         composable(
@@ -289,7 +292,9 @@ fun MainScreen(
 
         // Now Playing Screen - Sits on top
         NowPlayingScreen(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationY = nowPlayingOffsetY },
             playbackState = playbackState,
             progressState = progressState,
             queueState = queueState,

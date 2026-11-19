@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.rememberSplineBasedDecay
@@ -63,6 +64,7 @@ fun LibraryScreenV2(
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
+    onNowPlayingOffsetYChange: (Float) -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -104,6 +106,7 @@ fun LibraryScreenV2(
         onSettingsClick = onSettingsClick,
         onOpenScanLocations = onOpenScanLocations,
         onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
+        onNowPlayingOffsetYChange = onNowPlayingOffsetYChange,
         onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
         onAddToQueue = { viewModel.addToQueue(it) },
         onCreatePlaylist = { viewModel.createPlaylist(it) },
@@ -134,6 +137,7 @@ fun LibraryContentV2(
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
+    onNowPlayingOffsetYChange: (Float) -> Unit = {},
     onPlaySong: (io.github.vinaygaykar.mp1.domain.models.Song, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> },
     onAddToQueue: (io.github.vinaygaykar.mp1.domain.models.Song) -> Unit = {},
     onCreatePlaylist: (String) -> Unit = {},
@@ -259,6 +263,43 @@ fun LibraryContentV2(
         }
     }
 
+    val nowPlayingOffsetY = remember { Animatable(0f) }
+
+    LaunchedEffect(nowPlayingOffsetY.value) {
+        onNowPlayingOffsetYChange(nowPlayingOffsetY.value)
+    }
+
+    /**
+     * Slides the collapsed Now Playing view downward below the screen bounds.
+     */
+    fun hideNowPlayingView() {
+        coroutineScope.launch {
+            val slideDistancePx = with(density) { (72.dp + bottomPadding).toPx() }
+            nowPlayingOffsetY.animateTo(
+                targetValue = slideDistancePx,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+        }
+    }
+
+    /**
+     * Slides the collapsed Now Playing view back up into its original screen position.
+     */
+    fun showNowPlayingView() {
+        coroutineScope.launch {
+            nowPlayingOffsetY.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+        }
+    }
+
     BackHandler(
         enabled = libraryState.isSelectionMode ||
                 libraryState.isPlaylistSelectionMode ||
@@ -374,7 +415,8 @@ fun LibraryContentV2(
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 onOpenScanLocations = onOpenScanLocations,
-                onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
+                onHideNowPlayingView = { hideNowPlayingView() },
+                onShowNowPlayingView = { showNowPlayingView() },
                 onPlaySong = onPlaySong,
                 onAddToQueue = onAddToQueue,
                 onImportPlaylistLauncher = {

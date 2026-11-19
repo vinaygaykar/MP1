@@ -3,6 +3,7 @@ package io.github.vinaygaykar.mp1.ui.components
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -76,7 +79,9 @@ import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Data structure holding target song and initial circular artwork bounds for hero transition.
@@ -108,7 +113,11 @@ fun SongHeroOverlayContainer(
         label = "songHeroOverlayBlur"
     )
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .zIndex(if (overlayData != null) 100f else 0f)
+    ) {
         // Parent Screen Content (blurred when overlayData != null)
         Box(
             modifier = Modifier
@@ -155,6 +164,25 @@ fun SongDetailOverlay(
     var isClosing by remember { mutableStateOf(false) }
     val animProgress = remember { Animatable(0f) }
 
+    // Fetch album artwork embedded from song file
+    var embeddedArtworkBytes by remember(song.uri) { mutableStateOf<ByteArray?>(null) }
+
+    LaunchedEffect(song.uri) {
+        if (song.uri != Uri.EMPTY) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val retriever = MediaMetadataRetriever()
+                    retriever.setDataSource(context, song.uri)
+                    val pic = retriever.embeddedPicture
+                    retriever.release()
+                    embeddedArtworkBytes = pic
+                } catch (_: Exception) {
+                    embeddedArtworkBytes = null
+                }
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         animProgress.animateTo(
             targetValue = 1f,
@@ -182,77 +210,90 @@ fun SongDetailOverlay(
         dismissWithAnimation()
     }
 
-    Popup(
-        onDismissRequest = dismissWithAnimation,
-        properties = PopupProperties(
-            focusable = true,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-            clippingEnabled = false
-        )
-    ) {
-        val screenWidthDp = configuration.screenWidthDp.dp
-        val screenHeightDp = configuration.screenHeightDp.dp
-        val screenWidthPx = with(density) { screenWidthDp.toPx() }
-        val screenHeightPx = with(density) { screenHeightDp.toPx() }
+    val screenWidthDp = configuration.screenWidthDp.dp
+    val screenHeightDp = configuration.screenHeightDp.dp
+    val screenWidthPx = with(density) { screenWidthDp.toPx() }
+    val screenHeightPx = with(density) { screenHeightDp.toPx() }
 
-        val p = animProgress.value
+    val p = animProgress.value
 
-        val targetSizeDp = 180.dp
-        val targetSizePx = with(density) { targetSizeDp.toPx() }
-        val targetX = (screenWidthPx - targetSizePx) / 2f
-        val targetY = with(density) { 56.dp.toPx() }
+    val targetSizeDp = 180.dp
+    val targetSizePx = with(density) { targetSizeDp.toPx() }
+    val targetX = (screenWidthPx - targetSizePx) / 2f
+    val targetY = with(density) { (56.dp + 48.dp + 20.dp).toPx() }
 
-        val startSizePx = if (startSize.width > 0) startSize.width.toFloat() else with(density) { 48.dp.toPx() }
-        val initialX = if (startOffset != Offset.Zero) startOffset.x else (screenWidthPx - startSizePx) / 2f
-        val initialY = if (startOffset != Offset.Zero) startOffset.y else (screenHeightPx - startSizePx) / 2f
+    val startSizePx = if (startSize.width > 0) startSize.width.toFloat() else with(density) { 48.dp.toPx() }
+    val initialX = if (startOffset != Offset.Zero) startOffset.x else (screenWidthPx - startSizePx) / 2f
+    val initialY = if (startOffset != Offset.Zero) startOffset.y else (screenHeightPx - startSizePx) / 2f
 
-        val currentSizePx = startSizePx + (targetSizePx - startSizePx) * p
-        val currentSizeDp = with(density) { currentSizePx.toDp() }
+    val currentSizePx = startSizePx + (targetSizePx - startSizePx) * p
+    val currentSizeDp = with(density) { currentSizePx.toDp() }
 
-        // Extracted File Type (MP3, FLAC, WAV, etc.)
-        val fileExtension = remember(song.fileName, song.uri) {
-            var ext = song.fileName.substringAfterLast('.', "").uppercase()
-            if (ext.isEmpty() || ext.length > 5) {
-                val path = song.uri.path ?: ""
-                ext = path.substringAfterLast('.', "").uppercase()
-            }
-            if (ext.isEmpty() || ext.length > 5) "AUDIO" else ext
+    // Extracted File Type (MP3, FLAC, WAV, etc.)
+    val fileExtension = remember(song.fileName, song.uri) {
+        var ext = song.fileName.substringAfterLast('.', "").uppercase()
+        if (ext.isEmpty() || ext.length > 5) {
+            val path = song.uri.path ?: ""
+            ext = path.substringAfterLast('.', "").uppercase()
         }
+        if (ext.isEmpty() || ext.length > 5) "AUDIO" else ext
+    }
 
-        // Formatted Audio Track Duration
-        val formattedDuration = remember(song.durationMs) { formatTrackDuration(song.durationMs) }
+    // Formatted Audio Track Duration
+    val formattedDuration = remember(song.durationMs) { formatTrackDuration(song.durationMs) }
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(100f)
+    ) {
+        // Transparent backdrop layer (triggers dismiss on click)
         Box(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = dismissWithAnimation
+                )
+        )
+
+        // Scrollable parent Column wrapping the 2 sub containers
+        val artworkAnimTranslationX = (initialX - targetX) * (1f - p)
+        val artworkAnimTranslationY = (initialY - targetY) * (1f - p)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(top = 56.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp)
+                .graphicsLayer {
+                    alpha = p
+                },
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Transparent backdrop layer (triggers dismiss on click)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = dismissWithAnimation
-                    )
-            )
-
-            // Scrollable Column wrapping ALL overlay components (including Artwork!)
-            val artworkAnimTranslationX = (initialX - targetX) * (1f - p)
-            val artworkAnimTranslationY = (initialY - targetY) * (1f - p)
-
+            // Sub container 1: Song title, album artwork, texts and other metadata
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 56.dp)
-                    .graphicsLayer {
-                        alpha = p
-                    },
+                modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Animated Circular Artwork (Inside the scrollable Column!)
+                // 1. Song Title (Moved above album artwork)
+                Text(
+                    text = song.title.ifBlank { "Unknown Title" },
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // 2. Animated Circular Artwork (Using embedded picture if available)
                 Box(
                     modifier = Modifier
                         .graphicsLayer {
@@ -265,8 +306,9 @@ fun SongDetailOverlay(
                     contentAlignment = Alignment.Center
                 ) {
                     val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                    val artworkModel = embeddedArtworkBytes ?: song.artworkUri
                     AsyncImage(
-                        model = song.artworkUri,
+                        model = artworkModel,
                         contentDescription = song.title,
                         error = musicPlaceholder,
                         placeholder = musicPlaceholder,
@@ -279,20 +321,7 @@ fun SongDetailOverlay(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 2. Song Title (No maxLines clipping, wraps as many lines as needed)
-                Text(
-                    text = song.title.ifBlank { "Unknown Title" },
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // 3. Album Name (No maxLines clipping, Clickable -> AlbumDetailActivity)
+                // 3. Album Name
                 val displayAlbum = remember(song.album) { song.album.ifBlank { "Unknown Album" } }
                 Surface(
                     onClick = {
@@ -320,7 +349,7 @@ fun SongDetailOverlay(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 4. List of Artists (No maxLines clipping, wraps as many lines as needed)
+                // 4. List of Artists
                 val displayArtists = remember(song.artistsDisplayString, song.artist) {
                     song.artistsDisplayString.ifBlank { song.artist.ifBlank { "Unknown Artist" } }
                 }
@@ -414,132 +443,132 @@ fun SongDetailOverlay(
                         }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // Action Buttons Column
-                Column(
+            // Sub container 2: Action Buttons
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Play Next Button
+                Button(
+                    onClick = {
+                        onPlayNext?.invoke(song)
+                        dismissWithAnimation()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
-                    // 5. Play Next Button
-                    Button(
-                        onClick = {
-                            onPlayNext?.invoke(song)
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Play next",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Play next",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
-                    // 6. Add to Queue Button
-                    FilledTonalButton(
-                        onClick = {
-                            onAddToQueue?.invoke(song)
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Add to queue",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                // Add to Queue Button
+                FilledTonalButton(
+                    onClick = {
+                        onAddToQueue?.invoke(song)
+                        dismissWithAnimation()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add to queue",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
-                    // 7. Add to Playlist Button
-                    FilledTonalButton(
-                        onClick = {
-                            onAddToPlaylist?.invoke(song)
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Add to playlist",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                // Add to Playlist Button
+                FilledTonalButton(
+                    onClick = {
+                        onAddToPlaylist?.invoke(song)
+                        dismissWithAnimation()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add to playlist",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
-                    // 4th Button: Show File (Opens parent folder in file manager)
-                    FilledTonalButton(
-                        onClick = {
-                            if (onShowFile != null) {
-                                onShowFile(song)
-                            } else {
-                                openSongParentFolder(context, song)
-                            }
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Folder,
-                            contentDescription = "Show file",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Show file",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                // Show File Button
+                FilledTonalButton(
+                    onClick = {
+                        if (onShowFile != null) {
+                            onShowFile(song)
+                        } else {
+                            openSongParentFolder(context, song)
+                        }
+                        dismissWithAnimation()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = "Show file",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Show file",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

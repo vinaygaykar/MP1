@@ -91,7 +91,8 @@ internal fun CategoryDetailScreen(
     onPlaySong: (Song, List<Song>) -> Unit,
     onAddToQueue: (Song) -> Unit,
     onImportPlaylistLauncher: () -> Unit,
-    onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -123,7 +124,9 @@ internal fun CategoryDetailScreen(
 
     LaunchedEffect(activeOverlayData != null) {
         if (activeOverlayData != null) {
-            onMiniPlayerCollapseChange(true)
+            onHideNowPlayingView()
+        } else {
+            onShowNowPlayingView()
         }
     }
 
