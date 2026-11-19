@@ -380,7 +380,10 @@ fun AlbumGridPunk(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .zIndex(100f)
-                .padding(bottom = contentPadding.calculateBottomPadding()),
+                .padding(
+                    top = contentPadding.calculateTopPadding(),
+                    bottom = contentPadding.calculateBottomPadding()
+                ),
             listState = if (isFastModeActive && USE_NEW_FAST_GRID) fastLazyListState else if (!isFastModeActive) lazyListState else null,
             gridState = if (isFastModeActive && !USE_NEW_FAST_GRID) lazyGridState else null,
             onInteractingChanged = { interacting ->

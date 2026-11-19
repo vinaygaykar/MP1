@@ -38,9 +38,9 @@ fun SimpleScrollBar(
     scrollState: ScrollState? = null,
     modifier: Modifier = Modifier,
     thumbColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-    thumbWidth: Dp = 4.dp,
+    thumbWidth: Dp = 8.dp,
     touchTargetWidth: Dp = 24.dp,
-    paddingEnd: Dp = 6.dp,
+    paddingEnd: Dp = 8.dp,
     onInteractingChanged: ((Boolean) -> Unit)? = null
 ) {
     val needsScrollbar by remember(listState, gridState, scrollState) {
@@ -64,7 +64,7 @@ fun SimpleScrollBar(
     val activeThumbColor = if (isDragging) primaryColor else thumbColor
 
     val animatedWidth by animateDpAsState(
-        targetValue = if (isDragging) thumbWidth * 1.75f else thumbWidth,
+        targetValue = if (isDragging) thumbWidth * 1.5f else thumbWidth,
         label = "thumb_width"
     )
 

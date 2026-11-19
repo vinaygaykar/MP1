@@ -124,7 +124,10 @@ fun ArtistGrid(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .zIndex(100f)
-                    .padding(bottom = contentPadding.calculateBottomPadding()),
+                    .padding(
+                        top = contentPadding.calculateTopPadding(),
+                        bottom = contentPadding.calculateBottomPadding()
+                    ),
                 gridState = gridState
             )
         }
