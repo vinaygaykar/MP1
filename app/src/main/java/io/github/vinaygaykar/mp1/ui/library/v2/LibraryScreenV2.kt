@@ -370,9 +370,7 @@ fun LibraryContentV2(
                 displayFolder = displayFolder,
                 bottomPadding = bottomPadding,
                 detailProgress = detailProgress,
-                isPlayerActive = isPlayerActive,
                 scrollBehavior = scrollBehavior,
-                onOpenCategoryMenu = { openCategoryMenu() },
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 onOpenScanLocations = onOpenScanLocations,
@@ -391,8 +389,7 @@ fun LibraryContentV2(
                             "text/x-m3u"
                         )
                     )
-                },
-                onAddFlyingArtwork = { flyingArtworks.add(it) }
+                }
             )
         }
 

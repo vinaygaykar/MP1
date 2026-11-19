@@ -11,10 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -26,9 +23,7 @@ import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
-import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
-import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 private const val EMPTY_STATE_MESSAGE = "No Songs found.\nScan a folder from Settings."
@@ -44,9 +39,6 @@ fun SongList(
     onSongMoreClick: ((Song, Offset, IntSize) -> Unit)? = null,
     headerHeight: Dp = 104.dp
 ) {
-    var internalOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
-    val isInternalMode = onSongMoreClick == null
-
     if (songs.isEmpty()) {
         val topPadding = contentPadding.calculateTopPadding()
         val bottomPadding = contentPadding.calculateBottomPadding()
@@ -60,51 +52,42 @@ fun SongList(
         )
     } else {
         val listState = rememberLazyListState()
-        SongHeroOverlayContainer(
-            overlayData = if (isInternalMode) internalOverlayData else null,
-            onDismiss = { internalOverlayData = null }
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = contentPadding
-                ) {
-                    items(songs, key = { it.id }) { song ->
-                        val isSelected = selectedSongIds.contains(song.id)
-                        val onClickLambda = remember(song.id, isSelectionMode) {
-                            { onSongClick(song) }
-                        }
-                        val onLongClickLambda = remember(song.id) {
-                            { onSongLongClick(song) }
-                        }
-                        SongListItem(
-                            song = song,
-                            onClick = onClickLambda,
-                            isSelected = isSelected,
-                            isSelectionMode = isSelectionMode,
-                            onLongClick = onLongClickLambda,
-                            onMoreClick = { offset, size ->
-                                if (onSongMoreClick != null) {
-                                    onSongMoreClick(song, offset, size)
-                                } else {
-                                    internalOverlayData = SongOverlayData(song, offset, size)
-                                }
-                            }
-                        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = contentPadding
+            ) {
+                items(songs, key = { it.id }) { song ->
+                    val isSelected = selectedSongIds.contains(song.id)
+                    val onClickLambda = remember(song.id, isSelectionMode) {
+                        { onSongClick(song) }
                     }
+                    val onLongClickLambda = remember(song.id) {
+                        { onSongLongClick(song) }
+                    }
+                    SongListItem(
+                        song = song,
+                        onClick = onClickLambda,
+                        isSelected = isSelected,
+                        isSelectionMode = isSelectionMode,
+                        onLongClick = onLongClickLambda,
+                        onMoreClick = { offset, size ->
+                            onSongMoreClick?.invoke(song, offset, size)
+                        }
+                    )
                 }
-                SimpleScrollBar(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .zIndex(100f)
-                        .padding(
-                            top = contentPadding.calculateTopPadding(),
-                            bottom = contentPadding.calculateBottomPadding()
-                        ),
-                    listState = listState
-                )
             }
+            SimpleScrollBar(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .zIndex(100f)
+                    .padding(
+                        top = contentPadding.calculateTopPadding(),
+                        bottom = contentPadding.calculateBottomPadding()
+                    ),
+                listState = listState
+            )
         }
     }
 }
