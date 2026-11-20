@@ -19,10 +19,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.NavigateNext
+import androidx.compose.material.icons.filled.FontDownload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -33,6 +36,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.HorizontalDivider
+import io.github.vinaygaykar.mp1.ui.theme.AppFont
+import io.github.vinaygaykar.mp1.ui.theme.CurrentTypographyFonts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -147,7 +158,57 @@ fun SettingsContent(
                 )
             }
 
-            // Section 2: About
+            // Section 2: Developer Typography Preview
+            SettingsSectionHeader(title = "TYPOGRAPHY PREVIEW")
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column {
+                    val fontsConfig by CurrentTypographyFonts.collectAsState()
+
+                    SingleFontSelectorItem(
+                        categoryTitle = "Display Font",
+                        categorySubtitle = "displayLarge, displayMedium, displaySmall",
+                        selectedFont = fontsConfig.displayFont,
+                        onFontSelected = { font ->
+                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(displayFont = font)
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SingleFontSelectorItem(
+                        categoryTitle = "Headline Font",
+                        categorySubtitle = "headlineLarge, headlineMedium, headlineSmall",
+                        selectedFont = fontsConfig.headlineFont,
+                        onFontSelected = { font ->
+                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(headlineFont = font)
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SingleFontSelectorItem(
+                        categoryTitle = "Title Font",
+                        categorySubtitle = "titleLarge, titleMedium, titleSmall",
+                        selectedFont = fontsConfig.titleFont,
+                        onFontSelected = { font ->
+                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(titleFont = font)
+                        }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    SingleFontSelectorItem(
+                        categoryTitle = "Body & Others Font",
+                        categorySubtitle = "body & label styles",
+                        selectedFont = fontsConfig.bodyFont,
+                        onFontSelected = { font ->
+                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(bodyFont = font)
+                        }
+                    )
+                }
+            }
+
+            // Section 3: About
             SettingsSectionHeader(title = "ABOUT")
             Card(
                 colors = CardDefaults.cardColors(
@@ -260,6 +321,55 @@ private fun ExpressiveSettingsItem(
         if (trailingContent != null) {
             Spacer(modifier = Modifier.width(12.dp))
             trailingContent()
+        }
+    }
+}
+
+@Composable
+private fun SingleFontSelectorItem(
+    categoryTitle: String,
+    categorySubtitle: String,
+    selectedFont: AppFont,
+    onFontSelected: (AppFont) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        ExpressiveSettingsItem(
+            title = categoryTitle,
+            subtitle = "$categorySubtitle (${selectedFont.displayName})",
+            icon = Icons.Default.FontDownload,
+            iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            trailingContent = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.NavigateNext,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            onClick = { expanded = true },
+        )
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            AppFont.entries.forEach { font ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = font.displayName,
+                            fontWeight = if (font == selectedFont) FontWeight.Bold else FontWeight.Normal,
+                            color = if (font == selectedFont) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    onClick = {
+                        onFontSelected(font)
+                        expanded = false
+                    },
+                )
+            }
         }
     }
 }

@@ -15,6 +15,9 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
@@ -51,7 +54,17 @@ fun MusicPlayerTheme(
         }
     }
 
-    val typography = if (LocalInspectionMode.current) PreviewTypography else Typography
+    val fontConfig by CurrentTypographyFonts.collectAsState()
+    val typography = if (LocalInspectionMode.current) {
+        PreviewTypography
+    } else {
+        getTypographyForFonts(
+            displayFont = fontConfig.displayFont.fontFamily,
+            headlineFont = fontConfig.headlineFont.fontFamily,
+            titleFont = fontConfig.titleFont.fontFamily,
+            bodyFont = fontConfig.bodyFont.fontFamily
+        )
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,
