@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
@@ -53,6 +53,7 @@ import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
+import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
 import io.github.vinaygaykar.mp1.ui.library.LibraryViewModel
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.ui.theme.isArtistMatchingPlayingTrack
@@ -68,6 +69,10 @@ fun ArtistGrid(
     artists: List<Artist>,
     onArtistClick: (Artist, Offset, IntSize) -> Unit,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false,
     libraryViewModel: LibraryViewModel? = if (LocalInspectionMode.current) null else hiltViewModel(),
     playerViewModel: PlayerViewModel? = if (LocalInspectionMode.current) null else hiltViewModel()
 ) {
@@ -104,20 +109,28 @@ fun ArtistGrid(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(artists) { artist ->
-                    ArtistGridItem(
-                        artist = artist,
-                        playingArtist = playingArtist,
-                        playingAlbum = playingAlbum,
-                        isPlaying = isPlaying,
-                        onClick = { offset, size -> onArtistClick(artist, offset, size) },
-                        onFetchImageUrl = { name, id ->
-                            libraryViewModel?.getArtistImageUrl(
-                                name,
-                                id
-                            )
-                        }
-                    )
+                itemsIndexed(artists, key = { _, artist -> artist.id }) { index, artist ->
+                    StaggeredItemWrapper(
+                        index = index,
+                        categoryKey = categoryKey,
+                        detailProgress = detailProgress,
+                        isSplashActive = isSplashActive,
+                        isCategoryEntranceComplete = isCategoryEntranceComplete
+                    ) {
+                        ArtistGridItem(
+                            artist = artist,
+                            playingArtist = playingArtist,
+                            playingAlbum = playingAlbum,
+                            isPlaying = isPlaying,
+                            onClick = { offset, size -> onArtistClick(artist, offset, size) },
+                            onFetchImageUrl = { name, id ->
+                                libraryViewModel?.getArtistImageUrl(
+                                    name,
+                                    id
+                                )
+                            }
+                        )
+                    }
                 }
             }
             SimpleScrollBar(

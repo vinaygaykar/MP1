@@ -58,6 +58,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
+import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -75,7 +76,11 @@ fun AlbumGridCompact(
     albums: List<Album>,
     onAlbumClick: (Album) -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false
 ) {
     if (albums.isEmpty()) return
 
@@ -126,11 +131,19 @@ fun AlbumGridCompact(
         ) {
             itemsIndexed(albums, key = { _, album -> album.id }) { index, album ->
                 val isSelected = index == centerIndex
-                CompactAlbumTitleItem(
-                    album = album,
-                    isSelected = isSelected,
-                    onClick = { onAlbumClick(album) }
-                )
+                StaggeredItemWrapper(
+                    index = index,
+                    categoryKey = categoryKey,
+                    detailProgress = detailProgress,
+                    isSplashActive = isSplashActive,
+                    isCategoryEntranceComplete = isCategoryEntranceComplete
+                ) {
+                    CompactAlbumTitleItem(
+                        album = album,
+                        isSelected = isSelected,
+                        onClick = { onAlbumClick(album) }
+                    )
+                }
             }
         }
 

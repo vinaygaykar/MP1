@@ -61,12 +61,14 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Playlist
 import io.github.vinaygaykar.mp1.ui.components.EmptyState
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
+import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 private const val EMPTY_STATE_MESSAGE = "No Playlists found.\nScan a folder from Settings."
@@ -81,6 +83,10 @@ fun PlaylistGrid(
     isSelectionMode: Boolean = false,
     onPlaylistClick: (Playlist) -> Unit = {},
     onPlaylistLongClick: (Playlist) -> Unit = {},
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
@@ -96,82 +102,90 @@ fun PlaylistGrid(
                 .padding(horizontal = 16.dp)
         ) {
             item {
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 3.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                StaggeredItemWrapper(
+                    index = 0,
+                    categoryKey = categoryKey,
+                    detailProgress = detailProgress,
+                    isSplashActive = isSplashActive,
+                    isCategoryEntranceComplete = isCategoryEntranceComplete
                 ) {
-                    Row(
+                    Surface(
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tonalElevation = 3.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 4.dp)
                     ) {
-                        // Create button
-                        Surface(
-                            onClick = onCreateClick,
-                            shape = RoundedCornerShape(
-                                topStart = 22.dp,
-                                bottomStart = 22.dp,
-                                topEnd = 6.dp,
-                                bottomEnd = 6.dp
-                            ),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.weight(1f)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                            // Create button
+                            Surface(
+                                onClick = onCreateClick,
+                                shape = RoundedCornerShape(
+                                    topStart = 22.dp,
+                                    bottomStart = 22.dp,
+                                    topEnd = 6.dp,
+                                    bottomEnd = 6.dp
+                                ),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Create",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    modifier = Modifier.padding(vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Create",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
-                        }
 
-                        // Import button
-                        Surface(
-                            onClick = onImportClick,
-                            shape = RoundedCornerShape(
-                                topStart = 6.dp,
-                                bottomStart = 6.dp,
-                                topEnd = 22.dp,
-                                bottomEnd = 22.dp
-                            ),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                            // Import button
+                            Surface(
+                                onClick = onImportClick,
+                                shape = RoundedCornerShape(
+                                    topStart = 6.dp,
+                                    bottomStart = 6.dp,
+                                    topEnd = 22.dp,
+                                    bottomEnd = 22.dp
+                                ),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.FileDownload,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Import",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Row(
+                                    modifier = Modifier.padding(vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FileDownload,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Import",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -188,18 +202,26 @@ fun PlaylistGrid(
                     )
                 }
             } else {
-                items(
+                itemsIndexed(
                     items = playlists,
-                    key = { it.id }
-                ) { playlist ->
+                    key = { _, item -> item.id }
+                ) { index, playlist ->
                     val isSelected = selectedPlaylistIds.contains(playlist.id)
-                    PlaylistItemCard(
-                        playlist = playlist,
-                        onClick = { onPlaylistClick(playlist) },
-                        isSelected = isSelected,
-                        isSelectionMode = isSelectionMode,
-                        onLongClick = { onPlaylistLongClick(playlist) }
-                    )
+                    StaggeredItemWrapper(
+                        index = index + 1,
+                        categoryKey = categoryKey,
+                        detailProgress = detailProgress,
+                        isSplashActive = isSplashActive,
+                        isCategoryEntranceComplete = isCategoryEntranceComplete
+                    ) {
+                        PlaylistItemCard(
+                            playlist = playlist,
+                            onClick = { onPlaylistClick(playlist) },
+                            isSelected = isSelected,
+                            isSelectionMode = isSelectionMode,
+                            onLongClick = { onPlaylistLongClick(playlist) }
+                        )
+                    }
                 }
             }
         }

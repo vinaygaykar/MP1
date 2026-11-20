@@ -5,8 +5,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.AnchoredDraggableState
@@ -58,6 +60,7 @@ import kotlinx.coroutines.launch
 fun LibraryScreenV2(
     bottomPadding: Dp = 0.dp,
     isPlayerActive: Boolean = false,
+    isSplashActive: Boolean = false,
     miniPlayerTargetOffset: Offset? = null,
     onBulgeMiniPlayer: () -> Unit = {},
     onSearchClick: () -> Unit = {},
@@ -99,6 +102,7 @@ fun LibraryScreenV2(
         uiState = uiState,
         bottomPadding = bottomPadding,
         isPlayerActive = isPlayerActive,
+        isSplashActive = isSplashActive,
         miniPlayerTargetOffset = miniPlayerTargetOffset,
         onDismissImportError = { viewModel.clearImportError() },
         onBulgeMiniPlayer = onBulgeMiniPlayer,
@@ -133,6 +137,7 @@ fun LibraryContentV2(
     uiState: LibraryUiState,
     bottomPadding: Dp = 0.dp,
     isPlayerActive: Boolean = false,
+    isSplashActive: Boolean = false,
     miniPlayerTargetOffset: Offset? = null,
     onDismissImportError: () -> Unit = {},
     onBulgeMiniPlayer: () -> Unit = {},
@@ -181,9 +186,9 @@ fun LibraryContentV2(
 
     val anchoredDraggableState = rememberSaveable(
         saver = AnchoredDraggableState.Saver(
-            snapAnimationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessLow
+            snapAnimationSpec = tween(
+                durationMillis = 350,
+                easing = EaseOutCubic
             ),
             decayAnimationSpec = splineBasedDecay,
             positionalThreshold = { distance: Float -> distance * 0.4f },
@@ -195,9 +200,9 @@ fun LibraryContentV2(
             initialValue = DragValue.EXPANDED,
             positionalThreshold = { distance: Float -> distance * 0.4f },
             velocityThreshold = { with(density) { 100.dp.toPx() } },
-            snapAnimationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessLow
+            snapAnimationSpec = tween(
+                durationMillis = 350,
+                easing = EaseOutCubic
             ),
             decayAnimationSpec = splineBasedDecay,
             confirmValueChange = { true }
@@ -415,6 +420,7 @@ fun LibraryContentV2(
                 displayFolder = displayFolder,
                 bottomPadding = bottomPadding,
                 detailProgress = detailProgress,
+                isSplashActive = isSplashActive,
                 scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,

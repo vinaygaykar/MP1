@@ -53,7 +53,11 @@ fun AlbumsTab(
     albums: List<Album>,
     contentPadding: PaddingValues = PaddingValues(),
     onSearchClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false
 ) {
     if (albums.isEmpty()) {
         EmptyState(
@@ -93,21 +97,33 @@ fun AlbumsTab(
                 onAlbumClick = onAlbumClick,
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
-                contentPadding = contentPadding
+                contentPadding = contentPadding,
+                detailProgress = detailProgress,
+                categoryKey = categoryKey,
+                isSplashActive = isSplashActive,
+                isCategoryEntranceComplete = isCategoryEntranceComplete
             )
         }
         isCompactHeight -> {
             AlbumsTabCompact(
                 albums = albums,
                 onAlbumClick = onAlbumClick,
-                contentPadding = contentPadding
+                contentPadding = contentPadding,
+                detailProgress = detailProgress,
+                categoryKey = categoryKey,
+                isSplashActive = isSplashActive,
+                isCategoryEntranceComplete = isCategoryEntranceComplete
             )
         }
         else -> {
             AlbumsTabPortrait(
                 albums = albums,
                 onAlbumClick = onAlbumClick,
-                contentPadding = contentPadding
+                contentPadding = contentPadding,
+                detailProgress = detailProgress,
+                categoryKey = categoryKey,
+                isSplashActive = isSplashActive,
+                isCategoryEntranceComplete = isCategoryEntranceComplete
             )
         }
     }
@@ -131,12 +147,20 @@ private fun rememberOnAlbumClick(): (Album) -> Unit {
 private fun AlbumsTabPortrait(
     albums: List<Album>,
     onAlbumClick: (Album) -> Unit,
-    contentPadding: PaddingValues = PaddingValues()
+    contentPadding: PaddingValues = PaddingValues(),
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false
 ) {
     AlbumGridPunk(
         albums = albums,
         onAlbumClick = onAlbumClick,
-        contentPadding = contentPadding
+        contentPadding = contentPadding,
+        detailProgress = detailProgress,
+        categoryKey = categoryKey,
+        isSplashActive = isSplashActive,
+        isCategoryEntranceComplete = isCategoryEntranceComplete
     )
 }
 
@@ -144,12 +168,20 @@ private fun AlbumsTabPortrait(
 private fun AlbumsTabCompact(
     albums: List<Album>,
     onAlbumClick: (Album) -> Unit,
-    contentPadding: PaddingValues = PaddingValues()
+    contentPadding: PaddingValues = PaddingValues(),
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false
 ) {
     AlbumGridClean(
         albums = albums,
         onAlbumClick = { album, _, _ -> onAlbumClick(album) },
-        contentPadding = contentPadding
+        contentPadding = contentPadding,
+        detailProgress = detailProgress,
+        categoryKey = categoryKey,
+        isSplashActive = isSplashActive,
+        isCategoryEntranceComplete = isCategoryEntranceComplete
     )
 }
 
@@ -160,7 +192,11 @@ private fun AlbumsTabLandscape(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues()
+    contentPadding: PaddingValues = PaddingValues(),
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false
 ) {
     Row(
         modifier = modifier.fillMaxSize()
@@ -175,7 +211,11 @@ private fun AlbumsTabLandscape(
             AlbumGridCompact(
                 albums = albums,
                 onAlbumClick = onAlbumClick,
-                contentPadding = contentPadding
+                contentPadding = contentPadding,
+                detailProgress = detailProgress,
+                categoryKey = categoryKey,
+                isSplashActive = isSplashActive,
+                isCategoryEntranceComplete = isCategoryEntranceComplete
             )
         }
 

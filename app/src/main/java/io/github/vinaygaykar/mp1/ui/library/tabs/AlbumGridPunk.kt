@@ -72,6 +72,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
+import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
 import kotlinx.coroutines.delay
@@ -87,7 +88,11 @@ const val USE_NEW_FAST_GRID = true
 fun AlbumGridPunk(
     albums: List<Album>,
     onAlbumClick: (Album) -> Unit,
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false
 ) {
     if (albums.isEmpty()) return
 
@@ -321,14 +326,22 @@ fun AlbumGridPunk(
                         }
                     }
 
-                    AlbumRowItem(
-                        album = album,
-                        isTargeted = isTargeted,
-                        itemHeight = normalItemHeight,
-                        fastScrollProgress = fastScrollProgress,
+                    StaggeredItemWrapper(
                         index = index,
-                        onClick = { onAlbumClick(album) }
-                    )
+                        categoryKey = categoryKey,
+                        detailProgress = detailProgress,
+                        isSplashActive = isSplashActive,
+                        isCategoryEntranceComplete = isCategoryEntranceComplete
+                    ) {
+                        AlbumRowItem(
+                            album = album,
+                            isTargeted = isTargeted,
+                            itemHeight = normalItemHeight,
+                            fastScrollProgress = fastScrollProgress,
+                            index = index,
+                            onClick = { onAlbumClick(album) }
+                        )
+                    }
                 }
             }
         }

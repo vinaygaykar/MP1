@@ -73,7 +73,7 @@ internal fun CategoryCardItem(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )

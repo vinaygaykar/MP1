@@ -42,6 +42,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
+import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
 
 /**
  * AlbumGridClean renders a 2-column grid layout of square album art with sharp corners.
@@ -53,6 +54,10 @@ fun AlbumGridClean(
     modifier: Modifier = Modifier,
     selectedAlbumId: String? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    detailProgress: Float = 1f,
+    categoryKey: Any? = null,
+    isSplashActive: Boolean = false,
+    isCategoryEntranceComplete: Boolean = false
 ) {
     if (albums.isEmpty()) return
 
@@ -72,12 +77,20 @@ fun AlbumGridClean(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            itemsIndexed(albums, key = { _, album -> album.id }) { _, album ->
-                AlbumCleanCard(
-                    album = album,
-                    onClick = { offset, size -> onAlbumClick(album, offset, size) },
-                    isSelected = album.id == selectedAlbumId,
-                )
+            itemsIndexed(albums, key = { _, album -> album.id }) { index, album ->
+                StaggeredItemWrapper(
+                    index = index,
+                    categoryKey = categoryKey,
+                    detailProgress = detailProgress,
+                    isSplashActive = isSplashActive,
+                    isCategoryEntranceComplete = isCategoryEntranceComplete
+                ) {
+                    AlbumCleanCard(
+                        album = album,
+                        onClick = { offset, size -> onAlbumClick(album, offset, size) },
+                        isSelected = album.id == selectedAlbumId,
+                    )
+                }
             }
         }
 

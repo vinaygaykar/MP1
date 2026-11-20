@@ -44,7 +44,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -96,6 +98,7 @@ internal fun CategoryDetailScreen(
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
     onCheckHasOfflineLyrics: suspend (Song) -> Boolean = { false },
+    isSplashActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -125,6 +128,16 @@ internal fun CategoryDetailScreen(
     }
 
     var activeOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
+    var isCategoryEntranceComplete by remember(libraryState.lastOpenedCategory) { mutableStateOf(false) }
+
+    LaunchedEffect(libraryState.lastOpenedCategory, isSplashActive, detailProgress > 0.85f) {
+        if (!isSplashActive && (detailProgress > 0.85f)) {
+            delay(650.milliseconds)
+            isCategoryEntranceComplete = true
+        } else if (detailProgress < 0.05f) {
+            isCategoryEntranceComplete = false
+        }
+    }
 
     LaunchedEffect(activeOverlayData != null) {
         if (activeOverlayData != null) {
@@ -189,6 +202,7 @@ internal fun CategoryDetailScreen(
                     title = {
                         Text(
                             text = libraryState.lastOpenedCategory.title,
+                            style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -252,6 +266,10 @@ internal fun CategoryDetailScreen(
                                 onImportClick = onImportPlaylistLauncher,
                                 selectedPlaylistIds = libraryState.selectedPlaylistIds,
                                 isSelectionMode = libraryState.isPlaylistSelectionMode,
+                                detailProgress = detailProgress,
+                                categoryKey = libraryState.lastOpenedCategory,
+                                isSplashActive = isSplashActive,
+                                isCategoryEntranceComplete = isCategoryEntranceComplete,
                                 onPlaylistClick = { playlist ->
                                     if (libraryState.isPlaylistSelectionMode) {
                                         libraryState.togglePlaylistSelection(playlist)
@@ -282,6 +300,10 @@ internal fun CategoryDetailScreen(
                         LibraryCategory.SONGS -> {
                             SongList(
                                 songs = uiState.songs,
+                                detailProgress = detailProgress,
+                                categoryKey = libraryState.lastOpenedCategory,
+                                isSplashActive = isSplashActive,
+                                isCategoryEntranceComplete = isCategoryEntranceComplete,
                                 onSongClick = { song ->
                                     if (libraryState.isSelectionMode) {
                                         libraryState.toggleSongSelection(song)
@@ -308,6 +330,10 @@ internal fun CategoryDetailScreen(
                         LibraryCategory.ALBUMS -> {
                             AlbumsTab(
                                 albums = uiState.albums,
+                                detailProgress = detailProgress,
+                                categoryKey = libraryState.lastOpenedCategory,
+                                isSplashActive = isSplashActive,
+                                isCategoryEntranceComplete = isCategoryEntranceComplete,
                                 contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
                             )
                         }
@@ -315,6 +341,10 @@ internal fun CategoryDetailScreen(
                         LibraryCategory.ARTISTS -> {
                             ArtistGrid(
                                 artists = uiState.artists,
+                                detailProgress = detailProgress,
+                                categoryKey = libraryState.lastOpenedCategory,
+                                isSplashActive = isSplashActive,
+                                isCategoryEntranceComplete = isCategoryEntranceComplete,
                                 onArtistClick = { artist, offset, size ->
                                     val intent =
                                         Intent(context, ArtistDetailActivity::class.java).apply {
