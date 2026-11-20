@@ -1,5 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.components
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -21,13 +22,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +59,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,7 +76,6 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -74,10 +86,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
@@ -148,6 +160,7 @@ fun SongHeroOverlayContainer(
     }
 }
 
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun SongDetailOverlay(
     song: Song,
@@ -164,6 +177,23 @@ fun SongDetailOverlay(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val coroutineScope = rememberCoroutineScope()
+
+    val activity = context as? Activity
+    val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
+    val widthClass = windowSizeClass?.widthSizeClass
+    val heightClass = windowSizeClass?.heightSizeClass
+
+    val isWideWindow = if (widthClass != null) {
+        widthClass != WindowWidthSizeClass.Compact
+    } else {
+        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
+
+    val isCompactHeight = if (heightClass != null) {
+        heightClass == WindowHeightSizeClass.Compact
+    } else {
+        configuration.screenHeightDp < 500
+    }
 
     var isClosing by remember { mutableStateOf(false) }
     var isExpanded by remember { mutableStateOf(false) }
@@ -236,12 +266,33 @@ fun SongDetailOverlay(
 
     val p = animProgress.value
 
-    val normalTargetSizeDp = 180.dp
-    val expandedTargetSizeDp = 260.dp
+    val normalTargetSizeDp = when {
+        isWideWindow -> 160.dp
+        isCompactHeight -> 120.dp
+        else -> 180.dp
+    }
+    val expandedTargetSizeDp = when {
+        isWideWindow -> 220.dp
+        isCompactHeight -> 150.dp
+        else -> 260.dp
+    }
     val targetSizeDp = normalTargetSizeDp + (expandedTargetSizeDp - normalTargetSizeDp) * expandProgress
     val targetSizePx = with(density) { targetSizeDp.toPx() }
-    val targetX = (screenWidthPx - targetSizePx) / 2f
-    val targetY = with(density) { (56.dp + 48.dp + 20.dp).toPx() }
+
+    val targetX = if (isWideWindow) {
+        val collapsedTargetX = (screenWidthPx / 4f) - (targetSizePx / 2f)
+        val expandedTargetX = (screenWidthPx - targetSizePx) / 2f
+        collapsedTargetX + (expandedTargetX - collapsedTargetX) * expandProgress
+    } else {
+        (screenWidthPx - targetSizePx) / 2f
+    }
+
+    val statusBarTopPx = WindowInsets.statusBars.getTop(density)
+    val targetY = if (isWideWindow) {
+        statusBarTopPx + with(density) { (16.dp + 36.dp + 12.dp).toPx() }
+    } else {
+        with(density) { (56.dp + 48.dp + 20.dp).toPx() }
+    }
 
     val artworkShadowElevation = 18.dp * expandProgress
 
@@ -251,6 +302,9 @@ fun SongDetailOverlay(
 
     val currentSizePx = startSizePx + (targetSizePx - startSizePx) * p
     val currentSizeDp = with(density) { currentSizePx.toDp() }
+
+    val artworkAnimTranslationX = (initialX - targetX) * (1f - p)
+    val artworkAnimTranslationY = (initialY - targetY) * (1f - p)
 
     // Extracted File Type (MP3, FLAC, WAV, etc.)
     val fileExtension = remember(song.fileName, song.uri) {
@@ -264,6 +318,8 @@ fun SongDetailOverlay(
 
     // Formatted Audio Track Duration
     val formattedDuration = remember(song.durationMs) { formatTrackDuration(song.durationMs) }
+
+    val buttonsAlpha = (1f - expandProgress * 1.5f).coerceIn(0f, 1f)
 
     Box(
         modifier = Modifier
@@ -281,351 +337,72 @@ fun SongDetailOverlay(
                 )
         )
 
-        // Parent Column wrapping the 2 sub containers (scrollable when collapsed, full height when expanded)
-        val artworkAnimTranslationX = (initialX - targetX) * (1f - p)
-        val artworkAnimTranslationY = (initialY - targetY) * (1f - p)
-
-        val scrollState = rememberScrollState()
-        val scrollModifier = if (!isExpanded) Modifier.verticalScroll(scrollState) else Modifier
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(scrollModifier)
-                .padding(horizontal = 24.dp)
-                .padding(top = 56.dp)
-                .navigationBarsPadding()
-                .padding(bottom = 24.dp)
-                .graphicsLayer {
-                    alpha = p
-                },
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Sub container 1: Song title, album artwork, texts and other metadata
-            val firstContainerScale = 1f + (0.05f * expandProgress)
-            val firstContainerModifier = if (isExpanded) {
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            } else {
-                Modifier.fillMaxWidth()
-            }
-
-            Column(
-                modifier = firstContainerModifier
-                    .graphicsLayer {
-                        scaleX = firstContainerScale
-                        scaleY = firstContainerScale
-                    },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Top spacing when expanded to move track title down from top edge
-                if (isExpanded) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-
-                // 1. Song Title (Constant headlineSmall typography)
-                Text(
-                    text = song.title.ifBlank { "Unknown Title" },
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 8.dp)
+        when {
+            isWideWindow -> {
+                SongDetailLandscapeContent(
+                    song = song,
+                    embeddedArtworkBytes = embeddedArtworkBytes,
+                    hasOfflineLyrics = hasOfflineLyrics,
+                    formattedDuration = formattedDuration,
+                    fileExtension = fileExtension,
+                    currentSizeDp = currentSizeDp,
+                    artworkAnimTranslationX = artworkAnimTranslationX,
+                    artworkAnimTranslationY = artworkAnimTranslationY,
+                    artworkShadowElevation = artworkShadowElevation,
+                    p = p,
+                    isExpanded = isExpanded,
+                    expandProgress = expandProgress,
+                    buttonsAlpha = buttonsAlpha,
+                    dismissWithAnimation = dismissWithAnimation,
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onShowFile = onShowFile
                 )
-
-                Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
-
-                // 2. Animated Circular Artwork (With dynamic scale & shadow on expand)
-                Box(
-                    modifier = Modifier
-                        .graphicsLayer {
-                            translationX = artworkAnimTranslationX
-                            translationY = artworkAnimTranslationY
-                        }
-                        .size(currentSizeDp)
-                        .shadow(
-                            elevation = artworkShadowElevation,
-                            shape = CircleShape,
-                            clip = false
-                        )
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
-                    val artworkModel = embeddedArtworkBytes ?: song.artworkUri
-                    AsyncImage(
-                        model = artworkModel,
-                        contentDescription = song.title,
-                        error = musicPlaceholder,
-                        placeholder = musicPlaceholder,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-                // Spacer between Artwork and Album Name (Same distance as Track Title and Artwork)
-                Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
-
-                // 3. Album Name
-                val displayAlbum = remember(song.album) { song.album.ifBlank { "Unknown Album" } }
-                Surface(
-                    onClick = {
-                        val albumIdentifier = song.albumId?.ifEmpty { null } ?: song.album
-                        if (albumIdentifier.isNotBlank()) {
-                            val intent = Intent(context, AlbumDetailActivity::class.java).apply {
-                                putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, albumIdentifier)
-                            }
-                            context.startActivity(intent)
-                            dismissWithAnimation()
-                        }
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color.Transparent
-                ) {
-                    Text(
-                        text = displayAlbum,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
-
-                // 4. List of Artists (Hidden when expanded)
-                if (!isExpanded) {
-                    val displayArtists = remember(song.artistsDisplayString, song.artist) {
-                        song.artistsDisplayString.ifBlank { song.artist.ifBlank { "Unknown Artist" } }
-                    }
-                    Text(
-                        text = displayArtists,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // Metadata Info Row (Track Duration, File Format, Offline Lyrics chips left-aligned)
-                if (!isExpanded) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    ) {
-                        // Audio Track Time
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Duration",
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = formattedDuration,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // File Type (MP3, FLAC, WAV, etc.)
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AudioFile,
-                                    contentDescription = "File Type",
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = fileExtension,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // Offline Lyrics Indicator
-                        if (hasOfflineLyrics) {
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudDone,
-                                        contentDescription = "Offline Lyrics",
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Lyrics",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Sub container 2: Action Buttons (Text & Icon only, no background, distinct theme colors)
-            val buttonsAlpha = (1f - expandProgress * 1.5f).coerceIn(0f, 1f)
-            if (buttonsAlpha > 0.01f) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp)
-                        .graphicsLayer {
-                            alpha = buttonsAlpha
-                            translationY = with(density) { (30.dp * expandProgress).toPx() }
-                        },
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Play Next Button
-                    TextButton(
-                        onClick = {
-                            onPlayNext?.invoke(song)
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Play next",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    // Add to Queue Button
-                    TextButton(
-                        onClick = {
-                            onAddToQueue?.invoke(song)
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.secondary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Add to queue",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    // Add to Playlist Button
-                    TextButton(
-                        onClick = {
-                            onAddToPlaylist?.invoke(song)
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.tertiary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Add to playlist",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    // Show File Button
-                    TextButton(
-                        onClick = {
-                            if (onShowFile != null) {
-                                onShowFile(song)
-                            } else {
-                                openSongParentFolder(context, song)
-                            }
-                            dismissWithAnimation()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Folder,
-                            contentDescription = "Show file",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Show file",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
+            isCompactHeight -> {
+                SongDetailCompactContent(
+                    song = song,
+                    embeddedArtworkBytes = embeddedArtworkBytes,
+                    hasOfflineLyrics = hasOfflineLyrics,
+                    formattedDuration = formattedDuration,
+                    fileExtension = fileExtension,
+                    currentSizeDp = currentSizeDp,
+                    artworkAnimTranslationX = artworkAnimTranslationX,
+                    artworkAnimTranslationY = artworkAnimTranslationY,
+                    artworkShadowElevation = artworkShadowElevation,
+                    p = p,
+                    isExpanded = isExpanded,
+                    expandProgress = expandProgress,
+                    buttonsAlpha = buttonsAlpha,
+                    dismissWithAnimation = dismissWithAnimation,
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onShowFile = onShowFile
+                )
+            }
+            else -> {
+                SongDetailPortraitContent(
+                    song = song,
+                    embeddedArtworkBytes = embeddedArtworkBytes,
+                    hasOfflineLyrics = hasOfflineLyrics,
+                    formattedDuration = formattedDuration,
+                    fileExtension = fileExtension,
+                    currentSizeDp = currentSizeDp,
+                    artworkAnimTranslationX = artworkAnimTranslationX,
+                    artworkAnimTranslationY = artworkAnimTranslationY,
+                    artworkShadowElevation = artworkShadowElevation,
+                    p = p,
+                    isExpanded = isExpanded,
+                    expandProgress = expandProgress,
+                    buttonsAlpha = buttonsAlpha,
+                    dismissWithAnimation = dismissWithAnimation,
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onShowFile = onShowFile
+                )
             }
         }
 
@@ -642,6 +419,779 @@ fun SongDetailOverlay(
                 imageVector = if (isExpanded) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
                 contentDescription = if (isExpanded) "Collapse layout" else "Expand layout",
                 modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SongDetailPortraitContent(
+    song: Song,
+    embeddedArtworkBytes: ByteArray?,
+    hasOfflineLyrics: Boolean,
+    formattedDuration: String,
+    fileExtension: String,
+    currentSizeDp: Dp,
+    artworkAnimTranslationX: Float,
+    artworkAnimTranslationY: Float,
+    artworkShadowElevation: Dp,
+    p: Float,
+    isExpanded: Boolean,
+    expandProgress: Float,
+    buttonsAlpha: Float,
+    dismissWithAnimation: () -> Unit,
+    onPlayNext: ((Song) -> Unit)?,
+    onAddToQueue: ((Song) -> Unit)?,
+    onAddToPlaylist: ((Song) -> Unit)?,
+    onShowFile: ((Song) -> Unit)?
+) {
+    val density = LocalDensity.current
+    val scrollState = rememberScrollState()
+    val scrollModifier = if (!isExpanded) Modifier.verticalScroll(scrollState) else Modifier
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(scrollModifier)
+            .padding(horizontal = 24.dp)
+            .padding(top = 56.dp)
+            .navigationBarsPadding()
+            .padding(bottom = 24.dp)
+            .graphicsLayer {
+                alpha = p
+            },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Sub container 1: Song title, album artwork, texts and other metadata
+        val firstContainerScale = 1f + (0.05f * expandProgress)
+        val firstContainerModifier = if (isExpanded) {
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        } else {
+            Modifier.fillMaxWidth()
+        }
+
+        Column(
+            modifier = firstContainerModifier
+                .graphicsLayer {
+                    scaleX = firstContainerScale
+                    scaleY = firstContainerScale
+                },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Top spacing when expanded to move track title down from top edge
+            if (isExpanded) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            // 1. Song Title (Constant headlineSmall typography)
+            Text(
+                text = song.title.ifBlank { "Unknown Title" },
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
+
+            // 2. Animated Circular Artwork
+            SongArtworkBox(
+                song = song,
+                embeddedArtworkBytes = embeddedArtworkBytes,
+                currentSizeDp = currentSizeDp,
+                artworkAnimTranslationX = artworkAnimTranslationX,
+                artworkAnimTranslationY = artworkAnimTranslationY,
+                artworkShadowElevation = artworkShadowElevation
+            )
+
+            Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
+
+            // 3. Album Name
+            SongAlbumTitle(
+                album = song.album,
+                albumId = song.albumId,
+                onDismiss = dismissWithAnimation
+            )
+
+            Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
+
+            // 4. List of Artists (Hidden when expanded)
+            if (!isExpanded) {
+                val displayArtists = remember(song.artistsDisplayString, song.artist) {
+                    song.artistsDisplayString.ifBlank { song.artist.ifBlank { "Unknown Artist" } }
+                }
+                Text(
+                    text = displayArtists,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Metadata Info Row (Track Duration, File Format, Offline Lyrics chips left-aligned)
+            if (!isExpanded) {
+                SongMetadataChips(
+                    formattedDuration = formattedDuration,
+                    fileExtension = fileExtension,
+                    hasOfflineLyrics = hasOfflineLyrics
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Sub container 2: Action Buttons
+        if (buttonsAlpha > 0.01f) {
+            SongActionButtons(
+                song = song,
+                onPlayNext = onPlayNext,
+                onAddToQueue = onAddToQueue,
+                onAddToPlaylist = onAddToPlaylist,
+                onShowFile = onShowFile,
+                onDismiss = dismissWithAnimation,
+                buttonHeight = 52.dp,
+                spacing = 12.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+                    .graphicsLayer {
+                        alpha = buttonsAlpha
+                        translationY = with(density) { (30.dp * expandProgress).toPx() }
+                    }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SongDetailLandscapeContent(
+    song: Song,
+    embeddedArtworkBytes: ByteArray?,
+    hasOfflineLyrics: Boolean,
+    formattedDuration: String,
+    fileExtension: String,
+    currentSizeDp: Dp,
+    artworkAnimTranslationX: Float,
+    artworkAnimTranslationY: Float,
+    artworkShadowElevation: Dp,
+    p: Float,
+    isExpanded: Boolean,
+    expandProgress: Float,
+    buttonsAlpha: Float,
+    dismissWithAnimation: () -> Unit,
+    onPlayNext: ((Song) -> Unit)?,
+    onAddToQueue: ((Song) -> Unit)?,
+    onAddToPlaylist: ((Song) -> Unit)?,
+    onShowFile: ((Song) -> Unit)?
+) {
+    val density = LocalDensity.current
+    val leftScrollState = rememberScrollState()
+    val rightScrollState = rememberScrollState()
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .displayCutoutPadding()
+            .padding(horizontal = 24.dp)
+            .graphicsLayer {
+                alpha = p
+            },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left Pane: 1st sub column of data (album artwork and metadata)
+        val firstContainerScale = 1f + (0.05f * expandProgress)
+        val leftPaneModifier = Modifier
+            .fillMaxHeight()
+            .weight(1f)
+
+        Column(
+            modifier = leftPaneModifier
+                .verticalScroll(leftScrollState)
+                .graphicsLayer {
+                    scaleX = firstContainerScale
+                    scaleY = firstContainerScale
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Status bar top spacer so content initially starts below status bar but scrolls under it
+            Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Top spacing when expanded
+            if (isExpanded) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            // 1. Song Title
+            Text(
+                text = song.title.ifBlank { "Unknown Title" },
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
+
+            // 2. Animated Circular Artwork
+            SongArtworkBox(
+                song = song,
+                embeddedArtworkBytes = embeddedArtworkBytes,
+                currentSizeDp = currentSizeDp,
+                artworkAnimTranslationX = artworkAnimTranslationX,
+                artworkAnimTranslationY = artworkAnimTranslationY,
+                artworkShadowElevation = artworkShadowElevation
+            )
+
+            Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
+
+            // 3. Album Name
+            SongAlbumTitle(
+                album = song.album,
+                albumId = song.albumId,
+                onDismiss = dismissWithAnimation
+            )
+
+            Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(8.dp))
+
+            // 4. List of Artists (Hidden when expanded)
+            if (!isExpanded) {
+                val displayArtists = remember(song.artistsDisplayString, song.artist) {
+                    song.artistsDisplayString.ifBlank { song.artist.ifBlank { "Unknown Artist" } }
+                }
+                Text(
+                    text = displayArtists,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Bottom spacing when expanded
+            if (isExpanded) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            // Navigation bar bottom spacer so content scrolls above navigation bar
+            Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Right Pane: 2nd sub column of metadata & buttons
+        if (buttonsAlpha > 0.01f) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .verticalScroll(rightScrollState)
+                    .padding(horizontal = 16.dp)
+                    .graphicsLayer {
+                        alpha = buttonsAlpha
+                        translationX = with(density) { (30.dp * expandProgress).toPx() }
+                    },
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Status bar top spacer
+                Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Metadata Info Row (Track Duration, File Format, Offline Lyrics chips)
+                if (!isExpanded) {
+                    SongMetadataChips(
+                        formattedDuration = formattedDuration,
+                        fileExtension = fileExtension,
+                        hasOfflineLyrics = hasOfflineLyrics
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                SongActionButtons(
+                    song = song,
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onShowFile = onShowFile,
+                    onDismiss = dismissWithAnimation,
+                    buttonHeight = 48.dp,
+                    spacing = 8.dp
+                )
+
+                // Navigation bar bottom spacer
+                Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SongDetailCompactContent(
+    song: Song,
+    embeddedArtworkBytes: ByteArray?,
+    hasOfflineLyrics: Boolean,
+    formattedDuration: String,
+    fileExtension: String,
+    currentSizeDp: Dp,
+    artworkAnimTranslationX: Float,
+    artworkAnimTranslationY: Float,
+    artworkShadowElevation: Dp,
+    p: Float,
+    isExpanded: Boolean,
+    expandProgress: Float,
+    buttonsAlpha: Float,
+    dismissWithAnimation: () -> Unit,
+    onPlayNext: ((Song) -> Unit)?,
+    onAddToQueue: ((Song) -> Unit)?,
+    onAddToPlaylist: ((Song) -> Unit)?,
+    onShowFile: ((Song) -> Unit)?
+) {
+    val density = LocalDensity.current
+    val scrollState = rememberScrollState()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = p }
+    ) {
+        // Background Artwork with Dark Overlay (visible only when collapsed)
+        val bgAlpha = (1f - expandProgress).coerceIn(0f, 1f)
+        if (bgAlpha > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = bgAlpha }
+            ) {
+                val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                val artworkModel = embeddedArtworkBytes ?: song.artworkUri
+
+                AsyncImage(
+                    model = artworkModel,
+                    contentDescription = null,
+                    error = musicPlaceholder,
+                    placeholder = musicPlaceholder,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                // Dark overlay so text is clearly visible
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.65f))
+                )
+            }
+        }
+
+        // Main Foreground Content (Single Column - always scrollable)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .displayCutoutPadding()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .verticalScroll(scrollState),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 1. Track Title
+            Text(
+                text = song.title.ifBlank { "Unknown Title" },
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (isExpanded) MaterialTheme.colorScheme.onSurface else Color.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            if (isExpanded) {
+                // When expanded: show track title, circular album artwork, and collapse button
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // 2. Circular Album Artwork
+                SongArtworkBox(
+                    song = song,
+                    embeddedArtworkBytes = embeddedArtworkBytes,
+                    currentSizeDp = currentSizeDp,
+                    artworkAnimTranslationX = artworkAnimTranslationX,
+                    artworkAnimTranslationY = artworkAnimTranslationY,
+                    artworkShadowElevation = artworkShadowElevation
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+            } else {
+                // When collapsed: show space, album name, artists, metadata chips, action buttons
+                Spacer(modifier = Modifier.height(48.dp))
+
+                // 2. Album Name
+                SongAlbumTitle(
+                    album = song.album,
+                    albumId = song.albumId,
+                    onDismiss = dismissWithAnimation,
+                    textColor = Color.White
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 3. List of Artists
+                val displayArtists = remember(song.artistsDisplayString, song.artist) {
+                    song.artistsDisplayString.ifBlank { song.artist.ifBlank { "Unknown Artist" } }
+                }
+                Text(
+                    text = displayArtists,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 4. Metadata Info Chips
+                SongMetadataChips(
+                    formattedDuration = formattedDuration,
+                    fileExtension = fileExtension,
+                    hasOfflineLyrics = hasOfflineLyrics
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 5. Action Buttons
+                if (buttonsAlpha > 0.01f) {
+                    SongActionButtons(
+                        song = song,
+                        onPlayNext = onPlayNext,
+                        onAddToQueue = onAddToQueue,
+                        onAddToPlaylist = onAddToPlaylist,
+                        onShowFile = onShowFile,
+                        onDismiss = dismissWithAnimation,
+                        buttonHeight = 44.dp,
+                        spacing = 8.dp,
+                        playNextColor = Color(0xFF90CAF9),
+                        addToQueueColor = Color(0xFFA5D6A7),
+                        addToPlaylistColor = Color(0xFFCE93D8),
+                        showFileColor = Color.White,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                            .graphicsLayer {
+                                alpha = buttonsAlpha
+                                translationY = with(density) { (20.dp * expandProgress).toPx() }
+                            }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SongArtworkBox(
+    song: Song,
+    embeddedArtworkBytes: ByteArray?,
+    currentSizeDp: Dp,
+    artworkAnimTranslationX: Float,
+    artworkAnimTranslationY: Float,
+    artworkShadowElevation: Dp,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                translationX = artworkAnimTranslationX
+                translationY = artworkAnimTranslationY
+            }
+            .size(currentSizeDp)
+            .shadow(
+                elevation = artworkShadowElevation,
+                shape = CircleShape,
+                clip = false
+            )
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center
+    ) {
+        val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+        val artworkModel = embeddedArtworkBytes ?: song.artworkUri
+        AsyncImage(
+            model = artworkModel,
+            contentDescription = song.title,
+            error = musicPlaceholder,
+            placeholder = musicPlaceholder,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+private fun SongAlbumTitle(
+    album: String,
+    albumId: String?,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    val context = LocalContext.current
+    val displayAlbum = remember(album) { album.ifBlank { "Unknown Album" } }
+    Surface(
+        onClick = {
+            val albumIdentifier = albumId?.ifEmpty { null } ?: album
+            if (albumIdentifier.isNotBlank()) {
+                val intent = Intent(context, AlbumDetailActivity::class.java).apply {
+                    putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, albumIdentifier)
+                }
+                context.startActivity(intent)
+                onDismiss()
+            }
+        },
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
+        modifier = modifier
+    ) {
+        Text(
+            text = displayAlbum,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun SongMetadataChips(
+    formattedDuration: String,
+    fileExtension: String,
+    hasOfflineLyrics: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.padding(vertical = 4.dp)
+    ) {
+        // Audio Track Time
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = "Duration",
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = formattedDuration,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // File Type (MP3, FLAC, WAV, etc.)
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AudioFile,
+                    contentDescription = "File Type",
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = fileExtension,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Offline Lyrics Indicator
+        if (hasOfflineLyrics) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDone,
+                        contentDescription = "Offline Lyrics",
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Lyrics",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SongActionButtons(
+    song: Song,
+    onPlayNext: ((Song) -> Unit)?,
+    onAddToQueue: ((Song) -> Unit)?,
+    onAddToPlaylist: ((Song) -> Unit)?,
+    onShowFile: ((Song) -> Unit)?,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    buttonHeight: Dp = 52.dp,
+    spacing: Dp = 12.dp,
+    playNextColor: Color = MaterialTheme.colorScheme.primary,
+    addToQueueColor: Color = MaterialTheme.colorScheme.secondary,
+    addToPlaylistColor: Color = MaterialTheme.colorScheme.tertiary,
+    showFileColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    val context = LocalContext.current
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Play Next Button
+        TextButton(
+            onClick = {
+                onPlayNext?.invoke(song)
+                onDismiss()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(buttonHeight),
+            shape = RoundedCornerShape(buttonHeight / 2),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = playNextColor
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Play next",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        // Add to Queue Button
+        TextButton(
+            onClick = {
+                onAddToQueue?.invoke(song)
+                onDismiss()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(buttonHeight),
+            shape = RoundedCornerShape(buttonHeight / 2),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = addToQueueColor
+            )
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Add to queue",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        // Add to Playlist Button
+        TextButton(
+            onClick = {
+                onAddToPlaylist?.invoke(song)
+                onDismiss()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(buttonHeight),
+            shape = RoundedCornerShape(buttonHeight / 2),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = addToPlaylistColor
+            )
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Add to playlist",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        // Show File Button
+        TextButton(
+            onClick = {
+                if (onShowFile != null) {
+                    onShowFile(song)
+                } else {
+                    openSongParentFolder(context, song)
+                }
+                onDismiss()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(buttonHeight),
+            shape = RoundedCornerShape(buttonHeight / 2),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = showFileColor
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = "Show file",
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Show file",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
