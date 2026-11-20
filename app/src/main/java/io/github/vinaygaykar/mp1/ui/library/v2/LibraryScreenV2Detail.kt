@@ -42,7 +42,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -93,11 +95,13 @@ internal fun CategoryDetailScreen(
     onImportPlaylistLauncher: () -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
+    onCheckHasOfflineLyrics: suspend (Song) -> Boolean = { false },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val view = LocalView.current
     val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
 
     var noticeBannerHeightPx by remember { mutableFloatStateOf(0f) }
 
@@ -289,7 +293,10 @@ internal fun CategoryDetailScreen(
                                     libraryState.toggleSongSelection(song)
                                 },
                                 onSongMoreClick = { song, offset, size ->
-                                    activeOverlayData = SongOverlayData(song, offset, size)
+                                    coroutineScope.launch {
+                                        val hasLyrics = onCheckHasOfflineLyrics(song)
+                                        activeOverlayData = SongOverlayData(song, offset, size, hasOfflineLyrics = hasLyrics)
+                                    }
                                 },
                                 selectedSongIds = libraryState.selectedSongIds,
                                 isSelectionMode = libraryState.isSelectionMode,

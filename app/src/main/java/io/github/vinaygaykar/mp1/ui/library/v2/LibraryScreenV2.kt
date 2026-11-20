@@ -117,6 +117,9 @@ fun LibraryScreenV2(
         },
         onCreatePlaylistWithSongs = { name, songsToAdd ->
             viewModel.createPlaylistAndAddSongs(name, songsToAdd)
+        },
+        onCheckHasOfflineLyrics = { song ->
+            viewModel.checkHasOfflineLyrics(song)
         }
     )
 }
@@ -144,7 +147,8 @@ fun LibraryContentV2(
     onDeletePlaylists: (Set<Long>) -> Unit = {},
     onImportPlaylist: (Uri) -> Unit = {},
     onAddSongsToPlaylist: (Long, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> },
-    onCreatePlaylistWithSongs: (String, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> }
+    onCreatePlaylistWithSongs: (String, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> },
+    onCheckHasOfflineLyrics: suspend (io.github.vinaygaykar.mp1.domain.models.Song) -> Boolean = { false }
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -419,6 +423,7 @@ fun LibraryContentV2(
                 onShowNowPlayingView = { showNowPlayingView() },
                 onPlaySong = onPlaySong,
                 onAddToQueue = onAddToQueue,
+                onCheckHasOfflineLyrics = onCheckHasOfflineLyrics,
                 onImportPlaylistLauncher = {
                     importPlaylistLauncher.launch(
                         arrayOf(

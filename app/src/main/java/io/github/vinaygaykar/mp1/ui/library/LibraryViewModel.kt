@@ -11,6 +11,7 @@ import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.domain.models.Genre
 import io.github.vinaygaykar.mp1.domain.models.Playlist
 import io.github.vinaygaykar.mp1.domain.models.Song
+import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.domain.repository.PlaylistRepository
 import io.github.vinaygaykar.mp1.playback.client.PlaybackClient
@@ -29,6 +30,7 @@ class LibraryViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
     private val playlistRepository: PlaylistRepository,
     private val artistImageRepository: ArtistImageRepository,
+    private val lyricsRepository: LyricsRepository,
     private val playback: PlaybackClient,
 ) : ViewModel() {
 
@@ -117,5 +119,9 @@ class LibraryViewModel @Inject constructor(
 
     fun addToQueue(song: Song) {
         viewModelScope.launch { playback.addToQueue(song) }
+    }
+
+    suspend fun checkHasOfflineLyrics(song: Song): Boolean {
+        return lyricsRepository.isLocalOrEmbeddedLyrics(song)
     }
 }
