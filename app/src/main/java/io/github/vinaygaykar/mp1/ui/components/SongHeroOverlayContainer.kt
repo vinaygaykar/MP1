@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -628,29 +629,20 @@ fun SongDetailOverlay(
             }
         }
 
-        // Floating Circular Expand / Collapse Layout Button (Bottom Right)
-        Surface(
+        // Floating Circular Expand / Collapse Layout Button (FilledTonalIconButton with no shadow)
+        FilledTonalIconButton(
             onClick = { isExpanded = !isExpanded },
-            shape = CircleShape,
-            color = if (isExpanded) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.primaryContainer,
-            contentColor = if (isExpanded) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimaryContainer,
-            shadowElevation = 0.dp,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
                 .padding(end = 24.dp, bottom = 24.dp)
                 .size(48.dp)
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
-                    contentDescription = if (isExpanded) "Collapse layout" else "Expand layout",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
+                contentDescription = if (isExpanded) "Collapse layout" else "Expand layout",
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
