@@ -418,6 +418,9 @@ internal fun CategoryDetailScreen(
             val noticeBannerHeightDp = with(density) {
                 if (uiState.isScanning) noticeBannerHeightPx.toDp() else 0.dp
             }
+            var multiSelectHeaderHeightPx by remember { mutableFloatStateOf(0f) }
+            val multiSelectHeaderHeightDp = with(density) { multiSelectHeaderHeightPx.toDp() }
+
             OverlappingArtworksRow2(
                 songs = selectedSongsInSelectionOrder,
                 visible = libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode,
@@ -428,11 +431,14 @@ internal fun CategoryDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = noticeBannerHeightDp)
+                    .onGloballyPositioned { coordinates ->
+                        multiSelectHeaderHeightPx = coordinates.size.height.toFloat()
+                    }
                     .align(Alignment.TopCenter)
                     .zIndex(5f)
             )
 
-            // MultiSelectionActionPopup sliding in from bottom of screen on the same overlay z-index layer
+            // MultiSelectionActionPopup filling rest of screen below OverlappingArtworksRow2 with Haze backdrop blur
             MultiSelectionActionPopup(
                 visible = libraryState.showMultiSelectionSheet && libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode,
                 onDismiss = { libraryState.showMultiSelectionSheet = false },
@@ -450,10 +456,12 @@ internal fun CategoryDetailScreen(
                     selectedSongsInSelectionOrder.forEach { song -> onAddToQueue(song) }
                     libraryState.clearSongSelection()
                 },
+                hazeState = hazeState,
+                bottomPadding = bottomPadding,
                 modifier = Modifier
-                    .padding(bottom = bottomPadding + 8.dp)
-                    .align(Alignment.BottomCenter)
-                    .zIndex(5f)
+                    .fillMaxSize()
+                    .padding(top = noticeBannerHeightDp + multiSelectHeaderHeightDp)
+                    .zIndex(4f)
             )
 
             // Left Side Shadow during Transition

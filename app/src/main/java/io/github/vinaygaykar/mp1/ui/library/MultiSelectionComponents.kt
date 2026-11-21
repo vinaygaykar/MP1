@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.Dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -47,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -480,9 +483,9 @@ fun MultiSelectionBottomSheet(
 }
 
 /**
- * Inline floating action popup triggered when clicking OverlappingArtworksRow2 in multi-selection mode.
- * Shows each action button ("Play all", "Playlist", "Add to queue") vertically on the same z-index layer
- * as OverlappingArtworksRow2 without any background scrim/dim.
+ * Inline action popup overlay triggered when clicking OverlappingArtworksRow2 in multi-selection mode.
+ * Fills the screen height below OverlappingArtworksRow2 with a Haze backdrop blur scrim,
+ * presenting action buttons ("Play all", "Playlist", "Add to queue") on top of the blurred background.
  */
 @Composable
 fun MultiSelectionActionPopup(
@@ -491,6 +494,8 @@ fun MultiSelectionActionPopup(
     onPlayAll: () -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
     onAddToQueue: () -> Unit = {},
+    hazeState: HazeState? = null,
+    bottomPadding: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -499,99 +504,122 @@ fun MultiSelectionActionPopup(
         exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
         modifier = modifier
     ) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.98f),
-            shadowElevation = 8.dp,
-            tonalElevation = 6.dp,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+        val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                )
+                .then(
+                    if (hazeState != null) {
+                        Modifier.hazeEffect(
+                            state = hazeState,
+                            style = HazeStyle(
+                                backgroundColor = containerColor,
+                                blurRadius = 12.dp,
+                                tint = HazeTint(containerColor.copy(alpha = 0.20f))
+                            )
+                        )
+                    } else {
+                        Modifier.background(containerColor.copy(alpha = 0.20f))
+                    }
+                ),
+            contentAlignment = Alignment.BottomCenter
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = bottomPadding + 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Row 1: Play all
-                Button(
+                TextButton(
                     onClick = {
                         onPlayAll()
                         onDismiss()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Play all",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
                 // Row 2: Add to Playlist
-                FilledTonalButton(
+                TextButton(
                     onClick = {
                         onAddToPlaylist()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Playlist",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
                 // Row 3: Add to Queue
-                FilledTonalButton(
+                TextButton(
                     onClick = {
                         onAddToQueue()
                         onDismiss()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Add to queue",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
