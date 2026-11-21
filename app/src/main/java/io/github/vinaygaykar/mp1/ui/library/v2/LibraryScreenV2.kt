@@ -66,6 +66,7 @@ fun LibraryScreenV2(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
+    onAlbumClick: (String) -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onNowPlayingOffsetYChange: (Float) -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
@@ -109,6 +110,7 @@ fun LibraryScreenV2(
         onSearchClick = onSearchClick,
         onSettingsClick = onSettingsClick,
         onOpenScanLocations = onOpenScanLocations,
+        onAlbumClick = onAlbumClick,
         onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
         onNowPlayingOffsetYChange = onNowPlayingOffsetYChange,
         onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
@@ -144,6 +146,7 @@ fun LibraryContentV2(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
+    onAlbumClick: (String) -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onNowPlayingOffsetYChange: (Float) -> Unit = {},
     onPlaySong: (io.github.vinaygaykar.mp1.domain.models.Song, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> },
@@ -209,8 +212,14 @@ fun LibraryContentV2(
         )
     }
 
+    var savedCategory by rememberSaveable { mutableStateOf(LibraryCategory.SONGS) }
+
     val libraryState = remember(anchoredDraggableState) {
-        LibraryState(anchoredDraggableState)
+        LibraryState(anchoredDraggableState, initialCategory = savedCategory)
+    }
+
+    LaunchedEffect(libraryState.lastOpenedCategory) {
+        savedCategory = libraryState.lastOpenedCategory
     }
 
     SideEffect {
@@ -427,6 +436,7 @@ fun LibraryContentV2(
                 onOpenScanLocations = onOpenScanLocations,
                 onHideNowPlayingView = { hideNowPlayingView() },
                 onShowNowPlayingView = { showNowPlayingView() },
+                onAlbumClick = onAlbumClick,
                 onPlaySong = onPlaySong,
                 onAddToQueue = onAddToQueue,
                 onCheckHasOfflineLyrics = onCheckHasOfflineLyrics,

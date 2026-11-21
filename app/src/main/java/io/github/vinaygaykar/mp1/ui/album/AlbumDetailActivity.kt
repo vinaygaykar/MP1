@@ -123,23 +123,7 @@ import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
 import dagger.hilt.android.AndroidEntryPoint
 import kotlin.math.ceil
 
-@AndroidEntryPoint
-class AlbumDetailActivity : ComponentActivity() {
 
-    companion object {
-        const val EXTRA_ALBUM_ID = "extra_album_id"
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MusicPlayerTheme {
-                AlbumDetailScreen(onBack = { finish() })
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

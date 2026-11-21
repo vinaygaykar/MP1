@@ -97,6 +97,7 @@ internal fun CategoryDetailScreen(
     onImportPlaylistLauncher: () -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
+    onAlbumClick: (String) -> Unit = {},
     onCheckHasOfflineLyrics: suspend (Song) -> Boolean = { false },
     isSplashActive: Boolean = false,
     modifier: Modifier = Modifier
@@ -330,6 +331,7 @@ internal fun CategoryDetailScreen(
                         LibraryCategory.ALBUMS -> {
                             AlbumsTab(
                                 albums = uiState.albums,
+                                onAlbumClick = { album -> onAlbumClick(album.id) },
                                 detailProgress = detailProgress,
                                 categoryKey = libraryState.lastOpenedCategory,
                                 isSplashActive = isSplashActive,
@@ -418,9 +420,8 @@ internal fun CategoryDetailScreen(
                     libraryState.showMultiSelectionSheet = !libraryState.showMultiSelectionSheet
                 },
                 modifier = Modifier
-                    .statusBarsPadding()
+                    .fillMaxWidth()
                     .padding(top = noticeBannerHeightDp)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
                     .align(Alignment.TopCenter)
                     .zIndex(5f)
             )

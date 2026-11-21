@@ -118,7 +118,6 @@ import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
-import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.album.SongCardItem
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
@@ -546,8 +545,9 @@ fun ArtistDetailScreen(
                                     ArtistAlbumCard(
                                         album = album,
                                         onClick = { offset, size ->
-                                            val intent = Intent(context, AlbumDetailActivity::class.java).apply {
-                                                putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
+                                            val intent = Intent(context, io.github.vinaygaykar.mp1.MainActivity::class.java).apply {
+                                                putExtra("extra_album_id", album.id)
+                                                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                             }
                                             launchActivityWithScaleUp(
                                                 context = context,
@@ -593,8 +593,9 @@ fun ArtistDetailScreen(
                                     ArtistAlbumCard(
                                         album = album,
                                         onClick = { offset, size ->
-                                            val intent = Intent(context, AlbumDetailActivity::class.java).apply {
-                                                putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
+                                            val intent = Intent(context, io.github.vinaygaykar.mp1.MainActivity::class.java).apply {
+                                                putExtra("extra_album_id", album.id)
+                                                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                             }
                                             launchActivityWithScaleUp(
                                                 context = context,

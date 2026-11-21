@@ -101,6 +101,7 @@ fun NowPlayingScreen(
     bulgeTrigger: Long = 0L,
     isCollapsedOnScroll: Boolean = false,
     targetState: DragValue? = null,
+    onAlbumClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
     if (playbackState.trackTitle.isEmpty()) return
@@ -297,6 +298,7 @@ fun NowPlayingScreen(
                             scrubFactor = scrubFactor,
                             controlsAlpha = controlsAlpha,
                             expandedAlpha = expandedAlpha,
+                            onAlbumClick = onAlbumClick,
                             onMiniPlayerPositioned = onMiniPlayerPositioned,
                             view = view
                         )
@@ -324,6 +326,7 @@ fun NowPlayingScreen(
                             scrubFactor = scrubFactor,
                             controlsAlpha = controlsAlpha,
                             expandedAlpha = expandedAlpha,
+                            onAlbumClick = onAlbumClick,
                             onMiniPlayerPositioned = onMiniPlayerPositioned,
                             view = view
                         )
@@ -352,6 +355,7 @@ fun NowPlayingScreen(
                             scrubFactor = scrubFactor,
                             controlsAlpha = controlsAlpha,
                             expandedAlpha = expandedAlpha,
+                            onAlbumClick = onAlbumClick,
                             onMiniPlayerPositioned = onMiniPlayerPositioned,
                             view = view
                         )
@@ -407,6 +411,7 @@ private fun NowPlayingCompactContent(
     scrubFactor: Float,
     controlsAlpha: Float,
     expandedAlpha: Float,
+    onAlbumClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)?,
     view: android.view.View
 ) {
@@ -665,6 +670,7 @@ private fun NowPlayingPortraitContent(
     scrubFactor: Float,
     controlsAlpha: Float,
     expandedAlpha: Float,
+    onAlbumClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)?,
     view: android.view.View
 ) {
@@ -735,7 +741,11 @@ private fun NowPlayingPortraitContent(
                 NowPlayingTrackInfo(
                     playbackState = playbackState,
                     queueState = queueState,
-                    pagerState = state.pagerState
+                    pagerState = state.pagerState,
+                    onAlbumClick = { albumId ->
+                        state.collapse()
+                        onAlbumClick(albumId)
+                    }
                 ) {
                     state.showArtistsDialog = true
                 }
@@ -867,6 +877,7 @@ private fun NowPlayingLandscapeContent(
     scrubFactor: Float,
     controlsAlpha: Float,
     expandedAlpha: Float,
+    onAlbumClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)?,
     view: android.view.View
 ) {
@@ -929,7 +940,11 @@ private fun NowPlayingLandscapeContent(
                     playbackState = playbackState,
                     queueState = queueState,
                     pagerState = state.pagerState,
-                    titleMaxLines = 1
+                    titleMaxLines = 1,
+                    onAlbumClick = { albumId ->
+                        state.collapse()
+                        onAlbumClick(albumId)
+                    }
                 ) {
                     state.showArtistsDialog = true
                 }

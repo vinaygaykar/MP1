@@ -900,8 +900,7 @@ private fun QueueLandscapeContent(
     }
 
     Row(
-        modifier = modifier
-            .fillMaxSize()
+        modifier = modifier.fillMaxSize()
     ) {
         // Left Pane (occupy all available space)
         Column(
@@ -912,8 +911,7 @@ private fun QueueLandscapeContent(
             // Header Surface (Playing Queue Title Row)
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth()

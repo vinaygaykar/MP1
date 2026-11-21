@@ -1,7 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
 import android.app.Activity
-import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,9 +39,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.vinaygaykar.mp1.domain.models.Album
-import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.EmptyState
-import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 private const val EMPTY_STATE_MESSAGE = "No Albums found.\nScan a folder from Settings."
@@ -51,6 +48,7 @@ private const val EMPTY_STATE_MESSAGE = "No Albums found.\nScan a folder from Se
 @Composable
 fun AlbumsTab(
     albums: List<Album>,
+    onAlbumClick: (Album) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(),
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -88,8 +86,6 @@ fun AlbumsTab(
         configuration.screenHeightDp < 500
     }
 
-    val onAlbumClick = rememberOnAlbumClick()
-
     when {
         isWideWindow -> {
             AlbumsTabLandscape(
@@ -125,20 +121,6 @@ fun AlbumsTab(
                 isSplashActive = isSplashActive,
                 isCategoryEntranceComplete = isCategoryEntranceComplete
             )
-        }
-    }
-}
-
-@Composable
-private fun rememberOnAlbumClick(): (Album) -> Unit {
-    val context = LocalContext.current
-    val view = LocalView.current
-    return remember(context, view) {
-        { album ->
-            val intent = Intent(context, AlbumDetailActivity::class.java).apply {
-                putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, album.id)
-            }
-            launchActivityWithScaleUp(context = context, intent = intent, view = view)
         }
     }
 }

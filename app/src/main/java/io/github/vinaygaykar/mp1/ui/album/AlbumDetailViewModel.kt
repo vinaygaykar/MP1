@@ -29,7 +29,7 @@ class AlbumDetailViewModel @Inject constructor(
     private val playback: PlaybackClient
 ) : ViewModel() {
 
-    val albumId: String = savedStateHandle.get<String>(AlbumDetailActivity.EXTRA_ALBUM_ID) ?: ""
+    val albumId: String = savedStateHandle.get<String>("albumId") ?: ""
 
     val album: StateFlow<Album?> = musicRepository.getAlbumByIdFlow(albumId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

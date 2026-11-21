@@ -34,9 +34,7 @@ import androidx.media3.common.Player
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.playback.QueueUiState
 import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
-import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
-import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
@@ -48,6 +46,7 @@ internal fun NowPlayingTrackInfo(
     queueState: QueueUiState = QueueUiState(),
     pagerState: PagerState? = null,
     titleMaxLines: Int = 2,
+    onAlbumClick: (String) -> Unit = {},
     onArtistClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -60,6 +59,7 @@ internal fun NowPlayingTrackInfo(
             album = playbackState.album,
             albumId = playbackState.albumId,
             titleMaxLines = titleMaxLines,
+            onAlbumClick = onAlbumClick,
             onArtistClick = onArtistClick,
             context = context,
             view = view,
@@ -137,6 +137,7 @@ internal fun NowPlayingTrackInfo(
                         albumId = albumId,
                         titleMaxLines = titleMaxLines,
                         onArtistClick = if (isCurrent) onArtistClick else null,
+                        onAlbumClick = onAlbumClick,
                         context = context,
                         view = view,
                         modifier = Modifier
@@ -161,6 +162,7 @@ private fun NowPlayingTrackTextContext(
     album: String,
     albumId: String?,
     titleMaxLines: Int,
+    onAlbumClick: (String) -> Unit,
     onArtistClick: (() -> Unit)?,
     context: Context,
     view: View,
@@ -216,11 +218,9 @@ private fun NowPlayingTrackTextContext(
                 .fillMaxWidth()
                 .padding(top = 4.dp)
                 .clickable {
-                    if (!albumId.isNullOrEmpty()) {
-                        val intent = Intent(context, AlbumDetailActivity::class.java).apply {
-                            putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, albumId)
-                        }
-                        launchActivityWithScaleUp(context, intent, view)
+                    val albumIdentifier = albumId?.ifEmpty { null } ?: album
+                    if (albumIdentifier.isNotBlank()) {
+                        onAlbumClick(albumIdentifier)
                     }
                 },
         )

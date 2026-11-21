@@ -45,7 +45,6 @@ import coil.request.ImageRequest
 import coil.size.Precision
 import io.github.vinaygaykar.mp1.domain.models.Song
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongListItem(
     song: Song,
@@ -80,7 +79,7 @@ fun SongListItem(
     }
 
     ListItem(
-        headlineContent = { Text(song.title, maxLines = 1, overflow = TextOverflow.Clip) },
+        headlineContent = { Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(displayArtist, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingContent = {
             Box(

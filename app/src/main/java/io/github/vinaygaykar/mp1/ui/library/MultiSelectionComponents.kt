@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -216,10 +218,11 @@ fun OverlappingArtworksRow(
 
 
 /**
- * Row displaying circular artworks of up to 3 selected songs overlapping each other inside a pill-shaped container.
+ * Header container extending edge-to-edge displaying circular artworks of up to 3 selected songs overlapping each other
+ * centered alongside the selected count number.
  * Encapsulates AnimatedVisibility top slide animation.
  * Shows the most recently selected song first (at position 0), pushing older selected songs down,
- * and dropping the oldest when the selection grows bigger than 3. Also displays the count of selected songs.
+ * and dropping the oldest when the selection grows bigger than 3.
  */
 @Composable
 fun OverlappingArtworksRow2(
@@ -236,21 +239,24 @@ fun OverlappingArtworksRow2(
         visible = visible && displaySongs.isNotEmpty(),
         enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
         exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
-        modifier = modifier
+        modifier = modifier.fillMaxWidth()
     ) {
         Surface(
             onClick = { onClick?.invoke() },
             enabled = onClick != null,
-            shape = CircleShape,
+            shape = RectangleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
             shadowElevation = 8.dp,
             tonalElevation = 6.dp,
-            modifier = Modifier.padding(vertical = 4.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Row(
-                modifier = Modifier.padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(vertical = 16.dp, horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.Center
             ) {
                 Box(
                     modifier = Modifier
@@ -293,6 +299,8 @@ fun OverlappingArtworksRow2(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.width(16.dp))
 
                 RollingNumberText(
                     count = songs.size,

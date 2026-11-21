@@ -92,7 +92,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Song
-import io.github.vinaygaykar.mp1.ui.album.AlbumDetailActivity
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -122,6 +121,7 @@ fun SongHeroOverlayContainer(
     onAddToQueue: ((Song) -> Unit)? = null,
     onAddToPlaylist: ((Song) -> Unit)? = null,
     onShowFile: ((Song) -> Unit)? = null,
+    onAlbumClick: ((String) -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val blurRadius by animateDpAsState(
@@ -154,7 +154,8 @@ fun SongHeroOverlayContainer(
                 onPlayNext = onPlayNext,
                 onAddToQueue = onAddToQueue,
                 onAddToPlaylist = onAddToPlaylist,
-                onShowFile = onShowFile
+                onShowFile = onShowFile,
+                onAlbumClick = onAlbumClick
             )
         }
     }
@@ -171,7 +172,8 @@ fun SongDetailOverlay(
     onPlayNext: ((Song) -> Unit)? = null,
     onAddToQueue: ((Song) -> Unit)? = null,
     onAddToPlaylist: ((Song) -> Unit)? = null,
-    onShowFile: ((Song) -> Unit)? = null
+    onShowFile: ((Song) -> Unit)? = null,
+    onAlbumClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -357,7 +359,8 @@ fun SongDetailOverlay(
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
                     onAddToPlaylist = onAddToPlaylist,
-                    onShowFile = onShowFile
+                    onShowFile = onShowFile,
+                    onAlbumClick = onAlbumClick
                 )
             }
             isCompactHeight -> {
@@ -379,7 +382,8 @@ fun SongDetailOverlay(
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
                     onAddToPlaylist = onAddToPlaylist,
-                    onShowFile = onShowFile
+                    onShowFile = onShowFile,
+                    onAlbumClick = onAlbumClick
                 )
             }
             else -> {
@@ -443,7 +447,8 @@ private fun SongDetailPortraitContent(
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
     onAddToPlaylist: ((Song) -> Unit)?,
-    onShowFile: ((Song) -> Unit)?
+    onShowFile: ((Song) -> Unit)?,
+    onAlbumClick: ((String) -> Unit)? = null
 ) {
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
@@ -513,7 +518,8 @@ private fun SongDetailPortraitContent(
             SongAlbumTitle(
                 album = song.album,
                 albumId = song.albumId,
-                onDismiss = dismissWithAnimation
+                onDismiss = dismissWithAnimation,
+                onAlbumClick = onAlbumClick
             )
 
             Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
@@ -588,7 +594,8 @@ private fun SongDetailLandscapeContent(
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
     onAddToPlaylist: ((Song) -> Unit)?,
-    onShowFile: ((Song) -> Unit)?
+    onShowFile: ((Song) -> Unit)?,
+    onAlbumClick: ((String) -> Unit)? = null
 ) {
     val density = LocalDensity.current
     val leftScrollState = rememberScrollState()
@@ -657,7 +664,8 @@ private fun SongDetailLandscapeContent(
             SongAlbumTitle(
                 album = song.album,
                 albumId = song.albumId,
-                onDismiss = dismissWithAnimation
+                onDismiss = dismissWithAnimation,
+                onAlbumClick = onAlbumClick
             )
 
             Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(8.dp))
@@ -755,7 +763,8 @@ private fun SongDetailCompactContent(
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
     onAddToPlaylist: ((Song) -> Unit)?,
-    onShowFile: ((Song) -> Unit)?
+    onShowFile: ((Song) -> Unit)?,
+    onAlbumClick: ((String) -> Unit)? = null
 ) {
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
@@ -839,6 +848,7 @@ private fun SongDetailCompactContent(
                     album = song.album,
                     albumId = song.albumId,
                     onDismiss = dismissWithAnimation,
+                    onAlbumClick = onAlbumClick,
                     textColor = Color.White
                 )
 
@@ -942,6 +952,7 @@ private fun SongAlbumTitle(
     album: String,
     albumId: String?,
     onDismiss: () -> Unit,
+    onAlbumClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
@@ -951,10 +962,15 @@ private fun SongAlbumTitle(
         onClick = {
             val albumIdentifier = albumId?.ifEmpty { null } ?: album
             if (albumIdentifier.isNotBlank()) {
-                val intent = Intent(context, AlbumDetailActivity::class.java).apply {
-                    putExtra(AlbumDetailActivity.EXTRA_ALBUM_ID, albumIdentifier)
+                if (onAlbumClick != null) {
+                    onAlbumClick(albumIdentifier)
+                } else {
+                    val intent = Intent(context, io.github.vinaygaykar.mp1.MainActivity::class.java).apply {
+                        putExtra("extra_album_id", albumIdentifier)
+                        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }
+                    context.startActivity(intent)
                 }
-                context.startActivity(intent)
                 onDismiss()
             }
         },

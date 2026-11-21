@@ -1,6 +1,7 @@
 package io.github.vinaygaykar.mp1
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -41,12 +42,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
+import io.github.vinaygaykar.mp1.ui.album.AlbumDetailScreen
 import io.github.vinaygaykar.mp1.ui.library.v2.LibraryScreenV2
 import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.search.SearchScreen
@@ -63,9 +67,12 @@ import kotlinx.coroutines.flow.map
 class MainActivity : ComponentActivity() {
     private val splashViewModel: SplashViewModel by viewModels()
 
+    var pendingAlbumId by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
 
         if (savedInstanceState != null || splashViewModel.hasSplashBeenCompleted) {
             splashViewModel.markSplashCompleted()
@@ -79,6 +86,21 @@ class MainActivity : ComponentActivity() {
             MusicPlayerTheme {
                 MainScreen(splashViewModel = splashViewModel)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val albumId = intent?.getStringExtra("extra_album_id")
+        if (!albumId.isNullOrEmpty()) {
+            pendingAlbumId = albumId
+            splashViewModel.markSplashCompleted()
+            intent.removeExtra("extra_album_id")
         }
     }
 }
@@ -150,6 +172,15 @@ fun MainScreen(
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
+    val mainActivity = context as? MainActivity
+    val pendingAlbumId = mainActivity?.pendingAlbumId
+    LaunchedEffect(pendingAlbumId) {
+        if (!pendingAlbumId.isNullOrEmpty()) {
+            navController.navigate("album_detail/$pendingAlbumId")
+            mainActivity.pendingAlbumId = null
+        }
+    }
+
     LaunchedEffect(hasScanFoldersState, currentRoute) {
         if (hasScanFoldersState == true && currentRoute == "onboarding_scan_locations") {
             navController.navigate(Screen.Library.route) {
@@ -199,6 +230,7 @@ fun MainScreen(
                                 onSearchClick = { navController.navigate(Screen.Search.route) },
                                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                                 onOpenScanLocations = { navController.navigate("scan_locations") },
+                                onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
                                 onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
                                 onNowPlayingOffsetYChange = { nowPlayingOffsetY = it }
                             )
@@ -232,6 +264,39 @@ fun MainScreen(
                         ) {
                             SearchScreen(
                                 bottomPadding = bottomPadding,
+                                onBack = { navController.popBackStack() },
+                                onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") }
+                            )
+                        }
+                        composable(
+                            route = "album_detail/{albumId}",
+                            arguments = listOf(navArgument("albumId") { type = NavType.StringType }),
+                            enterTransition = {
+                                slideInHorizontally(
+                                    initialOffsetX = { it },
+                                    animationSpec = tween(350)
+                                ) + fadeIn(tween(350))
+                            },
+                            exitTransition = {
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeOut(tween(350))
+                            },
+                            popEnterTransition = {
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = tween(350)
+                                ) + fadeIn(tween(350))
+                            },
+                            popExitTransition = {
+                                slideOutHorizontally(
+                                    targetOffsetX = { it },
+                                    animationSpec = tween(350)
+                                ) + fadeOut(tween(350))
+                            }
+                        ) {
+                            AlbumDetailScreen(
                                 onBack = { navController.popBackStack() }
                             )
                         }
@@ -307,7 +372,8 @@ fun MainScreen(
             onProgressUpdate = { expansionProgress.floatValue = it },
             visualizerState = visualizerState,
             bulgeTrigger = miniPlayerBulgeTrigger,
-            isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll
+            isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll,
+            onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") }
         ) { offset -> miniPlayerTargetOffset = offset }
 
         // Custom Compose Splash Overlay (removed immediately once the logo has left the screen)
