@@ -24,7 +24,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -229,6 +234,7 @@ fun OverlappingArtworksRow2(
     songs: List<Song>,
     visible: Boolean = songs.isNotEmpty(),
     modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
     onClick: (() -> Unit)? = null
 ) {
     val displaySongs = remember(songs) { songs.asReversed().take(3) }
@@ -245,10 +251,24 @@ fun OverlappingArtworksRow2(
             onClick = { onClick?.invoke() },
             enabled = onClick != null,
             shape = RectangleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
-            shadowElevation = 8.dp,
-            tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth()
+            color = Color.Transparent,
+            shadowElevation = 0.dp,
+            tonalElevation = 0.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (hazeState != null) {
+                        val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                        Modifier.hazeEffect(
+                            state = hazeState,
+                            style = HazeStyle(
+                                backgroundColor = containerColor,
+                                blurRadius = 12.dp,
+                                tint = HazeTint(containerColor.copy(alpha = 0.20f))
+                            )
+                        )
+                    } else Modifier
+                )
         ) {
             Row(
                 modifier = Modifier

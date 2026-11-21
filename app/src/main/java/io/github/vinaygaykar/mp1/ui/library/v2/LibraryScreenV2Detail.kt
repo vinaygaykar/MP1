@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -148,6 +150,8 @@ internal fun CategoryDetailScreen(
         }
     }
 
+    val hazeState = remember { HazeState() }
+
     SongHeroOverlayContainer(
         modifier = modifier
             .fillMaxSize()
@@ -163,6 +167,7 @@ internal fun CategoryDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .hazeSource(hazeState)
             ) {
                 // Scan Notice Banner
                 AnimatedVisibility(
@@ -419,6 +424,7 @@ internal fun CategoryDetailScreen(
                 onClick = {
                     libraryState.showMultiSelectionSheet = !libraryState.showMultiSelectionSheet
                 },
+                hazeState = hazeState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = noticeBannerHeightDp)

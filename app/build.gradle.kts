@@ -100,6 +100,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.9.0")
     implementation(libs.kotlinx.collections.immutable)
 
+    // Haze for backdrop blur
+    implementation(libs.haze)
+
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
