@@ -4,6 +4,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -14,6 +18,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -64,8 +69,10 @@ import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -76,6 +83,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -210,6 +219,74 @@ fun SongDetailOverlay(
         ),
         label = "songDetailOverlayExpand"
     )
+
+    // Gyroscope / Motion tracking for metallic sheen reflection
+    val sensorManager = remember(context) {
+        context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    }
+
+    var rawTiltX by remember { mutableFloatStateOf(0f) }
+    var rawTiltY by remember { mutableFloatStateOf(0f) }
+
+    val shineTiltX by animateFloatAsState(
+        targetValue = if (isExpanded) rawTiltX else 0f,
+        animationSpec = spring(
+            stiffness = Spring.StiffnessLow,
+            dampingRatio = Spring.DampingRatioNoBouncy
+        ),
+        label = "shineTiltX"
+    )
+    val shineTiltY by animateFloatAsState(
+        targetValue = if (isExpanded) rawTiltY else 0f,
+        animationSpec = spring(
+            stiffness = Spring.StiffnessLow,
+            dampingRatio = Spring.DampingRatioNoBouncy
+        ),
+        label = "shineTiltY"
+    )
+
+    DisposableEffect(isExpanded, sensorManager) {
+        if (!isExpanded || sensorManager == null) {
+            rawTiltX = 0f
+            rawTiltY = 0f
+            onDispose { }
+        } else {
+            val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+                ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+            val rotationMatrix = FloatArray(9)
+            val orientationAngles = FloatArray(3)
+
+            val listener = object : SensorEventListener {
+                override fun onSensorChanged(event: SensorEvent?) {
+                    if (event == null) return
+                    if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+                        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                        SensorManager.getOrientation(rotationMatrix, orientationAngles)
+                        val pitch = orientationAngles[1]
+                        val roll = orientationAngles[2]
+                        rawTiltX = (roll / 0.5f).coerceIn(-1.5f, 1.5f)
+                        rawTiltY = (pitch / 0.5f).coerceIn(-1.5f, 1.5f)
+                    } else if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+                        val accelX = event.values[0]
+                        val accelY = event.values[1]
+                        rawTiltX = (-accelX / 5f).coerceIn(-1.5f, 1.5f)
+                        rawTiltY = (accelY / 5f).coerceIn(-1.5f, 1.5f)
+                    }
+                }
+
+                override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            }
+
+            if (rotationSensor != null) {
+                sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+            }
+
+            onDispose {
+                sensorManager.unregisterListener(listener)
+            }
+        }
+    }
 
     // Fetch album artwork embedded from song file
     var embeddedArtworkBytes by remember(song.uri) { mutableStateOf<ByteArray?>(null) }
@@ -355,6 +432,8 @@ fun SongDetailOverlay(
                     isExpanded = isExpanded,
                     expandProgress = expandProgress,
                     buttonsAlpha = buttonsAlpha,
+                    shineTiltX = shineTiltX,
+                    shineTiltY = shineTiltY,
                     dismissWithAnimation = dismissWithAnimation,
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
@@ -378,6 +457,8 @@ fun SongDetailOverlay(
                     isExpanded = isExpanded,
                     expandProgress = expandProgress,
                     buttonsAlpha = buttonsAlpha,
+                    shineTiltX = shineTiltX,
+                    shineTiltY = shineTiltY,
                     dismissWithAnimation = dismissWithAnimation,
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
@@ -401,6 +482,8 @@ fun SongDetailOverlay(
                     isExpanded = isExpanded,
                     expandProgress = expandProgress,
                     buttonsAlpha = buttonsAlpha,
+                    shineTiltX = shineTiltX,
+                    shineTiltY = shineTiltY,
                     dismissWithAnimation = dismissWithAnimation,
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
@@ -443,6 +526,8 @@ private fun SongDetailPortraitContent(
     isExpanded: Boolean,
     expandProgress: Float,
     buttonsAlpha: Float,
+    shineTiltX: Float = 0f,
+    shineTiltY: Float = 0f,
     dismissWithAnimation: () -> Unit,
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
@@ -509,7 +594,10 @@ private fun SongDetailPortraitContent(
                 currentSizeDp = currentSizeDp,
                 artworkAnimTranslationX = artworkAnimTranslationX,
                 artworkAnimTranslationY = artworkAnimTranslationY,
-                artworkShadowElevation = artworkShadowElevation
+                artworkShadowElevation = artworkShadowElevation,
+                shineAlpha = expandProgress,
+                shineTiltX = shineTiltX,
+                shineTiltY = shineTiltY
             )
 
             Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
@@ -590,6 +678,8 @@ private fun SongDetailLandscapeContent(
     isExpanded: Boolean,
     expandProgress: Float,
     buttonsAlpha: Float,
+    shineTiltX: Float = 0f,
+    shineTiltY: Float = 0f,
     dismissWithAnimation: () -> Unit,
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
@@ -655,7 +745,10 @@ private fun SongDetailLandscapeContent(
                 currentSizeDp = currentSizeDp,
                 artworkAnimTranslationX = artworkAnimTranslationX,
                 artworkAnimTranslationY = artworkAnimTranslationY,
-                artworkShadowElevation = artworkShadowElevation
+                artworkShadowElevation = artworkShadowElevation,
+                shineAlpha = expandProgress,
+                shineTiltX = shineTiltX,
+                shineTiltY = shineTiltY
             )
 
             Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
@@ -759,6 +852,8 @@ private fun SongDetailCompactContent(
     isExpanded: Boolean,
     expandProgress: Float,
     buttonsAlpha: Float,
+    shineTiltX: Float = 0f,
+    shineTiltY: Float = 0f,
     dismissWithAnimation: () -> Unit,
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
@@ -835,7 +930,10 @@ private fun SongDetailCompactContent(
                     currentSizeDp = currentSizeDp,
                     artworkAnimTranslationX = artworkAnimTranslationX,
                     artworkAnimTranslationY = artworkAnimTranslationY,
-                    artworkShadowElevation = artworkShadowElevation
+                    artworkShadowElevation = artworkShadowElevation,
+                    shineAlpha = expandProgress,
+                    shineTiltX = shineTiltX,
+                    shineTiltY = shineTiltY
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -914,7 +1012,10 @@ private fun SongArtworkBox(
     artworkAnimTranslationX: Float,
     artworkAnimTranslationY: Float,
     artworkShadowElevation: Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    shineAlpha: Float = 0f,
+    shineTiltX: Float = 0f,
+    shineTiltY: Float = 0f
 ) {
     Box(
         modifier = modifier
@@ -944,6 +1045,33 @@ private fun SongArtworkBox(
                 .clip(CircleShape),
             contentScale = ContentScale.Crop
         )
+
+        if (shineAlpha > 0.001f) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .graphicsLayer { alpha = shineAlpha }
+            ) {
+                val shiftX = shineTiltX * size.width * 0.45f
+                val shiftY = shineTiltY * size.height * 0.45f
+
+                val shineBrush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.0f),
+                        Color.White.copy(alpha = 0.05f),
+                        Color.White.copy(alpha = 0.25f),
+                        Color.White.copy(alpha = 0.45f),
+                        Color.White.copy(alpha = 0.25f),
+                        Color.White.copy(alpha = 0.05f),
+                        Color.White.copy(alpha = 0.0f),
+                    ),
+                    start = Offset(shiftX, shiftY),
+                    end = Offset(size.width + shiftX, size.height + shiftY)
+                )
+                drawRect(brush = shineBrush, blendMode = BlendMode.Screen)
+            }
+        }
     }
 }
 
