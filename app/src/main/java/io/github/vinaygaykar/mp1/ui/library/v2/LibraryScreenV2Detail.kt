@@ -1,6 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.library.v2
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -141,9 +142,18 @@ internal fun CategoryDetailScreen(
         }
     }
 
-    val isActionPopupOpen = libraryState.showMultiSelectionSheet &&
-            libraryState.lastOpenedCategory == LibraryCategory.SONGS &&
-            libraryState.isSelectionMode
+    val isSongsSelectionActive = libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode
+    val isActionPopupOpen = isSongsSelectionActive && libraryState.showMultiSelectionSheet
+
+    // Back Handler Level 1: When expanded, back press collapses the overlay back to compact mode
+    BackHandler(enabled = isActionPopupOpen) {
+        libraryState.showMultiSelectionSheet = false
+    }
+
+    // Back Handler Level 2: When collapsed in selection mode, back press exits selection mode and deselects all
+    BackHandler(enabled = isSongsSelectionActive && !libraryState.showMultiSelectionSheet) {
+        libraryState.clearSongSelection()
+    }
 
     LaunchedEffect(libraryState.isSelectionMode) {
         if (!libraryState.isSelectionMode) {
@@ -442,19 +452,21 @@ internal fun CategoryDetailScreen(
                 onDismiss = {
                     libraryState.showMultiSelectionSheet = false
                 },
-                onPlayAll = {
-                    if (selectedSongsInSelectionOrder.isNotEmpty()) {
-                        onPlaySong(selectedSongsInSelectionOrder.first(), uiState.songs)
+                onPlayNext = { activeSongs ->
+                    if (activeSongs.isNotEmpty()) {
+                        activeSongs.forEach { song -> onAddToQueue(song) }
                         libraryState.clearSongSelection()
                     }
                 },
-                onAddToPlaylist = {
+                onAddToPlaylist = { activeSongs ->
                     libraryState.showMultiSelectionSheet = false
                     libraryState.showPlaylistSelectionSheet = true
                 },
-                onAddToQueue = {
-                    selectedSongsInSelectionOrder.forEach { song -> onAddToQueue(song) }
-                    libraryState.clearSongSelection()
+                onAddToQueue = { activeSongs ->
+                    if (activeSongs.isNotEmpty()) {
+                        activeSongs.forEach { song -> onAddToQueue(song) }
+                        libraryState.clearSongSelection()
+                    }
                 },
                 hazeState = hazeState,
                 bottomPadding = bottomPadding,
