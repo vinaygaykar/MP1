@@ -69,9 +69,8 @@ import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.NoticeBanner
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
-import io.github.vinaygaykar.mp1.ui.library.MultiSelectionActionPopup
-import io.github.vinaygaykar.mp1.ui.library.OverlappingArtworksRow2
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
+import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
 import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.library.tabs.AlbumsTab
 import io.github.vinaygaykar.mp1.ui.library.tabs.ArtistGrid
@@ -145,6 +144,12 @@ internal fun CategoryDetailScreen(
     val isActionPopupOpen = libraryState.showMultiSelectionSheet &&
             libraryState.lastOpenedCategory == LibraryCategory.SONGS &&
             libraryState.isSelectionMode
+
+    LaunchedEffect(libraryState.isSelectionMode) {
+        if (!libraryState.isSelectionMode) {
+            libraryState.showMultiSelectionSheet = false
+        }
+    }
 
     LaunchedEffect(activeOverlayData != null, isActionPopupOpen) {
         if (activeOverlayData != null || isActionPopupOpen) {
@@ -418,34 +423,25 @@ internal fun CategoryDetailScreen(
                 }
             }
 
-            // OverlappingArtworksRow2 floating overlay when multi-select is active on SONGS
+            // Unified OverlappingArtworksRow2 floating overlay (Compact top bar when closed, full-screen scrollable overlay when expanded)
             val noticeBannerHeightDp = with(density) {
                 if (uiState.isScanning) noticeBannerHeightPx.toDp() else 0.dp
             }
-            var multiSelectHeaderHeightPx by remember { mutableFloatStateOf(0f) }
-            val multiSelectHeaderHeightDp = with(density) { multiSelectHeaderHeightPx.toDp() }
 
-            OverlappingArtworksRow2(
+            val isActionPopupVisible = libraryState.showMultiSelectionSheet &&
+                    libraryState.lastOpenedCategory == LibraryCategory.SONGS &&
+                    libraryState.isSelectionMode
+
+            SongsMultiSelectOverlay(
                 songs = selectedSongsInSelectionOrder,
                 visible = libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode,
+                isExpanded = isActionPopupVisible,
                 onClick = {
                     libraryState.showMultiSelectionSheet = !libraryState.showMultiSelectionSheet
                 },
-                hazeState = hazeState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = noticeBannerHeightDp)
-                    .onGloballyPositioned { coordinates ->
-                        multiSelectHeaderHeightPx = coordinates.size.height.toFloat()
-                    }
-                    .align(Alignment.TopCenter)
-                    .zIndex(5f)
-            )
-
-            // MultiSelectionActionPopup filling rest of screen below OverlappingArtworksRow2 with Haze backdrop blur
-            MultiSelectionActionPopup(
-                visible = libraryState.showMultiSelectionSheet && libraryState.lastOpenedCategory == LibraryCategory.SONGS && libraryState.isSelectionMode,
-                onDismiss = { libraryState.showMultiSelectionSheet = false },
+                onDismiss = {
+                    libraryState.showMultiSelectionSheet = false
+                },
                 onPlayAll = {
                     if (selectedSongsInSelectionOrder.isNotEmpty()) {
                         onPlaySong(selectedSongsInSelectionOrder.first(), uiState.songs)
@@ -463,9 +459,10 @@ internal fun CategoryDetailScreen(
                 hazeState = hazeState,
                 bottomPadding = bottomPadding,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = noticeBannerHeightDp + multiSelectHeaderHeightDp)
-                    .zIndex(4f)
+                    .fillMaxWidth()
+                    .padding(top = noticeBannerHeightDp)
+                    .align(Alignment.TopCenter)
+                    .zIndex(5f)
             )
 
             // Left Side Shadow during Transition
