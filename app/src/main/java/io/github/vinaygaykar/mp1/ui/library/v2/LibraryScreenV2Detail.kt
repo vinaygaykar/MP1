@@ -142,8 +142,12 @@ internal fun CategoryDetailScreen(
         }
     }
 
-    LaunchedEffect(activeOverlayData != null) {
-        if (activeOverlayData != null) {
+    val isActionPopupOpen = libraryState.showMultiSelectionSheet &&
+            libraryState.lastOpenedCategory == LibraryCategory.SONGS &&
+            libraryState.isSelectionMode
+
+    LaunchedEffect(activeOverlayData != null, isActionPopupOpen) {
+        if (activeOverlayData != null || isActionPopupOpen) {
             onHideNowPlayingView()
         } else {
             onShowNowPlayingView()

@@ -221,7 +221,6 @@ fun MainScreen(
                             val isSplashActive = (showSplash != false && !splashFinished)
                             LibraryScreenV2(
                                 bottomPadding = bottomPadding,
-                                isPlayerActive = isPlayerActive,
                                 isSplashActive = isSplashActive,
                                 miniPlayerTargetOffset = miniPlayerTargetOffset,
                                 onBulgeMiniPlayer = {

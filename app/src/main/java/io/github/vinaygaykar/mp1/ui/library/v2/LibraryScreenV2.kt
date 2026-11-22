@@ -59,7 +59,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun LibraryScreenV2(
     bottomPadding: Dp = 0.dp,
-    isPlayerActive: Boolean = false,
     isSplashActive: Boolean = false,
     miniPlayerTargetOffset: Offset? = null,
     onBulgeMiniPlayer: () -> Unit = {},
@@ -102,7 +101,6 @@ fun LibraryScreenV2(
     LibraryContentV2(
         uiState = uiState,
         bottomPadding = bottomPadding,
-        isPlayerActive = isPlayerActive,
         isSplashActive = isSplashActive,
         miniPlayerTargetOffset = miniPlayerTargetOffset,
         onDismissImportError = { viewModel.clearImportError() },
@@ -138,7 +136,6 @@ fun LibraryScreenV2(
 fun LibraryContentV2(
     uiState: LibraryUiState,
     bottomPadding: Dp = 0.dp,
-    isPlayerActive: Boolean = false,
     isSplashActive: Boolean = false,
     miniPlayerTargetOffset: Offset? = null,
     onDismissImportError: () -> Unit = {},
