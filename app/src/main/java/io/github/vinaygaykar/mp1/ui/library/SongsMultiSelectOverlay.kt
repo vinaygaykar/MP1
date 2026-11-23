@@ -4,21 +4,21 @@ import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed as lazyRowItemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -46,9 +45,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,14 +59,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -87,7 +81,10 @@ import dev.chrisbanes.haze.hazeEffect
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.components.RollingNumberText
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.itemsIndexed as lazyRowItemsIndexed
 
 /**
  * Unified multi-selection overlay component for songs category.
@@ -128,8 +125,20 @@ fun SongsMultiSelectOverlay(
     val coroutineScope = rememberCoroutineScope()
     var titleClearJob by remember { mutableStateOf<Job?>(null) }
     val deselectedSongIds = remember { mutableStateListOf<String>() }
-    val animatedSongIds = remember { mutableStateListOf<String>() }
     var highlightedSongTitle by remember { mutableStateOf<String?>(null) }
+
+    val totalAnimatedCount = remember(songs) { songs.size.coerceAtMost(MAX_ANIMATED_ITEMS_COUNT) }
+    val revealedIndexLimit by animateIntAsState(
+        targetValue = if (isExpanded) totalAnimatedCount else 0,
+        animationSpec = tween(
+            durationMillis = (totalAnimatedCount * INITIAL_STEP_DELAY_MS.toInt()).coerceIn(
+                200,
+                1200
+            ),
+            easing = LinearEasing
+        ),
+        label = "revealedIndexLimit"
+    )
 
     val showSongTitleWithTimeout: (String) -> Unit = { title ->
         titleClearJob?.cancel()
@@ -144,7 +153,6 @@ fun SongsMultiSelectOverlay(
         if (!isExpanded) {
             deselectedSongIds.clear()
             highlightedSongTitle = null
-            animatedSongIds.clear()
             titleClearJob?.cancel()
         }
     }
@@ -208,7 +216,10 @@ fun SongsMultiSelectOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = if (isExpanded) 0.dp else 16.dp, vertical = if (isExpanded) 24.dp else 16.dp),
+                        .padding(
+                            horizontal = if (isExpanded) 0.dp else 16.dp,
+                            vertical = if (isExpanded) 24.dp else 16.dp
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (!isExpanded) {
@@ -313,7 +324,10 @@ fun SongsMultiSelectOverlay(
                                         .fillMaxWidth()
                                         .height(72.dp),
                                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                                    horizontalArrangement = Arrangement.spacedBy(
+                                        16.dp,
+                                        Alignment.CenterHorizontally
+                                    ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     lazyRowItemsIndexed(
@@ -324,10 +338,8 @@ fun SongsMultiSelectOverlay(
                                         StaggeredGridArtworkAvatar(
                                             song = song,
                                             index = index,
-                                            isExpanded = isExpanded,
+                                            isRevealed = index < revealedIndexLimit,
                                             isDeselected = isDeselected,
-                                            hasAlreadyAnimated = song.id in animatedSongIds,
-                                            onAnimated = { animatedSongIds.add(song.id) },
                                             onClick = {
                                                 if (isDeselected) {
                                                     deselectedSongIds.remove(song.id)
@@ -359,10 +371,8 @@ fun SongsMultiSelectOverlay(
                                         StaggeredGridArtworkAvatar(
                                             song = song,
                                             index = index,
-                                            isExpanded = isExpanded,
+                                            isRevealed = index < revealedIndexLimit,
                                             isDeselected = isDeselected,
-                                            hasAlreadyAnimated = song.id in animatedSongIds,
-                                            onAnimated = { animatedSongIds.add(song.id) },
                                             onClick = {
                                                 if (isDeselected) {
                                                     deselectedSongIds.remove(song.id)
@@ -397,7 +407,9 @@ fun SongsMultiSelectOverlay(
                             text = highlightedSongTitle ?: "Tap to remove a song, hold to view",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
-                            color = if (highlightedSongTitle != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            color = if (highlightedSongTitle != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                alpha = 0.7f
+                            ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.basicMarquee()
@@ -512,56 +524,46 @@ fun SongsMultiSelectOverlay(
     }
 }
 
-private const val STAGGERED_ANIMATION_DURATION_MS = 60
+private const val ITEM_ANIMATION_DURATION_MS = 150
+private const val INITIAL_STEP_DELAY_MS = 50L
 private const val MAX_ANIMATED_ITEMS_COUNT = 25
 private const val SONG_TITLE_CLEAR_DELAY_MS = 3000L
 
 /**
  * Single grid item representing a selected song artwork avatar in the expanded grid.
- * Animates in sequentially with a constant delay step, sliding up from below.
+ * Animates in as index < revealedIndexLimit, sliding up from below.
  * Shows disabled effect when deselected.
  * Short click toggles deselection; long press displays song title for 3s.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StaggeredGridArtworkAvatar(
     song: Song,
     index: Int,
-    isExpanded: Boolean,
+    isRevealed: Boolean,
     isDeselected: Boolean,
-    hasAlreadyAnimated: Boolean,
-    onAnimated: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isBeyondThreshold = index >= MAX_ANIMATED_ITEMS_COUNT || hasAlreadyAnimated
-    val delayMs = if (isBeyondThreshold) 0L else index * STAGGERED_ANIMATION_DURATION_MS.toLong()
+    val isBeyondThreshold = index >= MAX_ANIMATED_ITEMS_COUNT
+    val shouldShow = isRevealed || isBeyondThreshold
 
-    var visible by remember(hasAlreadyAnimated) { mutableStateOf(hasAlreadyAnimated) }
-
-    LaunchedEffect(isExpanded, hasAlreadyAnimated) {
-        if (isExpanded) {
-            if (!hasAlreadyAnimated && delayMs > 0L) {
-                delay(delayMs)
-            }
-            visible = true
-            onAnimated()
-        } else {
-            visible = false
-        }
-    }
-
-    val animationSpec = if (isBeyondThreshold) snap<Float>() else tween<Float>(durationMillis = STAGGERED_ANIMATION_DURATION_MS, easing = FastOutSlowInEasing)
-    val animationDpSpec = if (isBeyondThreshold) snap<Dp>() else tween<Dp>(durationMillis = STAGGERED_ANIMATION_DURATION_MS, easing = FastOutSlowInEasing)
+    val animationSpec = if (isBeyondThreshold) snap<Float>() else tween<Float>(
+        durationMillis = ITEM_ANIMATION_DURATION_MS,
+        easing = FastOutSlowInEasing
+    )
+    val animationDpSpec = if (isBeyondThreshold) snap<Dp>() else tween<Dp>(
+        durationMillis = ITEM_ANIMATION_DURATION_MS,
+        easing = FastOutSlowInEasing
+    )
 
     val alpha by animateFloatAsState(
-        targetValue = if (!visible) 0f else if (isDeselected) 0.35f else 1f,
+        targetValue = if (!shouldShow) 0f else if (isDeselected) 0.35f else 1f,
         animationSpec = animationSpec,
         label = "avatarAlpha"
     )
     val offsetY by animateDpAsState(
-        targetValue = if (visible) 0.dp else 24.dp,
+        targetValue = if (shouldShow) 0.dp else 24.dp,
         animationSpec = animationDpSpec,
         label = "avatarOffsetY"
     )
@@ -624,50 +626,22 @@ private fun StaggeredGridArtworkAvatar(
  * Previews for SongsMultiSelectOverlay
  * ----------------------------------------------------------------------------------------- */
 
-private val samplePreviewSongs = listOf(
+private val sample32PreviewSongs = (1..32).map { index ->
     Song(
-        id = "1",
+        id = "$index",
         uri = android.net.Uri.EMPTY,
-        title = "Blinding Lights",
-        artist = "The Weeknd",
-        album = "After Hours",
-        durationMs = 200000L,
-        trackNumber = 1,
+        title = "Lorem Ipsum $index",
+        artist = "Artist $index",
+        album = "Album $index",
+        durationMs = 200000L + index * 1000L,
+        trackNumber = index,
         discNumber = 1,
-        year = 2020,
+        year = 2024,
         artworkUri = null,
-        fileName = "blinding_lights.mp3",
-        lastModified = 0L
-    ),
-    Song(
-        id = "2",
-        uri = android.net.Uri.EMPTY,
-        title = "Starboy",
-        artist = "The Weeknd",
-        album = "Starboy",
-        durationMs = 210000L,
-        trackNumber = 2,
-        discNumber = 1,
-        year = 2016,
-        artworkUri = null,
-        fileName = "starboy.mp3",
-        lastModified = 0L
-    ),
-    Song(
-        id = "3",
-        uri = android.net.Uri.EMPTY,
-        title = "Save Your Tears",
-        artist = "The Weeknd",
-        album = "After Hours",
-        durationMs = 215000L,
-        trackNumber = 3,
-        discNumber = 1,
-        year = 2020,
-        artworkUri = null,
-        fileName = "save_your_tears.mp3",
+        fileName = "lorem_ipsum_$index.mp3",
         lastModified = 0L
     )
-)
+}
 
 @Preview(
     name = "Portrait Light",
@@ -709,7 +683,7 @@ private fun SongsMultiSelectOverlayCollapsedPreview() {
     MusicPlayerTheme(dynamicColor = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
             SongsMultiSelectOverlay(
-                songs = samplePreviewSongs,
+                songs = sample32PreviewSongs.take(3),
                 visible = true,
                 isExpanded = false
             )
@@ -719,35 +693,35 @@ private fun SongsMultiSelectOverlayCollapsedPreview() {
 
 @Preview(
     name = "Portrait Light",
-    group = "SongsMultiSelectOverlay - Expanded",
+    group = "SongsMultiSelectOverlay - Expanded 32 Songs",
     showBackground = true,
     device = "spec:width=411dp,height=891dp,orientation=portrait",
     uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Preview(
     name = "Portrait Dark",
-    group = "SongsMultiSelectOverlay - Expanded",
+    group = "SongsMultiSelectOverlay - Expanded 32 Songs",
     showBackground = true,
     device = "spec:width=411dp,height=891dp,orientation=portrait",
     uiMode = Configuration.UI_MODE_NIGHT_YES
 )
 @Preview(
     name = "Landscape Light",
-    group = "SongsMultiSelectOverlay - Expanded",
+    group = "SongsMultiSelectOverlay - Expanded 32 Songs",
     showBackground = true,
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_NO
 )
 @Preview(
     name = "Landscape Dark",
-    group = "SongsMultiSelectOverlay - Expanded",
+    group = "SongsMultiSelectOverlay - Expanded 32 Songs",
     showBackground = true,
     device = "spec:width=891dp,height=411dp,orientation=landscape",
     uiMode = Configuration.UI_MODE_NIGHT_YES
 )
 @Preview(
     name = "Compact / Split Light",
-    group = "SongsMultiSelectOverlay - Expanded",
+    group = "SongsMultiSelectOverlay - Expanded 32 Songs",
     showBackground = true,
     device = "spec:width=411dp,height=445dp,orientation=portrait",
     uiMode = Configuration.UI_MODE_NIGHT_NO
@@ -757,7 +731,34 @@ private fun SongsMultiSelectOverlayExpandedPreview() {
     MusicPlayerTheme(dynamicColor = false) {
         Surface(modifier = Modifier.fillMaxSize()) {
             SongsMultiSelectOverlay(
-                songs = samplePreviewSongs,
+                songs = sample32PreviewSongs,
+                visible = true,
+                isExpanded = true
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "Portrait Light",
+    group = "SongsMultiSelectOverlay - Expanded 5 Songs",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "SongsMultiSelectOverlay - Expanded 5 Songs",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun SongsMultiSelectOverlayExpanded5SongsPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            SongsMultiSelectOverlay(
+                songs = sample32PreviewSongs.take(5),
                 visible = true,
                 isExpanded = true
             )
