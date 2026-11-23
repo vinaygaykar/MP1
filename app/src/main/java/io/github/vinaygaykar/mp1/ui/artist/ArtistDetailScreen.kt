@@ -118,7 +118,6 @@ import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
-import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.isArtistMatchingPlayingTrack
 import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
@@ -139,10 +138,7 @@ fun ArtistDetailScreen(
     val collaborators by viewModel.collaborators.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val playbackState by playerViewModel.playbackState.collectAsState()
-    val progressState by playerViewModel.progressState.collectAsState()
     val queueState by playerViewModel.queueState.collectAsState()
-    val lyricsState by playerViewModel.lyricsState.collectAsState()
-    val visualizerState by playerViewModel.visualizerState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
     var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
@@ -225,7 +221,6 @@ fun ArtistDetailScreen(
     val currentColorScheme = artistColorScheme ?: MaterialTheme.colorScheme
 
     val isPlayerActive = playbackState.trackTitle.isNotEmpty()
-    val expansionProgress = remember { mutableFloatStateOf(0f) }
 
     val lazyListState = rememberLazyListState()
 
@@ -748,22 +743,6 @@ fun ArtistDetailScreen(
                     }
                 }
             }
-
-            // Now Playing Screen
-            NowPlayingScreen(
-                modifier = Modifier.fillMaxSize(),
-                playbackState = playbackState,
-                progressState = progressState,
-                queueState = queueState,
-                lyricsState = lyricsState,
-                playbackControls = playerViewModel,
-                queueControls = playerViewModel,
-                lyricsControls = playerViewModel,
-                onProgressUpdate = { expansionProgress.floatValue = it },
-                visualizerState = visualizerState,
-                bulgeTrigger = miniPlayerBulgeTrigger,
-                isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll
-            ) { miniPlayerTargetOffset = it }
 
             // Multi-selection Bottom Sheet
             if (showMultiSelectionSheet) {

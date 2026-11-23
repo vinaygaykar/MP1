@@ -84,7 +84,6 @@ import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
-import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -109,10 +108,7 @@ fun PlaylistDetailScreen(
     val playlist by viewModel.playlist.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val playbackState by playerViewModel.playbackState.collectAsState()
-    val progressState by playerViewModel.progressState.collectAsState()
     val queueState by playerViewModel.queueState.collectAsState()
-    val lyricsState by playerViewModel.lyricsState.collectAsState()
-    val visualizerState by playerViewModel.visualizerState.collectAsState()
 
     val isDark = isSystemInDarkTheme()
 
@@ -129,7 +125,6 @@ fun PlaylistDetailScreen(
 
     MaterialTheme(colorScheme = themeColorScheme) {
         val isPlayerActive = playbackState.trackTitle.isNotEmpty()
-        val expansionProgress = remember { mutableFloatStateOf(0f) }
         val lazyListState = rememberLazyListState()
 
         val showTopBarTitle by remember {
@@ -360,21 +355,6 @@ fun PlaylistDetailScreen(
                     }
                 }
             }
-
-            // Now Playing Screen
-            NowPlayingScreen(
-                modifier = Modifier.fillMaxSize(),
-                playbackState = playbackState,
-                progressState = progressState,
-                queueState = queueState,
-                lyricsState = lyricsState,
-                playbackControls = playerViewModel,
-                queueControls = playerViewModel,
-                lyricsControls = playerViewModel,
-                onProgressUpdate = { expansionProgress.floatValue = it },
-                visualizerState = visualizerState,
-                isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll
-            ) { miniPlayerTargetOffset = it }
         }
     }
 }
