@@ -37,6 +37,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
@@ -55,6 +56,7 @@ fun SongListItem(
     isFastScrolling: Boolean = false,
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
+    showTrackNumber: Boolean = false,
     onLongClick: () -> Unit = {},
     onMoreClick: (Offset, IntSize) -> Unit = { _, _ -> }
 ) {
@@ -93,7 +95,19 @@ fun SongListItem(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                if (isFastScrolling || imageRequest == null) {
+                if (showTrackNumber) {
+                    val trackNumberText = remember(song.trackNumber) {
+                        song.trackNumber?.toString() ?: "-"
+                    }
+                    Text(
+                        text = trackNumberText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                } else if (isFastScrolling || imageRequest == null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -226,6 +240,42 @@ private fun SongListItemSelectedPreview() {
                 onClick = {},
                 isSelected = true,
                 isSelectionMode = true
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "Track Number 3 Digits - Light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Composable
+private fun SongListItemTrackNumberPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface {
+            SongListItem(
+                song = samplePreviewSong.copy(trackNumber = 103),
+                onClick = {},
+                showTrackNumber = true
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "Track Number 4 Digits - Light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Composable
+private fun SongListItemTrackNumberLongPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface {
+            SongListItem(
+                song = samplePreviewSong.copy(trackNumber = 1234),
+                onClick = {},
+                showTrackNumber = true
             )
         }
     }
