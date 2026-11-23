@@ -1,18 +1,16 @@
 package io.github.vinaygaykar.mp1.ui.components
 
+import android.content.res.Configuration
+import android.net.Uri
 import android.view.HapticFeedbackConstants
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -20,7 +18,9 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,12 +38,14 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
 import io.github.vinaygaykar.mp1.domain.models.Song
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
 @Composable
 fun SongListItem(
@@ -118,23 +120,6 @@ fun SongListItem(
                         contentScale = ContentScale.Crop
                     )
                 }
-
-                if (isSelected) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
             }
         },
         trailingContent = {
@@ -160,22 +145,12 @@ fun SongListItem(
                 }
             }
         },
+        colors = ListItemDefaults.colors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surface
+        ),
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (isSelected) {
-                    Modifier.border(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                } else Modifier
-            )
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                else MaterialTheme.colorScheme.surface
-            )
             .combinedClickable(
                 onClick = {
                     if (isSelectionMode) {
@@ -190,4 +165,68 @@ fun SongListItem(
                 }
             )
     )
+}
+
+private val samplePreviewSong = Song(
+    id = "1",
+    uri = Uri.EMPTY,
+    title = "Lorem ipsum dolor sit amet",
+    artist = "Consectetur adipiscing elit",
+    album = "Sed do eiusmod tempor",
+    durationMs = 230000L,
+    trackNumber = 1,
+    discNumber = 1,
+    year = 2024,
+    artworkUri = null,
+    fileName = "lorem_ipsum.mp3",
+    lastModified = 0L,
+    artistsDisplayString = "Lorem Ipsum, Dolor Sit Amet"
+)
+
+@Preview(
+    name = "Normal - Light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Normal - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun SongListItemNormalPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface {
+            SongListItem(
+                song = samplePreviewSong,
+                onClick = {},
+                isSelected = false,
+                isSelectionMode = false
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "Selected - Light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Selected - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun SongListItemSelectedPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface {
+            SongListItem(
+                song = samplePreviewSong,
+                onClick = {},
+                isSelected = true,
+                isSelectionMode = true
+            )
+        }
+    }
 }
