@@ -2,7 +2,7 @@ package io.github.vinaygaykar.mp1.ui.library
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -10,8 +10,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -22,21 +24,28 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -65,6 +74,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,10 +98,9 @@ import androidx.compose.foundation.lazy.itemsIndexed as lazyRowItemsIndexed
 
 /**
  * Unified multi-selection overlay component for songs category.
- * In compact mode (isExpanded = false), renders an edge-to-edge top bar displaying circular artwork avatars and count.
+ * In compact mode (isExpanded = false), renders a pill-shaped floating top/side bar displaying circular artwork avatars and count.
  * In expanded mode (isExpanded = true), expands to fill the screen with a Haze backdrop blur,
- * where the artwork avatars and count occupy 75% of screen height, and the remaining space displays
- * action buttons ("Play all", "Add to queue", "Playlist").
+ * rendering layout adapted for Portrait, Landscape (2-pane side-by-side), or Compact mode.
  */
 @Composable
 fun SongsMultiSelectOverlay(
@@ -107,20 +116,52 @@ fun SongsMultiSelectOverlay(
     onAddToPlaylist: (List<Song>) -> Unit = {},
     onAddToQueue: (List<Song>) -> Unit = {}
 ) {
-    val displaySongs = remember(songs) { songs.asReversed().take(3) }
-    val animationSpec = tween<Dp>(durationMillis = 280, easing = FastOutSlowInEasing)
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isCompact = !isLandscape && configuration.screenHeightDp < 600
+
+    val displaySongs = remember(songs, isLandscape, isExpanded) {
+        if (isLandscape && !isExpanded) {
+            songs.asReversed().take(2)
+        } else {
+            songs.asReversed().take(3)
+        }
+    }
+
+    val animationSpec = tween<Dp>(durationMillis = 350, easing = FastOutSlowInEasing)
     val avatarSize by animateDpAsState(
-        targetValue = if (isExpanded) 72.dp else 56.dp,
+        targetValue = if (isExpanded) 72.dp else if (isCompact) 44.dp else 56.dp,
         animationSpec = animationSpec,
         label = "avatarSize"
     )
     val overlapOffset by animateDpAsState(
-        targetValue = if (isExpanded) 40.dp else 32.dp,
+        targetValue = if (isExpanded) 40.dp else if (isCompact) 24.dp else 32.dp,
         animationSpec = animationSpec,
         label = "overlapOffset"
     )
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isExpanded) 0.dp else 28.dp,
+        animationSpec = animationSpec,
+        label = "overlayCornerRadius"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isExpanded) 0.dp else 1.dp,
+        animationSpec = animationSpec,
+        label = "overlayBorderWidth"
+    )
+    val topPadding by animateDpAsState(
+        targetValue = if (isExpanded) 0.dp else 12.dp,
+        animationSpec = animationSpec,
+        label = "overlayTopPadding"
+    )
+    val sidePadding by animateDpAsState(
+        targetValue = if (isExpanded) 0.dp else 16.dp,
+        animationSpec = animationSpec,
+        label = "overlaySidePadding"
+    )
+
+    val overlayShape = if (!isExpanded) CircleShape else RoundedCornerShape(cornerRadius)
     val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val scrollState = rememberScrollState()
 
     val coroutineScope = rememberCoroutineScope()
     var titleClearJob by remember { mutableStateOf<Job?>(null) }
@@ -161,21 +202,50 @@ fun SongsMultiSelectOverlay(
         songs.filter { it.id !in deselectedSongIds }
     }
 
+    val onToggleDeselect: (Song) -> Unit = { song ->
+        if (song.id in deselectedSongIds) {
+            deselectedSongIds.remove(song.id)
+        } else {
+            deselectedSongIds.add(song.id)
+        }
+    }
+
+    val containerModifier = if (isExpanded) {
+        Modifier.fillMaxSize()
+    } else if (isLandscape) {
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .displayCutoutPadding()
+            .padding(top = topPadding, end = sidePadding)
+            .wrapContentSize(Alignment.TopEnd)
+    } else {
+        Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(top = topPadding, start = sidePadding, end = sidePadding)
+            .wrapContentSize(Alignment.TopCenter)
+    }
+
     AnimatedVisibility(
         visible = visible && displaySongs.isNotEmpty(),
         enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
         exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
-        modifier = modifier.fillMaxWidth()
+        modifier = if (!isExpanded && isLandscape) {
+            modifier.fillMaxSize()
+        } else {
+            modifier.fillMaxWidth()
+        }
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (isExpanded) Modifier.fillMaxSize() else Modifier)
-                .animateContentSize(
-                    animationSpec = tween(
-                        durationMillis = 280,
-                        easing = FastOutSlowInEasing
-                    )
+            modifier = containerModifier
+                .clip(overlayShape)
+                .border(
+                    width = borderWidth,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(
+                        alpha = if (isExpanded) 0f else 0.35f
+                    ),
+                    shape = overlayShape
                 )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -193,330 +263,77 @@ fun SongsMultiSelectOverlay(
                             style = HazeStyle(
                                 backgroundColor = containerColor,
                                 blurRadius = 12.dp,
-                                tint = HazeTint(containerColor.copy(alpha = 0.20f))
+                                tint = HazeTint(containerColor.copy(alpha = if (isExpanded) 0.20f else 0.35f))
                             )
                         )
                     } else {
-                        Modifier.background(containerColor.copy(alpha = 0.20f))
+                        Modifier.background(
+                            containerColor.copy(alpha = if (isExpanded) 0.95f else 0.85f),
+                            overlayShape
+                        )
                     }
                 )
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (isExpanded) Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState) else Modifier
-                    ),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Artwork Header Group + Count Text
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(
-                            horizontal = if (isExpanded) 0.dp else 16.dp,
-                            vertical = if (isExpanded) 24.dp else 16.dp
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!isExpanded) {
-                        // Collapsed Mode: Compact 3-overlapping artwork avatars + rolling count number
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(
-                                        avatarSize + overlapOffset * (displaySongs.size - 1).coerceAtLeast(
-                                            0
-                                        )
-                                    )
-                                    .height(avatarSize),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                displaySongs.forEachIndexed { index, song ->
-                                    Box(
-                                        modifier = Modifier
-                                            .offset(x = overlapOffset * index)
-                                            .size(avatarSize)
-                                            .zIndex((displaySongs.size - index).toFloat())
-                                            .border(
-                                                2.5.dp,
-                                                MaterialTheme.colorScheme.surface,
-                                                CircleShape
-                                            )
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (song.artworkUri != null) {
-                                            val musicPlaceholder =
-                                                rememberVectorPainter(Icons.Default.MusicNote)
-                                            AsyncImage(
-                                                model = ImageRequest.Builder(LocalContext.current)
-                                                    .data(song.artworkUri)
-                                                    .crossfade(true)
-                                                    .build(),
-                                                contentDescription = null,
-                                                error = musicPlaceholder,
-                                                placeholder = musicPlaceholder,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        } else {
-                                            Icon(
-                                                imageVector = Icons.Default.MusicNote,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            RollingNumberText(
-                                count = songs.size,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    } else {
-                        // Expanded Mode: 2-Row Header Layout
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            // Row 1: Selected song count + "songs selected" label
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                RollingNumberText(
-                                    count = activeSongs.size,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (activeSongs.size == 1) "song selected" else "songs selected",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(36.dp))
-
-                            // Row 2: Single horizontal row for <= 5 songs, or 5-row LazyHorizontalGrid for > 5 songs
-                            if (songs.size <= 5) {
-                                LazyRow(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(72.dp),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(
-                                        16.dp,
-                                        Alignment.CenterHorizontally
-                                    ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    lazyRowItemsIndexed(
-                                        items = songs,
-                                        key = { index, song -> "${song.id}_$index" }
-                                    ) { index, song ->
-                                        val isDeselected = song.id in deselectedSongIds
-                                        StaggeredGridArtworkAvatar(
-                                            song = song,
-                                            index = index,
-                                            isRevealed = index < revealedIndexLimit,
-                                            isDeselected = isDeselected,
-                                            onClick = {
-                                                if (isDeselected) {
-                                                    deselectedSongIds.remove(song.id)
-                                                } else {
-                                                    deselectedSongIds.add(song.id)
-                                                }
-                                            },
-                                            onLongClick = {
-                                                showSongTitleWithTimeout(song.title)
-                                            }
-                                        )
-                                    }
-                                }
-                            } else {
-                                LazyHorizontalGrid(
-                                    rows = GridCells.Fixed(5),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(310.dp),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    itemsIndexed(
-                                        items = songs,
-                                        key = { index, song -> "${song.id}_$index" }
-                                    ) { index, song ->
-                                        val isDeselected = song.id in deselectedSongIds
-                                        StaggeredGridArtworkAvatar(
-                                            song = song,
-                                            index = index,
-                                            isRevealed = index < revealedIndexLimit,
-                                            isDeselected = isDeselected,
-                                            onClick = {
-                                                if (isDeselected) {
-                                                    deselectedSongIds.remove(song.id)
-                                                } else {
-                                                    deselectedSongIds.add(song.id)
-                                                }
-                                            },
-                                            onLongClick = {
-                                                showSongTitleWithTimeout(song.title)
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Action Buttons list + Dynamic Song Title Marquee Text when expanded
-                if (isExpanded) {
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Song Title / Empty State Marquee Text
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = highlightedSongTitle ?: "Tap to remove a song, hold to view",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = if (highlightedSongTitle != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                alpha = 0.7f
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.basicMarquee()
+            Crossfade(
+                targetState = isExpanded,
+                animationSpec = tween(durationMillis = 280),
+                label = "overlayContentCrossfade"
+            ) { expanded ->
+                if (!expanded) {
+                    CollapsedMultiSelectHeader(
+                        songs = songs,
+                        displaySongs = displaySongs,
+                        avatarSize = avatarSize,
+                        overlapOffset = overlapOffset,
+                        isCompact = isCompact,
+                        isLandscape = isLandscape
+                    )
+                } else {
+                    if (isLandscape) {
+                        SongsMultiSelectOverlayLandscape(
+                            songs = songs,
+                            activeSongs = activeSongs,
+                            deselectedSongIds = deselectedSongIds,
+                            revealedIndexLimit = revealedIndexLimit,
+                            highlightedSongTitle = highlightedSongTitle,
+                            bottomPadding = bottomPadding,
+                            onToggleDeselect = onToggleDeselect,
+                            onShowSongTitle = showSongTitleWithTimeout,
+                            onPlayNext = onPlayNext,
+                            onAddToPlaylist = onAddToPlaylist,
+                            onAddToQueue = onAddToQueue,
+                            onDismiss = onDismiss
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .padding(bottom = bottomPadding + 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Action 1: Play next
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    onPlayNext(activeSongs)
-                                    onDismiss()
-                                },
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SkipNext,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Play next",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Action 2: Add to Queue
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    onAddToQueue(activeSongs)
-                                    onDismiss()
-                                },
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Add to queue",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Action 3: Playlist
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    onAddToPlaylist(activeSongs)
-                                },
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Playlist",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    } else if (isCompact) {
+                        SongsMultiSelectOverlayCompact(
+                            songs = songs,
+                            activeSongs = activeSongs,
+                            deselectedSongIds = deselectedSongIds,
+                            revealedIndexLimit = revealedIndexLimit,
+                            highlightedSongTitle = highlightedSongTitle,
+                            bottomPadding = bottomPadding,
+                            onToggleDeselect = onToggleDeselect,
+                            onShowSongTitle = showSongTitleWithTimeout,
+                            onPlayNext = onPlayNext,
+                            onAddToPlaylist = onAddToPlaylist,
+                            onAddToQueue = onAddToQueue,
+                            onDismiss = onDismiss
+                        )
+                    } else {
+                        SongsMultiSelectOverlayPortrait(
+                            songs = songs,
+                            activeSongs = activeSongs,
+                            deselectedSongIds = deselectedSongIds,
+                            revealedIndexLimit = revealedIndexLimit,
+                            highlightedSongTitle = highlightedSongTitle,
+                            bottomPadding = bottomPadding,
+                            onToggleDeselect = onToggleDeselect,
+                            onShowSongTitle = showSongTitleWithTimeout,
+                            onPlayNext = onPlayNext,
+                            onAddToPlaylist = onAddToPlaylist,
+                            onAddToQueue = onAddToQueue,
+                            onDismiss = onDismiss
+                        )
                     }
                 }
             }
@@ -529,9 +346,360 @@ private const val INITIAL_STEP_DELAY_MS = 50L
 private const val MAX_ANIMATED_ITEMS_COUNT = 25
 private const val SONG_TITLE_CLEAR_DELAY_MS = 3000L
 
+/* -----------------------------------------------------------------------------------------
+ * Sub-composables
+ * ----------------------------------------------------------------------------------------- */
+
+@Composable
+private fun CollapsedMultiSelectHeader(
+    songs: List<Song>,
+    displaySongs: List<Song>,
+    avatarSize: Dp,
+    overlapOffset: Dp,
+    isCompact: Boolean = false,
+    isLandscape: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val targetAvatarSpan = avatarSize + overlapOffset * (displaySongs.size - 1).coerceAtLeast(0)
+    val animatedAvatarSpan by animateDpAsState(
+        targetValue = targetAvatarSpan,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "collapsedAvatarSpan"
+    )
+
+    if (!isLandscape) {
+        // Horizontal Pill Header (Portrait / Compact)
+        Box(
+            modifier = modifier
+                .padding(
+                    start = if (isCompact) 14.dp else 18.dp,
+                    end = if (isCompact) 18.dp else 22.dp,
+                    top = if (isCompact) 8.dp else 12.dp,
+                    bottom = if (isCompact) 8.dp else 12.dp
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(animatedAvatarSpan)
+                        .height(avatarSize),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    displaySongs.forEachIndexed { index, song ->
+                        val animatedOffset by animateDpAsState(
+                            targetValue = overlapOffset * index,
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                            label = "avatarOffsetX"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .offset(x = animatedOffset)
+                                .size(avatarSize)
+                                .zIndex((displaySongs.size - index).toFloat())
+                                .border(
+                                    width = if (isCompact) 2.dp else 2.5.dp,
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = CircleShape
+                                )
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (song.artworkUri != null) {
+                                val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(song.artworkUri)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    error = musicPlaceholder,
+                                    placeholder = musicPlaceholder,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(if (isCompact) 11.dp else 14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(if (isCompact) 10.dp else 14.dp))
+
+                RollingNumberText(
+                    count = songs.size,
+                    style = if (isCompact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    } else {
+        // Vertical Pill Header (Landscape Collapsed - 2 Artworks Preview)
+        Box(
+            modifier = modifier
+                .padding(
+                    start = 14.dp,
+                    end = 14.dp,
+                    top = 14.dp,
+                    bottom = 18.dp
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // 1. Count first
+                RollingNumberText(
+                    count = songs.size,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 2. Artworks stacked vertically below count (2 preview items in landscape)
+                Box(
+                    modifier = Modifier
+                        .width(avatarSize)
+                        .height(animatedAvatarSpan),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    displaySongs.forEachIndexed { index, song ->
+                        val animatedOffset by animateDpAsState(
+                            targetValue = overlapOffset * index,
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                            label = "avatarOffsetY"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .offset(y = animatedOffset)
+                                .size(avatarSize)
+                                .zIndex((displaySongs.size - index).toFloat())
+                                .border(
+                                    2.5.dp,
+                                    MaterialTheme.colorScheme.surface,
+                                    CircleShape
+                                )
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (song.artworkUri != null) {
+                                val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(song.artworkUri)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    error = musicPlaceholder,
+                                    placeholder = musicPlaceholder,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectedCountHeader(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        RollingNumberText(
+            count = count,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = if (count == 1) "song selected" else "songs selected",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun SongTitleMarquee(
+    highlightedSongTitle: String?,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = highlightedSongTitle ?: "Tap to remove a song, hold to view",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            color = if (highlightedSongTitle != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                alpha = 0.7f
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.basicMarquee()
+        )
+    }
+}
+
+@Composable
+private fun ActionButtonsGroup(
+    activeSongs: List<Song>,
+    bottomPadding: Dp,
+    onPlayNext: (List<Song>) -> Unit,
+    onAddToQueue: (List<Song>) -> Unit,
+    onAddToPlaylist: (List<Song>) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = activeSongs.isNotEmpty(),
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = bottomPadding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Action 1: Play next
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        onPlayNext(activeSongs)
+                        onDismiss()
+                    }
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Play next",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Action 2: Add to Queue
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        onAddToQueue(activeSongs)
+                        onDismiss()
+                    }
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Add to queue",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Action 3: Playlist
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        onAddToPlaylist(activeSongs)
+                    }
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Playlist",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
 /**
  * Single grid item representing a selected song artwork avatar in the expanded grid.
- * Animates in as index < revealedIndexLimit, sliding up from below.
+ * Animates in as index < revealedIndexLimit.
+ * Slides vertically (offsetY) for Portrait/Compact, or horizontally (offsetX) for Landscape orientation.
  * Shows disabled effect when deselected.
  * Short click toggles deselection; long press displays song title for 3s.
  */
@@ -543,7 +711,8 @@ private fun StaggeredGridArtworkAvatar(
     isDeselected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    animateHorizontal: Boolean = false
 ) {
     val isBeyondThreshold = index >= MAX_ANIMATED_ITEMS_COUNT
     val shouldShow = isRevealed || isBeyondThreshold
@@ -562,19 +731,23 @@ private fun StaggeredGridArtworkAvatar(
         animationSpec = animationSpec,
         label = "avatarAlpha"
     )
-    val offsetY by animateDpAsState(
+    val offsetVal by animateDpAsState(
         targetValue = if (shouldShow) 0.dp else 24.dp,
         animationSpec = animationDpSpec,
-        label = "avatarOffsetY"
+        label = "avatarOffset"
     )
+
+    val offsetX = if (animateHorizontal) offsetVal else 0.dp
+    val offsetY = if (animateHorizontal) 0.dp else offsetVal
 
     Box(
         modifier = modifier
-            .offset(y = offsetY)
+            .offset(x = offsetX, y = offsetY)
             .graphicsLayer {
                 this.alpha = alpha
             }
             .size(54.dp)
+            .aspectRatio(1f)
             .border(
                 width = 2.5.dp,
                 color = if (isDeselected) MaterialTheme.colorScheme.outline.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface,
@@ -618,6 +791,361 @@ private fun StaggeredGridArtworkAvatar(
                     .fillMaxSize()
                     .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.35f))
             )
+        }
+    }
+}
+
+/* -----------------------------------------------------------------------------------------
+ * Mode-Specific Views
+ * ----------------------------------------------------------------------------------------- */
+
+@Composable
+private fun SongsMultiSelectOverlayPortrait(
+    songs: List<Song>,
+    activeSongs: List<Song>,
+    deselectedSongIds: List<String>,
+    revealedIndexLimit: Int,
+    highlightedSongTitle: String?,
+    bottomPadding: Dp,
+    onToggleDeselect: (Song) -> Unit,
+    onShowSongTitle: (String) -> Unit,
+    onPlayNext: (List<Song>) -> Unit,
+    onAddToPlaylist: (List<Song>) -> Unit,
+    onAddToQueue: (List<Song>) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+    val actualRows = songs.size.coerceAtMost(5)
+    val gridHeight = (54.dp * actualRows) + (10.dp * (actualRows - 1).coerceAtLeast(0))
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Artwork Header Group + Count Text
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(vertical = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                SelectedCountHeader(count = activeSongs.size)
+
+                Spacer(modifier = Modifier.height(36.dp))
+
+                if (songs.size <= 5) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(gridHeight),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            16.dp,
+                            Alignment.CenterHorizontally
+                        ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        lazyRowItemsIndexed(
+                            items = songs,
+                            key = { index, song -> "${song.id}_$index" }
+                        ) { index, song ->
+                            val isDeselected = song.id in deselectedSongIds
+                            StaggeredGridArtworkAvatar(
+                                song = song,
+                                index = index,
+                                isRevealed = index < revealedIndexLimit,
+                                isDeselected = isDeselected,
+                                animateHorizontal = false,
+                                onClick = { onToggleDeselect(song) },
+                                onLongClick = { onShowSongTitle(song.title) }
+                            )
+                        }
+                    }
+                } else {
+                    LazyHorizontalGrid(
+                        rows = GridCells.Fixed(5),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(gridHeight),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(
+                            items = songs,
+                            key = { index, song -> "${song.id}_$index" }
+                        ) { index, song ->
+                            val isDeselected = song.id in deselectedSongIds
+                            StaggeredGridArtworkAvatar(
+                                song = song,
+                                index = index,
+                                isRevealed = index < revealedIndexLimit,
+                                isDeselected = isDeselected,
+                                animateHorizontal = false,
+                                onClick = { onToggleDeselect(song) },
+                                onLongClick = { onShowSongTitle(song.title) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        SongTitleMarquee(highlightedSongTitle = highlightedSongTitle)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        ActionButtonsGroup(
+            activeSongs = activeSongs,
+            bottomPadding = bottomPadding,
+            onPlayNext = onPlayNext,
+            onAddToQueue = onAddToQueue,
+            onAddToPlaylist = onAddToPlaylist,
+            onDismiss = onDismiss
+        )
+    }
+}
+
+@Composable
+private fun SongsMultiSelectOverlayCompact(
+    songs: List<Song>,
+    activeSongs: List<Song>,
+    deselectedSongIds: List<String>,
+    revealedIndexLimit: Int,
+    highlightedSongTitle: String?,
+    bottomPadding: Dp,
+    onToggleDeselect: (Song) -> Unit,
+    onShowSongTitle: (String) -> Unit,
+    onPlayNext: (List<Song>) -> Unit,
+    onAddToPlaylist: (List<Song>) -> Unit,
+    onAddToQueue: (List<Song>) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+    val actualRows = songs.size.coerceAtMost(3)
+    val gridHeight = (54.dp * actualRows) + (10.dp * (actualRows - 1).coerceAtLeast(0))
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(vertical = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                SelectedCountHeader(count = activeSongs.size)
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                if (songs.size <= 3) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(gridHeight),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            16.dp,
+                            Alignment.CenterHorizontally
+                        ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        lazyRowItemsIndexed(
+                            items = songs,
+                            key = { index, song -> "${song.id}_$index" }
+                        ) { index, song ->
+                            val isDeselected = song.id in deselectedSongIds
+                            StaggeredGridArtworkAvatar(
+                                song = song,
+                                index = index,
+                                isRevealed = index < revealedIndexLimit,
+                                isDeselected = isDeselected,
+                                animateHorizontal = false,
+                                onClick = { onToggleDeselect(song) },
+                                onLongClick = { onShowSongTitle(song.title) }
+                            )
+                        }
+                    }
+                } else {
+                    LazyHorizontalGrid(
+                        rows = GridCells.Fixed(3),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(gridHeight),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(
+                            items = songs,
+                            key = { index, song -> "${song.id}_$index" }
+                        ) { index, song ->
+                            val isDeselected = song.id in deselectedSongIds
+                            StaggeredGridArtworkAvatar(
+                                song = song,
+                                index = index,
+                                isRevealed = index < revealedIndexLimit,
+                                isDeselected = isDeselected,
+                                animateHorizontal = false,
+                                onClick = { onToggleDeselect(song) },
+                                onLongClick = { onShowSongTitle(song.title) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SongTitleMarquee(highlightedSongTitle = highlightedSongTitle)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        ActionButtonsGroup(
+            activeSongs = activeSongs,
+            bottomPadding = bottomPadding,
+            onPlayNext = onPlayNext,
+            onAddToQueue = onAddToQueue,
+            onAddToPlaylist = onAddToPlaylist,
+            onDismiss = onDismiss
+        )
+    }
+}
+
+@Composable
+private fun SongsMultiSelectOverlayLandscape(
+    songs: List<Song>,
+    activeSongs: List<Song>,
+    deselectedSongIds: List<String>,
+    revealedIndexLimit: Int,
+    highlightedSongTitle: String?,
+    bottomPadding: Dp,
+    onToggleDeselect: (Song) -> Unit,
+    onShowSongTitle: (String) -> Unit,
+    onPlayNext: (List<Song>) -> Unit,
+    onAddToPlaylist: (List<Song>) -> Unit,
+    onAddToQueue: (List<Song>) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val rightPaneScrollState = rememberScrollState()
+
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .displayCutoutPadding()
+    ) {
+        // Left Pane: Column with Static Song Title at top, Grid below
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 1. Song Title Header (moved down from top screen edge)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp, bottom = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                SongTitleMarquee(highlightedSongTitle = highlightedSongTitle)
+            }
+
+            // 2. Grid starting AFTER song title text
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(5),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = bottomPadding + 16.dp
+                ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(
+                    items = songs,
+                    key = { index, song -> "${song.id}_$index" }
+                ) { index, song ->
+                    val isDeselected = song.id in deselectedSongIds
+                    StaggeredGridArtworkAvatar(
+                        song = song,
+                        index = index,
+                        isRevealed = index < revealedIndexLimit,
+                        isDeselected = isDeselected,
+                        animateHorizontal = true,
+                        onClick = { onToggleDeselect(song) },
+                        onLongClick = { onShowSongTitle(song.title) }
+                    )
+                }
+            }
+        }
+
+        // Right Pane: Selected Count + Action Buttons
+        // Vertically centered when content fits, aligned to top when content overflows
+        BoxWithConstraints(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        ) {
+            val paneMinHeight = this.maxHeight
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rightPaneScrollState),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = paneMinHeight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier.padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        SelectedCountHeader(count = activeSongs.size)
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        ActionButtonsGroup(
+                            activeSongs = activeSongs,
+                            bottomPadding = bottomPadding,
+                            onPlayNext = onPlayNext,
+                            onAddToQueue = onAddToQueue,
+                            onAddToPlaylist = onAddToPlaylist,
+                            onDismiss = onDismiss
+                        )
+                    }
+                }
+            }
         }
     }
 }
