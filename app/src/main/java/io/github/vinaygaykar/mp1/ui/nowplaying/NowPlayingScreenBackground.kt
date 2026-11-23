@@ -2,9 +2,6 @@ package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,7 +16,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import io.github.vinaygaykar.mp1.playback.PlaybackControls
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
@@ -27,10 +23,7 @@ import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 @Composable
 fun NowPlayingScreenBackground(
     state: NowPlayingScreenState,
-    peekHeight: Dp,
-    screenHeight: Dp,
     startPadding: Dp,
-    endPadding: Dp,
     recordX: Dp,
     recordY: Dp,
     recordSize: Dp,
@@ -44,9 +37,7 @@ fun NowPlayingScreenBackground(
     MaterialTheme(colorScheme = state.currentColorScheme) {
         Surface(
             modifier = modifier
-                .fillMaxWidth()
-                .height(lerp(peekHeight, screenHeight, state.progress))
-                .padding(start = startPadding, end = endPadding)
+                .fillMaxSize()
                 .graphicsLayer {
                     scaleX = state.animatableBulge.value
                 }
@@ -126,10 +117,7 @@ fun NowPlayingScreenBackgroundLightPreview() {
     MusicPlayerTheme(darkTheme = false) {
         NowPlayingScreenBackground(
             state = state,
-            peekHeight = 72.dp,
-            screenHeight = 600.dp,
             startPadding = 0.dp,
-            endPadding = 0.dp,
             recordX = 100.dp,
             recordY = 200.dp,
             recordSize = 200.dp,
@@ -173,10 +161,7 @@ fun NowPlayingScreenBackgroundDarkPreview() {
     MusicPlayerTheme(darkTheme = true) {
         NowPlayingScreenBackground(
             state = state,
-            peekHeight = 72.dp,
-            screenHeight = 600.dp,
             startPadding = 0.dp,
-            endPadding = 0.dp,
             recordX = 100.dp,
             recordY = 200.dp,
             recordSize = 200.dp,

@@ -256,14 +256,12 @@ fun NowPlayingScreen(
                 .fillMaxWidth()
                 .height(lerp(peekHeight, screenHeight, state.progress))
                 .offset { IntOffset(0, state.dragOffset.roundToInt()) }
+                .padding(start = startPadding, end = endPadding)
                 .anchoredDraggable(state.anchoredDraggableState, Orientation.Vertical)
         ) {
             NowPlayingScreenBackground(
                 state = state,
-                peekHeight = peekHeight,
-                screenHeight = screenHeight,
                 startPadding = startPadding,
-                endPadding = endPadding,
                 recordX = recordX,
                 recordY = recordY,
                 recordSize = recordSize,
