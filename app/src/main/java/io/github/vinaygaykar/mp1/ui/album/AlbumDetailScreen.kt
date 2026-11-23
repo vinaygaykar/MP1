@@ -1,10 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.album
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,7 +14,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,7 +100,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
-import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.artist.CollaboratorArtistCard
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
@@ -115,12 +109,9 @@ import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
 import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
-import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
-import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
-import dagger.hilt.android.AndroidEntryPoint
 import kotlin.math.ceil
 
 
@@ -129,6 +120,7 @@ import kotlin.math.ceil
 @Composable
 fun AlbumDetailScreen(
     onBack: () -> Unit,
+    onArtistClick: (String) -> Unit,
     viewModel: AlbumDetailViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -166,7 +158,6 @@ fun AlbumDetailScreen(
     }
 
     val context = LocalContext.current
-    val view = LocalView.current
     val isDark = isSystemInDarkTheme()
     var seedColor by remember { mutableStateOf<Color?>(null) }
 
@@ -453,7 +444,6 @@ fun AlbumDetailScreen(
                     // 3. Album Artist (or primary artist)
                     if (artistName != null && hasArtist) {
                         item {
-                            var itemCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
                             Text(
                                 text = artistName,
                                 style = MaterialTheme.typography.titleMedium,
@@ -463,28 +453,7 @@ fun AlbumDetailScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .onGloballyPositioned { coords ->
-                                        itemCoordinates = coords
-                                    }
-                                    .clickable {
-                                        val currentPrimaryArtist = primaryArtist
-                                        if (currentPrimaryArtist != null) {
-                                            val offset = itemCoordinates?.positionInRoot() ?: Offset.Zero
-                                            val size = itemCoordinates?.size ?: IntSize.Zero
-                                            val intent = Intent(context, ArtistDetailActivity::class.java).apply {
-                                                putExtra(ArtistDetailActivity.EXTRA_ARTIST_ID, currentPrimaryArtist.id)
-                                            }
-                                            launchActivityWithScaleUp(
-                                                context = context,
-                                                intent = intent,
-                                                view = view,
-                                                startX = offset.x.toInt(),
-                                                startY = offset.y.toInt(),
-                                                width = size.width,
-                                                height = size.height
-                                            )
-                                        }
-                                    }
+                                    .clickable { primaryArtist?.let { onArtistClick(it.id) } }
                                     .basicMarquee()
                             )
                         }
@@ -646,20 +615,7 @@ fun AlbumDetailScreen(
                                             playingArtist = playbackState.artist,
                                             playingAlbum = playbackState.album,
                                             isPlaying = playbackState.isPlaying,
-                                            onClick = { offset, size ->
-                                                val intent = Intent(context, ArtistDetailActivity::class.java).apply {
-                                                    putExtra(ArtistDetailActivity.EXTRA_ARTIST_ID, artist.id)
-                                                }
-                                                launchActivityWithScaleUp(
-                                                    context = context,
-                                                    intent = intent,
-                                                    view = view,
-                                                    startX = offset.x.toInt(),
-                                                    startY = offset.y.toInt(),
-                                                    width = size.width,
-                                                    height = size.height
-                                                )
-                                            }
+                                            onClick = { onArtistClick(artist.id) }
                                         )
                                     }
                                 }

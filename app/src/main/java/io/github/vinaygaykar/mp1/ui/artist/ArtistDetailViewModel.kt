@@ -35,7 +35,7 @@ class ArtistDetailViewModel @Inject constructor(
     private val playback: PlaybackClient
 ) : ViewModel() {
 
-    val artistId: String = savedStateHandle.get<String>(ArtistDetailActivity.EXTRA_ARTIST_ID) ?: ""
+    val artistId: String = savedStateHandle.get<String>("artistId") ?: ""
 
     private val _candidateImages = MutableStateFlow<List<DeezerArtist>>(emptyList())
     val candidateImages: StateFlow<List<DeezerArtist>> = _candidateImages.asStateFlow()

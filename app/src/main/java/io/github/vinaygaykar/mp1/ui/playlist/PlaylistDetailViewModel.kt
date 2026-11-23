@@ -21,10 +21,9 @@ class PlaylistDetailViewModel @Inject constructor(
     private val playback: PlaybackClient
 ) : ViewModel() {
 
-    val playlistId: Long = savedStateHandle.get<Long>(PlaylistDetailActivity.EXTRA_PLAYLIST_ID)
-        ?: (savedStateHandle.get<String>(PlaylistDetailActivity.EXTRA_PLAYLIST_ID)?.toLongOrNull() ?: 0L)
+    val playlistId: Long = savedStateHandle.get<Long>("playlistId") ?: 0L
 
-    val initialPlaylistName: String = savedStateHandle.get<String>(PlaylistDetailActivity.EXTRA_PLAYLIST_NAME) ?: ""
+    val initialPlaylistName: String = savedStateHandle.get<String>("playlistName") ?: ""
 
     val playlist: StateFlow<Playlist?> = playlistRepository.getPlaylistByIdFlow(playlistId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

@@ -8,7 +8,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.vinaygaykar.mp1.data.repo.ArtistImageRepository
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
-import io.github.vinaygaykar.mp1.domain.models.Genre
 import io.github.vinaygaykar.mp1.domain.models.Playlist
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
@@ -56,9 +55,6 @@ class LibraryViewModel @Inject constructor(
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val genres: StateFlow<List<Genre>> = musicRepository.getAllGenres()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun createPlaylist(name: String) {

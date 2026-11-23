@@ -1,6 +1,5 @@
 package io.github.vinaygaykar.mp1.ui.library.v2
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -57,27 +56,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.vinaygaykar.mp1.domain.models.Song
-import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.NoticeBanner
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
-import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.ui.library.tabs.AlbumsTab
 import io.github.vinaygaykar.mp1.ui.library.tabs.ArtistGrid
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistGrid
 import io.github.vinaygaykar.mp1.ui.library.tabs.SongList
-import io.github.vinaygaykar.mp1.ui.playlist.PlaylistDetailActivity
 
 /**
  * Level 2 Screen: Category Detail List.
@@ -100,12 +94,12 @@ internal fun CategoryDetailScreen(
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
     onAlbumClick: (String) -> Unit = {},
+    onArtistClick: (String) -> Unit = {},
+    onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onCheckHasOfflineLyrics: suspend (Song) -> Boolean = { false },
     isSplashActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val view = LocalView.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -179,7 +173,8 @@ internal fun CategoryDetailScreen(
                 clip = false
             },
         overlayData = activeOverlayData,
-        onDismiss = { activeOverlayData = null }
+        onDismiss = { activeOverlayData = null },
+        onAlbumClick = onAlbumClick
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -299,20 +294,7 @@ internal fun CategoryDetailScreen(
                                     if (libraryState.isPlaylistSelectionMode) {
                                         libraryState.togglePlaylistSelection(playlist)
                                     } else {
-                                        val intent = Intent(
-                                            context,
-                                            PlaylistDetailActivity::class.java
-                                        ).apply {
-                                            putExtra(
-                                                PlaylistDetailActivity.EXTRA_PLAYLIST_ID,
-                                                playlist.id
-                                            )
-                                            putExtra(
-                                                PlaylistDetailActivity.EXTRA_PLAYLIST_NAME,
-                                                playlist.name
-                                            )
-                                        }
-                                        context.startActivity(intent)
+                                        onPlaylistClick(playlist.id, playlist.name)
                                     }
                                 },
                                 onPlaylistLongClick = { playlist ->
@@ -371,24 +353,7 @@ internal fun CategoryDetailScreen(
                                 categoryKey = libraryState.lastOpenedCategory,
                                 isSplashActive = isSplashActive,
                                 isCategoryEntranceComplete = isCategoryEntranceComplete,
-                                onArtistClick = { artist, offset, size ->
-                                    val intent =
-                                        Intent(context, ArtistDetailActivity::class.java).apply {
-                                            putExtra(
-                                                ArtistDetailActivity.EXTRA_ARTIST_ID,
-                                                artist.id
-                                            )
-                                        }
-                                    launchActivityWithScaleUp(
-                                        context = context,
-                                        intent = intent,
-                                        view = view,
-                                        startX = offset.x.toInt(),
-                                        startY = offset.y.toInt(),
-                                        width = size.width,
-                                        height = size.height
-                                    )
-                                },
+                                onArtistClick = { artist -> onArtistClick(artist.id) },
                                 contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
                             )
                         }

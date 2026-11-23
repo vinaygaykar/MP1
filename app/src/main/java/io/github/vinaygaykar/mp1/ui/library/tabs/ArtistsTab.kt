@@ -33,12 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +63,7 @@ private const val EMPTY_STATE_MESSAGE = "No Artists found.\nScan a folder from S
 @Composable
 fun ArtistGrid(
     artists: List<Artist>,
-    onArtistClick: (Artist, Offset, IntSize) -> Unit,
+    onArtistClick: (Artist) -> Unit,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     detailProgress: Float = 1f,
     categoryKey: Any? = null,
@@ -122,7 +118,7 @@ fun ArtistGrid(
                             playingArtist = playingArtist,
                             playingAlbum = playingAlbum,
                             isPlaying = isPlaying,
-                            onClick = { offset, size -> onArtistClick(artist, offset, size) },
+                            onClick = { onArtistClick(artist) },
                             onFetchImageUrl = { name, id ->
                                 libraryViewModel?.getArtistImageUrl(
                                     name,
@@ -150,7 +146,7 @@ fun ArtistGrid(
 @Composable
 fun ArtistGridItem(
     artist: Artist,
-    onClick: (Offset, IntSize) -> Unit,
+    onClick: () -> Unit,
     playingArtist: String = "",
     playingAlbum: String = "",
     isPlaying: Boolean = false,
@@ -167,7 +163,6 @@ fun ArtistGridItem(
         }
     }
 
-    var itemCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val isMatchingArtist = remember(artist.name, playingArtist, playingAlbum) {
         isArtistMatchingPlayingTrack(
             artistName = artist.name,
@@ -187,12 +182,7 @@ fun ArtistGridItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { coords -> itemCoordinates = coords }
-            .clickable {
-                val offset = itemCoordinates?.positionInRoot() ?: Offset.Zero
-                val size = itemCoordinates?.size ?: IntSize.Zero
-                onClick(offset, size)
-            }
+            .clickable(onClick = onClick)
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -275,7 +265,7 @@ private fun ArtistsTabPreview() {
         Surface(modifier = Modifier.fillMaxSize()) {
             ArtistGrid(
                 artists = sampleArtists,
-                onArtistClick = { _, _, _ -> }
+                onArtistClick = {}
             )
         }
     }

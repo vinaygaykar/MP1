@@ -1,6 +1,5 @@
 package io.github.vinaygaykar.mp1.ui.search
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -66,7 +65,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -75,7 +73,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
-import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.theme.rememberArtistShape
 
@@ -85,12 +82,12 @@ fun SearchScreen(
     bottomPadding: Dp = 0.dp,
     onBack: () -> Unit = {},
     onAlbumClick: (String) -> Unit = {},
+    onArtistClick: (String) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val query by viewModel.searchQuery.collectAsState()
     val selectedFilters by viewModel.selectedFilters.collectAsState()
     val results by viewModel.searchResults.collectAsState()
-    val context = LocalContext.current
 
     val focusRequester = remember { FocusRequester() }
     val lazyListState = rememberLazyListState()
@@ -304,12 +301,7 @@ fun SearchScreen(
                     items(results.artists, key = { "artist_${it.id}" }) { artist ->
                         ArtistListItem(
                             artist = artist,
-                            onClick = {
-                                val intent = Intent(context, ArtistDetailActivity::class.java).apply {
-                                    putExtra(ArtistDetailActivity.EXTRA_ARTIST_ID, artist.id)
-                                }
-                                context.startActivity(intent)
-                            }
+                            onClick = { onArtistClick(artist.id) }
                         )
                     }
                 }

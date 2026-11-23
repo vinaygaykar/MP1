@@ -84,31 +84,19 @@ import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
-import io.github.vinaygaykar.mp1.ui.genre.getDeterministicVibrantSeedColor
 import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
-import dagger.hilt.android.AndroidEntryPoint
 import kotlin.math.ceil
 
-@AndroidEntryPoint
-class PlaylistDetailActivity : ComponentActivity() {
-
-    companion object {
-        const val EXTRA_PLAYLIST_ID = "extra_playlist_id"
-        const val EXTRA_PLAYLIST_NAME = "extra_playlist_name"
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MusicPlayerTheme {
-                PlaylistDetailScreen(onBack = { finish() })
-            }
-        }
-    }
+private fun getDeterministicVibrantSeedColor(title: String): Color {
+    if (title.isBlank()) return Color(0xFF6200EE)
+    val hash = title.hashCode()
+    val positiveHash = hash.toLong() and 0x7FFFFFFF
+    val hue = (positiveHash % 360).toFloat()
+    val argb = androidx.core.graphics.ColorUtils.HSLToColor(floatArrayOf(hue, 0.85f, 0.50f))
+    return Color(argb)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

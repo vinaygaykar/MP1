@@ -102,13 +102,13 @@ fun NowPlayingScreen(
     isCollapsedOnScroll: Boolean = false,
     targetState: DragValue? = null,
     onAlbumClick: (String) -> Unit = {},
+    onArtistClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)? = null
 ) {
     if (playbackState.trackTitle.isEmpty()) return
 
     val density = LocalDensity.current
     val context = LocalContext.current
-    val view = LocalView.current
 
     val currentPlaybackControls by rememberUpdatedState(playbackControls)
 
@@ -299,8 +299,8 @@ fun NowPlayingScreen(
                             controlsAlpha = controlsAlpha,
                             expandedAlpha = expandedAlpha,
                             onAlbumClick = onAlbumClick,
-                            onMiniPlayerPositioned = onMiniPlayerPositioned,
-                            view = view
+                            onArtistClick = onArtistClick,
+                            onMiniPlayerPositioned = onMiniPlayerPositioned
                         )
                     }
                     isCompactHeight -> {
@@ -327,8 +327,8 @@ fun NowPlayingScreen(
                             controlsAlpha = controlsAlpha,
                             expandedAlpha = expandedAlpha,
                             onAlbumClick = onAlbumClick,
-                            onMiniPlayerPositioned = onMiniPlayerPositioned,
-                            view = view
+                            onArtistClick = onArtistClick,
+                            onMiniPlayerPositioned = onMiniPlayerPositioned
                         )
                     }
                     else -> {
@@ -356,8 +356,8 @@ fun NowPlayingScreen(
                             controlsAlpha = controlsAlpha,
                             expandedAlpha = expandedAlpha,
                             onAlbumClick = onAlbumClick,
-                            onMiniPlayerPositioned = onMiniPlayerPositioned,
-                            view = view
+                            onArtistClick = onArtistClick,
+                            onMiniPlayerPositioned = onMiniPlayerPositioned
                         )
                     }
                 }
@@ -413,7 +413,7 @@ private fun NowPlayingCompactContent(
     expandedAlpha: Float,
     onAlbumClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)?,
-    view: android.view.View
+    onArtistClick: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -620,7 +620,7 @@ private fun NowPlayingCompactContent(
             playbackControls = playbackControls,
             queueControls = queueControls,
             lyricsControls = lyricsControls,
-            view = view
+            onArtistClick = onArtistClick
         )
     }
 }
@@ -672,7 +672,7 @@ private fun NowPlayingPortraitContent(
     expandedAlpha: Float,
     onAlbumClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)?,
-    view: android.view.View
+    onArtistClick: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -848,7 +848,7 @@ private fun NowPlayingPortraitContent(
             playbackControls = playbackControls,
             queueControls = queueControls,
             lyricsControls = lyricsControls,
-            view = view
+            onArtistClick = onArtistClick
         )
     }
 }
@@ -879,7 +879,7 @@ private fun NowPlayingLandscapeContent(
     expandedAlpha: Float,
     onAlbumClick: (String) -> Unit = {},
     onMiniPlayerPositioned: ((Offset) -> Unit)?,
-    view: android.view.View
+    onArtistClick: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -1074,7 +1074,7 @@ private fun NowPlayingLandscapeContent(
             playbackControls = playbackControls,
             queueControls = queueControls,
             lyricsControls = lyricsControls,
-            view = view
+            onArtistClick = onArtistClick
         )
     }
 }

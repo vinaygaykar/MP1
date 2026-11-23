@@ -1,7 +1,5 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
-import android.content.Intent
-import android.view.View
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.vinaygaykar.mp1.playback.LyricsControls
@@ -33,8 +30,6 @@ import io.github.vinaygaykar.mp1.playback.PlaybackProgressState
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.playback.QueueControls
 import io.github.vinaygaykar.mp1.playback.QueueUiState
-import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailActivity
-import io.github.vinaygaykar.mp1.ui.library.launchActivityWithScaleUp
 import io.github.vinaygaykar.mp1.utils.collectArtistNames
 import io.github.vinaygaykar.mp1.utils.toArtistId
 import kotlin.math.roundToInt
@@ -49,9 +44,8 @@ fun NowPlayingOverlays(
     playbackControls: PlaybackControls,
     queueControls: QueueControls,
     lyricsControls: LyricsControls,
-    view: View
+    onArtistClick: (String) -> Unit
 ) {
-    val context = LocalContext.current
 
     // Lyrics Overlay
     AnimatedVisibility(
@@ -118,13 +112,8 @@ fun NowPlayingOverlays(
             onDismissRequest = { state.showArtistsDialog = false },
             onArtistClick = { selectedArtistName ->
                 state.showArtistsDialog = false
-                val intent = Intent(context, ArtistDetailActivity::class.java).apply {
-                    putExtra(
-                        ArtistDetailActivity.EXTRA_ARTIST_ID,
-                        selectedArtistName.toArtistId()
-                    )
-                }
-                launchActivityWithScaleUp(context, intent, view)
+                state.collapse()
+                onArtistClick(selectedArtistName.toArtistId())
             }
         )
     }

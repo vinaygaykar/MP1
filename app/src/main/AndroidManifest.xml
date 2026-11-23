@@ -33,20 +33,7 @@
         </activity>
 
 
-        <activity
-            android:name=".ui.artist.ArtistDetailActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Mp1" />
 
-        <activity
-            android:name=".ui.genre.GenreDetailActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Mp1" />
-
-        <activity
-            android:name=".ui.playlist.PlaylistDetailActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Mp1" />
 
         <service
             android:name=".playback.PlaybackService"

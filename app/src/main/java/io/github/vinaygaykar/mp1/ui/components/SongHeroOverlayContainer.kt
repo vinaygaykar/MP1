@@ -1084,21 +1084,12 @@ private fun SongAlbumTitle(
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
-    val context = LocalContext.current
     val displayAlbum = remember(album) { album.ifBlank { "Unknown Album" } }
     Surface(
         onClick = {
             val albumIdentifier = albumId?.ifEmpty { null } ?: album
             if (albumIdentifier.isNotBlank()) {
-                if (onAlbumClick != null) {
-                    onAlbumClick(albumIdentifier)
-                } else {
-                    val intent = Intent(context, io.github.vinaygaykar.mp1.MainActivity::class.java).apply {
-                        putExtra("extra_album_id", albumIdentifier)
-                        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    }
-                    context.startActivity(intent)
-                }
+                onAlbumClick?.invoke(albumIdentifier)
                 onDismiss()
             }
         },
