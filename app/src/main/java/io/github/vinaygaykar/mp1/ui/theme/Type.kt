@@ -9,43 +9,18 @@ import androidx.compose.ui.unit.sp
 import io.github.vinaygaykar.mp1.R
 import kotlinx.coroutines.flow.MutableStateFlow
 
-// Define the default FontFamily using the local resource
-val googleSansFlexFontFamily = FontFamily(
-    Font(R.font.googlesans_flex)
-)
-
 enum class AppFont(val displayName: String, val fontFamily: FontFamily) {
-    GOOGLE_SANS("Google Sans Flex", googleSansFlexFontFamily),
-    ANTON("Anton", FontFamily(Font(R.font.anton_regular))),
-    BAGEL_FAT_ONE("Bagel Fat One", FontFamily(Font(R.font.bagel_fat_one_regular))),
-    BBH_BARTLE("BBH Bartle", FontFamily(Font(R.font.bbh_bartle_regular))),
     BBH_HEGARTY("BBH Hegarty", FontFamily(Font(R.font.bbh_hegarty_regular))),
     BOLDONSE("Boldonse", FontFamily(Font(R.font.boldonse_regular))),
-    BOWLBY_ONE_SC("Bowlby One SC", FontFamily(Font(R.font.bowlby_one_sc_regular))),
-    CAL_SANS("Cal Sans", FontFamily(Font(R.font.calsans_regular))),
-    CLIMATE_CRISIS("Climate Crisis", FontFamily(Font(R.font.climate_crisis_regular))),
-    DELA_GOTHIC_ONE("Dela Gothic One", FontFamily(Font(R.font.dela_gothic_one_regular))),
-    DM_SERIF("DM Serif Text", FontFamily(Font(R.font.dmseriftext_regular))),
-    GASOEK_ONE("Gasoek One", FontFamily(Font(R.font.gasoek_one_regular))),
-    KANIT(
-        "Kanit",
-        FontFamily(
-            Font(R.font.kanit_regular, FontWeight.Normal),
-            Font(R.font.kanit_medium, FontWeight.Medium),
-            Font(R.font.kanit_bold, FontWeight.Bold)
-        )
-    ),
-    PASSION_ONE("Passion One", FontFamily(Font(R.font.passion_one_regular))),
     RADIO_CANADA_BIG("Radio Canada Big", FontFamily(Font(R.font.radio_canada_big_variable))),
-    READEX_PRO("Readex Pro", FontFamily(Font(R.font.readex_pro_variable))),
-    SPECIAL_GOTHIC("Special Gothic Expanded", FontFamily(Font(R.font.special_gothic_expanded_one_regular)))
+    READEX_PRO("Readex Pro", FontFamily(Font(R.font.readex_pro_variable)))
 }
 
 data class TypographyFontConfig(
-    val displayFont: AppFont = AppFont.GOOGLE_SANS,
-    val headlineFont: AppFont = AppFont.GOOGLE_SANS,
-    val titleFont: AppFont = AppFont.GOOGLE_SANS,
-    val bodyFont: AppFont = AppFont.GOOGLE_SANS
+    val displayFont: AppFont = AppFont.BBH_HEGARTY,
+    val headlineFont: AppFont = AppFont.BOLDONSE,
+    val titleFont: AppFont = AppFont.READEX_PRO,
+    val bodyFont: AppFont = AppFont.READEX_PRO
 )
 
 // Global state flow for developer previewing font changes at runtime across 4 typography categories
@@ -173,6 +148,12 @@ fun getTypographyForFont(fontFamily: FontFamily): Typography {
 // Fallback typography for Preview mode to avoid font loading errors in Layoutlib
 val PreviewTypography = getTypographyForFont(FontFamily.Default)
 
-// Set up Material 3 typography styles using Google Sans Flex by default
-val Typography = getTypographyForFont(googleSansFlexFontFamily)
+// Set up Material 3 typography styles using default fonts:
+// Display: BBH Hegarty, Headline: Boldonse, Title & Body: Readex Pro
+val Typography = getTypographyForFonts(
+    displayFont = AppFont.BBH_HEGARTY.fontFamily,
+    headlineFont = AppFont.BOLDONSE.fontFamily,
+    titleFont = AppFont.READEX_PRO.fontFamily,
+    bodyFont = AppFont.READEX_PRO.fontFamily
+)
 

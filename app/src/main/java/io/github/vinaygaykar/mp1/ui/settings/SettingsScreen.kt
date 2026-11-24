@@ -41,7 +41,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.HorizontalDivider
 import io.github.vinaygaykar.mp1.ui.theme.AppFont
 import io.github.vinaygaykar.mp1.ui.theme.CurrentTypographyFonts
 import androidx.compose.ui.Alignment
@@ -167,45 +166,20 @@ fun SettingsContent(
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column {
-                    val fontsConfig by CurrentTypographyFonts.collectAsState()
+                val fontsConfig by CurrentTypographyFonts.collectAsState()
 
-                    SingleFontSelectorItem(
-                        categoryTitle = "Display Font",
-                        categorySubtitle = "displayLarge, displayMedium, displaySmall",
-                        selectedFont = fontsConfig.displayFont,
-                        onFontSelected = { font ->
-                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(displayFont = font)
-                        }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SingleFontSelectorItem(
-                        categoryTitle = "Headline Font",
-                        categorySubtitle = "headlineLarge, headlineMedium, headlineSmall",
-                        selectedFont = fontsConfig.headlineFont,
-                        onFontSelected = { font ->
-                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(headlineFont = font)
-                        }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SingleFontSelectorItem(
-                        categoryTitle = "Title Font",
-                        categorySubtitle = "titleLarge, titleMedium, titleSmall",
-                        selectedFont = fontsConfig.titleFont,
-                        onFontSelected = { font ->
-                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(titleFont = font)
-                        }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    SingleFontSelectorItem(
-                        categoryTitle = "Body & Others Font",
-                        categorySubtitle = "body & label styles",
-                        selectedFont = fontsConfig.bodyFont,
-                        onFontSelected = { font ->
-                            CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(bodyFont = font)
-                        }
-                    )
-                }
+                SingleFontSelectorItem(
+                    categoryTitle = "Body",
+                    categorySubtitle = "Title & Body font",
+                    selectedFont = fontsConfig.bodyFont,
+                    availableFonts = listOf(AppFont.READEX_PRO, AppFont.RADIO_CANADA_BIG),
+                    onFontSelected = { font ->
+                        CurrentTypographyFonts.value = CurrentTypographyFonts.value.copy(
+                            titleFont = font,
+                            bodyFont = font
+                        )
+                    }
+                )
             }
 
             // Section 3: About
@@ -330,6 +304,7 @@ private fun SingleFontSelectorItem(
     categoryTitle: String,
     categorySubtitle: String,
     selectedFont: AppFont,
+    availableFonts: List<AppFont> = listOf(AppFont.READEX_PRO, AppFont.RADIO_CANADA_BIG),
     onFontSelected: (AppFont) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -355,7 +330,7 @@ private fun SingleFontSelectorItem(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            AppFont.entries.forEach { font ->
+            availableFonts.forEach { font ->
                 DropdownMenuItem(
                     text = {
                         Text(
