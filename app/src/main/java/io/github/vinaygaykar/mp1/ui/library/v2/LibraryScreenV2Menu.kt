@@ -199,15 +199,10 @@ private fun CategoryMenuPortraitContent(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_icon_og),
-                        contentDescription = "App Icon",
-                        modifier = Modifier.size(72.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "MP.1",
                         style = MaterialTheme.typography.displayLarge.copy(
@@ -218,6 +213,11 @@ private fun CategoryMenuPortraitContent(
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         softWrap = false
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_icon_og),
+                        contentDescription = "App Icon",
+                        modifier = Modifier.size(72.dp)
                     )
                 }
 
@@ -316,7 +316,7 @@ private fun CategoryMenuLandscapeContent(
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        // 1st Pane: MP.1 Title at Bottom Left (reverted to original weight(1f) space)
+        // 1st Pane: MP.1 Title on left, Logo on right occupying complete width of parent
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxHeight()
@@ -328,16 +328,11 @@ private fun CategoryMenuLandscapeContent(
             val maxH = this.maxHeight
             val fontSize = minOf(maxW.value * 0.22f, maxH.value * 0.45f, 76f).sp
 
-            Column(
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.Bottom
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_icon_og),
-                    contentDescription = "App Icon",
-                    modifier = Modifier.size(72.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "MP.1",
                     style = MaterialTheme.typography.displayLarge.copy(
@@ -348,6 +343,11 @@ private fun CategoryMenuLandscapeContent(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     softWrap = false
+                )
+                Image(
+                    painter = painterResource(id = R.drawable.ic_icon_og),
+                    contentDescription = "App Icon",
+                    modifier = Modifier.size(72.dp)
                 )
             }
         }
