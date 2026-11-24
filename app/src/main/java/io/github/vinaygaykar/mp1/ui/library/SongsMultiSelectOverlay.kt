@@ -3,13 +3,19 @@ package io.github.vinaygaykar.mp1.ui.library
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateInt
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,6 +36,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +47,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -63,6 +72,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,8 +84,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -117,6 +129,7 @@ fun SongsMultiSelectOverlay(
     onAddToQueue: (List<Song>) -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isCompact = !isLandscape && configuration.screenHeightDp < 600
 
@@ -127,6 +140,8 @@ fun SongsMultiSelectOverlay(
             songs.asReversed().take(3)
         }
     }
+
+    val transition = updateTransition(targetState = isExpanded, label = "multiSelectExpansion")
 
     val animationSpec = tween<Dp>(durationMillis = 350, easing = FastOutSlowInEasing)
     val avatarSize by animateDpAsState(
@@ -139,28 +154,62 @@ fun SongsMultiSelectOverlay(
         animationSpec = animationSpec,
         label = "overlapOffset"
     )
-    val cornerRadius by animateDpAsState(
-        targetValue = if (isExpanded) 0.dp else 28.dp,
-        animationSpec = animationSpec,
-        label = "overlayCornerRadius"
-    )
-    val borderWidth by animateDpAsState(
-        targetValue = if (isExpanded) 0.dp else 1.dp,
-        animationSpec = animationSpec,
-        label = "overlayBorderWidth"
-    )
-    val topPadding by animateDpAsState(
-        targetValue = if (isExpanded) 0.dp else 12.dp,
-        animationSpec = animationSpec,
-        label = "overlayTopPadding"
-    )
-    val sidePadding by animateDpAsState(
-        targetValue = if (isExpanded) 0.dp else 16.dp,
-        animationSpec = animationSpec,
-        label = "overlaySidePadding"
-    )
 
-    val overlayShape = if (!isExpanded) CircleShape else RoundedCornerShape(cornerRadius)
+    val expansionFraction by transition.animateFloat(
+        transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+        label = "expansionFraction"
+    ) { expanded -> if (expanded) 1f else 0f }
+
+    val cornerPercent by transition.animateInt(
+        transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+        label = "overlayCornerPercent"
+    ) { expanded -> if (expanded) 0 else 50 }
+
+    val borderWidth by transition.animateDp(
+        transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+        label = "overlayBorderWidth"
+    ) { expanded -> if (expanded) 0.dp else 1.dp }
+
+    val borderAlpha by transition.animateFloat(
+        transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+        label = "overlayBorderAlpha"
+    ) { expanded -> if (expanded) 0f else 0.35f }
+
+    // Header Content Animation (Slide UP & Fade Away when expanding, Slide DOWN & Fade In when collapsing)
+    val headerAlpha by transition.animateFloat(
+        transitionSpec = {
+            if (targetState) {
+                tween(durationMillis = 160, easing = FastOutSlowInEasing)
+            } else {
+                tween(durationMillis = 200, delayMillis = 120, easing = FastOutSlowInEasing)
+            }
+        },
+        label = "headerAlpha"
+    ) { expanded -> if (expanded) 0f else 1f }
+
+    val headerOffsetY by transition.animateDp(
+        transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+        label = "headerOffsetY"
+    ) { expanded -> if (expanded) (-40).dp else 0.dp }
+
+    // Expanded View Content Animation (Slide UP & Fade In when expanding, Slide DOWN & Fade Out when collapsing)
+    val expandedAlpha by transition.animateFloat(
+        transitionSpec = {
+            if (targetState) {
+                tween(durationMillis = 220, delayMillis = 100, easing = FastOutSlowInEasing)
+            } else {
+                tween(durationMillis = 150, easing = FastOutSlowInEasing)
+            }
+        },
+        label = "expandedAlpha"
+    ) { expanded -> if (expanded) 1f else 0f }
+
+    val expandedOffsetY by transition.animateDp(
+        transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+        label = "expandedOffsetY"
+    ) { expanded -> if (expanded) 0.dp else 40.dp }
+
+    val overlayShape = RoundedCornerShape(cornerPercent)
     val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 
     val coroutineScope = rememberCoroutineScope()
@@ -210,21 +259,19 @@ fun SongsMultiSelectOverlay(
         }
     }
 
-    val containerModifier = if (isExpanded) {
-        Modifier.fillMaxSize()
-    } else if (isLandscape) {
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .displayCutoutPadding()
-            .padding(top = topPadding, end = sidePadding)
-            .wrapContentSize(Alignment.TopEnd)
+    var collapsedWidthPx by remember { mutableStateOf(0) }
+    var collapsedHeightPx by remember { mutableStateOf(0) }
+
+    val measuredCollapsedWidthDp = if (collapsedWidthPx > 0) {
+        with(density) { collapsedWidthPx.toDp() }
     } else {
-        Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(top = topPadding, start = sidePadding, end = sidePadding)
-            .wrapContentSize(Alignment.TopCenter)
+        if (isLandscape) 72.dp else if (isCompact) 140.dp else 170.dp
+    }
+
+    val measuredCollapsedHeightDp = if (collapsedHeightPx > 0) {
+        with(density) { collapsedHeightPx.toDp() }
+    } else {
+        if (isLandscape) 160.dp else if (isCompact) 48.dp else 56.dp
     }
 
     AnimatedVisibility(
@@ -237,108 +284,182 @@ fun SongsMultiSelectOverlay(
             modifier.fillMaxWidth()
         }
     ) {
-        Box(
-            modifier = containerModifier
-                .clip(overlayShape)
-                .border(
-                    width = borderWidth,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(
-                        alpha = if (isExpanded) 0f else 0.35f
-                    ),
-                    shape = overlayShape
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {
-                        if (!isExpanded) {
-                            onClick?.invoke()
-                        }
-                    }
-                )
-                .then(
-                    if (hazeState != null) {
-                        Modifier.hazeEffect(
-                            state = hazeState,
-                            style = HazeStyle(
-                                backgroundColor = containerColor,
-                                blurRadius = 12.dp,
-                                tint = HazeTint(containerColor.copy(alpha = if (isExpanded) 0.20f else 0.35f))
-                            )
-                        )
-                    } else {
-                        Modifier.background(
-                            containerColor.copy(alpha = if (isExpanded) 0.95f else 0.85f),
-                            overlayShape
-                        )
-                    }
-                )
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = if (isLandscape) Alignment.TopEnd else Alignment.TopCenter
         ) {
-            Crossfade(
-                targetState = isExpanded,
-                animationSpec = tween(durationMillis = 280),
-                label = "overlayContentCrossfade"
-            ) { expanded ->
-                if (!expanded) {
-                    CollapsedMultiSelectHeader(
-                        songs = songs,
-                        displaySongs = displaySongs,
-                        avatarSize = avatarSize,
-                        overlapOffset = overlapOffset,
-                        isCompact = isCompact,
-                        isLandscape = isLandscape
-                    )
+            val screenWidth = this.maxWidth
+            val screenHeight = this.maxHeight
+
+            val targetTopPadding = if (isCompact) 8.dp else 12.dp
+            val targetSidePadding = if (isCompact) 12.dp else 16.dp
+
+            val animatedTopPadding = lerpDp(targetTopPadding, 0.dp, expansionFraction)
+            val animatedSidePadding = lerpDp(targetSidePadding, 0.dp, expansionFraction)
+
+            val statusBarsTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val animatedStatusBarsPadding = lerpDp(statusBarsTop, 0.dp, expansionFraction)
+
+            val containerModifier = if (expansionFraction == 0f) {
+                if (isLandscape) {
+                    Modifier
+                        .statusBarsPadding()
+                        .displayCutoutPadding()
+                        .padding(top = targetTopPadding, end = targetSidePadding)
+                        .wrapContentSize(Alignment.TopEnd)
                 } else {
-                    if (isLandscape) {
-                        SongsMultiSelectOverlayLandscape(
+                    Modifier
+                        .statusBarsPadding()
+                        .padding(top = targetTopPadding, start = targetSidePadding, end = targetSidePadding)
+                        .wrapContentSize(Alignment.TopCenter)
+                }
+            } else {
+                val animatedWidth = lerpDp(measuredCollapsedWidthDp, screenWidth, expansionFraction)
+                val animatedHeight = lerpDp(measuredCollapsedHeightDp, screenHeight, expansionFraction)
+                Modifier
+                    .padding(
+                        top = animatedStatusBarsPadding + animatedTopPadding,
+                        start = if (isLandscape) 0.dp else animatedSidePadding,
+                        end = animatedSidePadding
+                    )
+                    .width(animatedWidth)
+                    .height(animatedHeight)
+            }
+
+            Box(
+                modifier = containerModifier
+                    .clip(overlayShape)
+                    .border(
+                        width = borderWidth,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = borderAlpha),
+                        shape = overlayShape
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            if (!isExpanded) {
+                                onClick?.invoke()
+                            }
+                        }
+                    )
+                    .then(
+                        if (hazeState != null) {
+                            Modifier.hazeEffect(
+                                state = hazeState,
+                                style = HazeStyle(
+                                    backgroundColor = containerColor,
+                                    blurRadius = 12.dp,
+                                    tint = HazeTint(
+                                        containerColor.copy(
+                                            alpha = lerpFloat(0.35f, 0.20f, expansionFraction)
+                                        )
+                                    )
+                                )
+                            )
+                        } else {
+                            Modifier.background(
+                                containerColor.copy(alpha = lerpFloat(0.85f, 0.95f, expansionFraction)),
+                                overlayShape
+                            )
+                        }
+                    )
+            ) {
+                // Header (Collapsed Preview)
+                if (headerAlpha > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                alpha = headerAlpha
+                                translationY = headerOffsetY.toPx()
+                            }
+                            .onGloballyPositioned { coordinates ->
+                                if (!isExpanded && coordinates.size.width > 0 && coordinates.size.height > 0) {
+                                    collapsedWidthPx = coordinates.size.width
+                                    collapsedHeightPx = coordinates.size.height
+                                }
+                            }
+                    ) {
+                        CollapsedMultiSelectHeader(
                             songs = songs,
-                            activeSongs = activeSongs,
-                            deselectedSongIds = deselectedSongIds,
-                            revealedIndexLimit = revealedIndexLimit,
-                            highlightedSongTitle = highlightedSongTitle,
-                            bottomPadding = bottomPadding,
-                            onToggleDeselect = onToggleDeselect,
-                            onShowSongTitle = showSongTitleWithTimeout,
-                            onPlayNext = onPlayNext,
-                            onAddToPlaylist = onAddToPlaylist,
-                            onAddToQueue = onAddToQueue,
-                            onDismiss = onDismiss
+                            displaySongs = displaySongs,
+                            avatarSize = avatarSize,
+                            overlapOffset = overlapOffset,
+                            isCompact = isCompact,
+                            isLandscape = isLandscape
                         )
-                    } else if (isCompact) {
-                        SongsMultiSelectOverlayCompact(
-                            songs = songs,
-                            activeSongs = activeSongs,
-                            deselectedSongIds = deselectedSongIds,
-                            revealedIndexLimit = revealedIndexLimit,
-                            highlightedSongTitle = highlightedSongTitle,
-                            bottomPadding = bottomPadding,
-                            onToggleDeselect = onToggleDeselect,
-                            onShowSongTitle = showSongTitleWithTimeout,
-                            onPlayNext = onPlayNext,
-                            onAddToPlaylist = onAddToPlaylist,
-                            onAddToQueue = onAddToQueue,
-                            onDismiss = onDismiss
-                        )
-                    } else {
-                        SongsMultiSelectOverlayPortrait(
-                            songs = songs,
-                            activeSongs = activeSongs,
-                            deselectedSongIds = deselectedSongIds,
-                            revealedIndexLimit = revealedIndexLimit,
-                            highlightedSongTitle = highlightedSongTitle,
-                            bottomPadding = bottomPadding,
-                            onToggleDeselect = onToggleDeselect,
-                            onShowSongTitle = showSongTitleWithTimeout,
-                            onPlayNext = onPlayNext,
-                            onAddToPlaylist = onAddToPlaylist,
-                            onAddToQueue = onAddToQueue,
-                            onDismiss = onDismiss
-                        )
+                    }
+                }
+
+                // Expanded View Content
+                if (expandedAlpha > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = expandedAlpha
+                                translationY = expandedOffsetY.toPx()
+                            }
+                    ) {
+                        if (isLandscape) {
+                            SongsMultiSelectOverlayLandscape(
+                                songs = songs,
+                                activeSongs = activeSongs,
+                                deselectedSongIds = deselectedSongIds,
+                                revealedIndexLimit = revealedIndexLimit,
+                                highlightedSongTitle = highlightedSongTitle,
+                                bottomPadding = bottomPadding,
+                                onToggleDeselect = onToggleDeselect,
+                                onShowSongTitle = showSongTitleWithTimeout,
+                                onPlayNext = onPlayNext,
+                                onAddToPlaylist = onAddToPlaylist,
+                                onAddToQueue = onAddToQueue,
+                                onDismiss = onDismiss
+                            )
+                        } else if (isCompact) {
+                            SongsMultiSelectOverlayCompact(
+                                songs = songs,
+                                activeSongs = activeSongs,
+                                deselectedSongIds = deselectedSongIds,
+                                revealedIndexLimit = revealedIndexLimit,
+                                highlightedSongTitle = highlightedSongTitle,
+                                bottomPadding = bottomPadding,
+                                onToggleDeselect = onToggleDeselect,
+                                onShowSongTitle = showSongTitleWithTimeout,
+                                onPlayNext = onPlayNext,
+                                onAddToPlaylist = onAddToPlaylist,
+                                onAddToQueue = onAddToQueue,
+                                onDismiss = onDismiss
+                            )
+                        } else {
+                            SongsMultiSelectOverlayPortrait(
+                                songs = songs,
+                                activeSongs = activeSongs,
+                                deselectedSongIds = deselectedSongIds,
+                                revealedIndexLimit = revealedIndexLimit,
+                                highlightedSongTitle = highlightedSongTitle,
+                                bottomPadding = bottomPadding,
+                                onToggleDeselect = onToggleDeselect,
+                                onShowSongTitle = showSongTitleWithTimeout,
+                                onPlayNext = onPlayNext,
+                                onAddToPlaylist = onAddToPlaylist,
+                                onAddToQueue = onAddToQueue,
+                                onDismiss = onDismiss
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+private fun lerpDp(start: Dp, stop: Dp, fraction: Float): Dp {
+    return (start.value + (stop.value - start.value) * fraction.coerceIn(0f, 1f)).dp
+}
+
+private fun lerpFloat(start: Float, stop: Float, fraction: Float): Float {
+    return start + (stop - start) * fraction.coerceIn(0f, 1f)
 }
 
 private const val ITEM_ANIMATION_DURATION_MS = 150
@@ -390,45 +511,69 @@ private fun CollapsedMultiSelectHeader(
                     contentAlignment = Alignment.CenterStart
                 ) {
                     displaySongs.forEachIndexed { index, song ->
-                        val animatedOffset by animateDpAsState(
-                            targetValue = overlapOffset * index,
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                            label = "avatarOffsetX"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .offset(x = animatedOffset)
-                                .size(avatarSize)
-                                .zIndex((displaySongs.size - index).toFloat())
-                                .border(
-                                    width = if (isCompact) 2.dp else 2.5.dp,
-                                    color = MaterialTheme.colorScheme.surface,
-                                    shape = CircleShape
-                                )
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (song.artworkUri != null) {
-                                val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(song.artworkUri)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = null,
-                                    error = musicPlaceholder,
-                                    placeholder = musicPlaceholder,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(if (isCompact) 11.dp else 14.dp)
-                                )
+                        key(song.id) {
+                            val entrySlideAnim = remember { Animatable(-avatarSize.value) }
+                            val entryAlphaAnim = remember { Animatable(0f) }
+
+                            LaunchedEffect(song.id) {
+                                launch {
+                                    entrySlideAnim.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                                    )
+                                }
+                                launch {
+                                    entryAlphaAnim.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                                    )
+                                }
+                            }
+
+                            val animatedOffset by animateDpAsState(
+                                targetValue = overlapOffset * index,
+                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                label = "avatarOffsetX"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = animatedOffset + entrySlideAnim.value.dp)
+                                    .graphicsLayer {
+                                        alpha = entryAlphaAnim.value
+                                    }
+                                    .size(avatarSize)
+                                    .zIndex((displaySongs.size - index).toFloat())
+                                    .border(
+                                        width = if (isCompact) 2.dp else 2.5.dp,
+                                        color = MaterialTheme.colorScheme.surface,
+                                        shape = CircleShape
+                                    )
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (song.artworkUri != null) {
+                                    val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(song.artworkUri)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = null,
+                                        error = musicPlaceholder,
+                                        placeholder = musicPlaceholder,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(if (isCompact) 11.dp else 14.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -478,45 +623,69 @@ private fun CollapsedMultiSelectHeader(
                     contentAlignment = Alignment.TopCenter
                 ) {
                     displaySongs.forEachIndexed { index, song ->
-                        val animatedOffset by animateDpAsState(
-                            targetValue = overlapOffset * index,
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                            label = "avatarOffsetY"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .offset(y = animatedOffset)
-                                .size(avatarSize)
-                                .zIndex((displaySongs.size - index).toFloat())
-                                .border(
-                                    2.5.dp,
-                                    MaterialTheme.colorScheme.surface,
-                                    CircleShape
-                                )
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (song.artworkUri != null) {
-                                val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(song.artworkUri)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = null,
-                                    error = musicPlaceholder,
-                                    placeholder = musicPlaceholder,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(14.dp)
-                                )
+                        key(song.id) {
+                            val entrySlideAnim = remember { Animatable(-avatarSize.value) }
+                            val entryAlphaAnim = remember { Animatable(0f) }
+
+                            LaunchedEffect(song.id) {
+                                launch {
+                                    entrySlideAnim.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                                    )
+                                }
+                                launch {
+                                    entryAlphaAnim.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                                    )
+                                }
+                            }
+
+                            val animatedOffset by animateDpAsState(
+                                targetValue = overlapOffset * index,
+                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                label = "avatarOffsetY"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .offset(y = animatedOffset + entrySlideAnim.value.dp)
+                                    .graphicsLayer {
+                                        alpha = entryAlphaAnim.value
+                                    }
+                                    .size(avatarSize)
+                                    .zIndex((displaySongs.size - index).toFloat())
+                                    .border(
+                                        2.5.dp,
+                                        MaterialTheme.colorScheme.surface,
+                                        CircleShape
+                                    )
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (song.artworkUri != null) {
+                                    val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(song.artworkUri)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = null,
+                                        error = musicPlaceholder,
+                                        placeholder = musicPlaceholder,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                             }
                         }
                     }
