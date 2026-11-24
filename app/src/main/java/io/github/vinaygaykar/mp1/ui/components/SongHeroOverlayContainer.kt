@@ -4,13 +4,16 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.RuntimeShader
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -86,6 +89,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -251,35 +259,37 @@ fun SongDetailOverlay(
             rawTiltY = 0f
             onDispose { }
         } else {
-            val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+            val gravitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
                 ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-            val rotationMatrix = FloatArray(9)
-            val orientationAngles = FloatArray(3)
-
             val listener = object : SensorEventListener {
+                // Last in-plane direction (world-up as seen on screen), held while the phone is flat
+                var dirX = 0f
+                var dirY = 1f
+
                 override fun onSensorChanged(event: SensorEvent?) {
                     if (event == null) return
-                    if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
-                        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                        SensorManager.getOrientation(rotationMatrix, orientationAngles)
-                        val pitch = orientationAngles[1]
-                        val roll = orientationAngles[2]
-                        rawTiltX = (roll / 0.5f).coerceIn(-1.5f, 1.5f)
-                        rawTiltY = (pitch / 0.5f).coerceIn(-1.5f, 1.5f)
-                    } else if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-                        val accelX = event.values[0]
-                        val accelY = event.values[1]
-                        rawTiltX = (-accelX / 5f).coerceIn(-1.5f, 1.5f)
-                        rawTiltY = (accelY / 5f).coerceIn(-1.5f, 1.5f)
+                    val gx = event.values[0]
+                    val gy = event.values[1]
+                    val gz = event.values[2]
+                    val g = kotlin.math.sqrt(gx * gx + gy * gy + gz * gz)
+                    if (g < 1e-3f) return
+                    val px = gx / g
+                    val py = gy / g
+                    val blend = kotlin.math.hypot(px, py).coerceIn(0f, 1f) // 0 flat, 1 upright
+                    if (blend > CdShine.FLAT_DEADZONE) {
+                        dirX = px / blend
+                        dirY = py / blend
                     }
+                    rawTiltX = dirX * blend
+                    rawTiltY = dirY * blend
                 }
 
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
             }
 
-            if (rotationSensor != null) {
-                sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+            if (gravitySensor != null) {
+                sensorManager.registerListener(listener, gravitySensor, SensorManager.SENSOR_DELAY_GAME)
             }
 
             onDispose {
@@ -1004,6 +1014,183 @@ private fun SongDetailCompactContent(
     }
 }
 
+private object CdShine {
+    /** Master knob 0..1. ~0.25 subtle, ~0.55 balanced, ~0.9 bold. */
+    const val INTENSITY = 0.55f
+
+    // Tilt
+    const val MAX_TILT = 1f                  // tilt is now the flat→upright blend, 0..1
+    const val IDLE_STRENGTH = 0.7f           // flat should already show clear conical wedges
+    const val FLAT_DEADZONE = 0.08f          // below this, hold the last in-plane angle
+    const val LIGHT_AZIMUTH_DEG = 45f        // light direction clockwise from screen-up (45 = top right)
+
+    // Spectral bands
+    const val BAND_REPEATS = 2
+    const val BAND_FILL_FRACTION = 0.45f     // portion of each segment that has color, rest is dark
+    const val SPECTRAL_ALPHA = 0.75f
+    const val BAND_ANGLE_FACTOR = -0.6f      // bands counter-rotate vs lobes so colors slide through them
+    const val BAND_TRAVEL_DEG_PER_TILT = 70f
+    const val PHASE_PER_TILT = 0.5f              // how fast colors slide through the lobe per unit of tilt
+    const val WEDGE_WIDTH_DEG = 45f          // one full spectrum from the lobe axis to this angle (mirrored on both sides)
+    const val VIRTUAL_CENTER_DIST = 2.2f     // radii from the CD center toward the light, outside the disc
+    const val GLARE_WIDTH = 0.12f            // white band thickness, in radii
+    const val RAINBOW_SPAN = 0.9f            // radial thickness of the one spectrum pass, in radii
+    const val GLARE_SOFTNESS = 0.4f          // glare falloff, in spectrum units
+    const val RADIAL_WHITEN = 0.55f          // how far lobe A fades toward white at upright
+    const val METAL_SHEEN_ALPHA = 0.25f
+    val METAL_COLOR = Color(0xFF9AA4AD)
+
+    // Lobe shapes at upright (A = light side, B = opposite)
+    const val LOBE_A_UPRIGHT_HALF_WIDTH = 0.20f
+    const val LOBE_B_UPRIGHT_HALF_WIDTH = 0.05f
+    const val HIGHLIGHT_A_UPRIGHT_HALF_WIDTH = 0.10f
+    const val LOBE_B_UPRIGHT_DIM = 0.6f      // lobe B alpha reduction at upright
+
+    // Highlight lobes (fractions of 360°)
+    const val LOBE_HALF_WIDTH = 0.14f        // must be >= WEDGE_WIDTH_DEG / 360 so the spectrum is not clipped
+    const val HIGHLIGHT_HALF_WIDTH = 0.05f
+    const val HIGHLIGHT_ALPHA = 0.55f
+
+    // Center fade (fractions of radius)
+    const val CENTER_FADE_START = 0.10f
+    const val CENTER_FADE_END = 0.45f
+
+    // Grooves
+    const val GROOVE_SPACING_DP = 2.5f
+    const val GROOVE_STROKE_DP = 0.6f
+    const val GROOVE_ALPHA = 0.18f
+
+    // Rim
+    const val RIM_STROKE_DP = 1.5f
+    const val RIM_ALPHA = 0.7f
+
+    val SPECTRUM = listOf(
+        Color(0xFF8F00FF), // violet
+        Color(0xFF2979FF), // blue
+        Color(0xFF00E676), // green
+        Color(0xFFFFEA00), // yellow
+        Color(0xFFFF1744)  // red
+    )
+}
+
+private fun buildSpectralStops(): Array<Pair<Float, Color>> = buildList {
+    val segment = 1f / CdShine.BAND_REPEATS
+    val bandSpan = segment * CdShine.BAND_FILL_FRACTION
+    val step = bandSpan / (CdShine.SPECTRUM.size + 1)
+    repeat(CdShine.BAND_REPEATS) { k ->
+        val start = k * segment
+        add(start to CdShine.SPECTRUM.first().copy(alpha = 0f))
+        CdShine.SPECTRUM.forEachIndexed { i, c -> add(start + step * (i + 1) to c) }
+        add(start + bandSpan to CdShine.SPECTRUM.last().copy(alpha = 0f))
+    }
+    add(1f to CdShine.SPECTRUM.first().copy(alpha = 0f))
+}.toTypedArray()
+
+private fun buildLobeStops(
+    halfA: Float, halfB: Float, colorA: Color, colorB: Color
+): Array<Pair<Float, Color>> = arrayOf(
+    0f to colorA,
+    halfA to colorA.copy(alpha = 0f),
+    0.5f - halfB to colorB.copy(alpha = 0f),
+    0.5f to colorB,
+    0.5f + halfB to colorB.copy(alpha = 0f),
+    1f - halfA to colorA.copy(alpha = 0f),
+    1f to colorA
+)
+
+private val SpectralStops = buildSpectralStops()
+
+/** Builds the AGSL source; colors and band layout come from [CdShine] so there is one source of truth. */
+private fun buildSpectralAgsl(): String {
+    val n = CdShine.SPECTRUM.size
+    fun rgb(c: Color) = "half3(${c.red}, ${c.green}, ${c.blue})"
+    val body = buildString {
+        append("if (pos < 1.0) return half4(${rgb(CdShine.SPECTRUM.first())}, half(pos));\n")
+        for (k in 1 until n) {
+            append("if (pos < ${k + 1}.0) return half4(mix(${rgb(CdShine.SPECTRUM[k - 1])}, ${rgb(CdShine.SPECTRUM[k])}, half(pos - ${k}.0)), 1.0);\n")
+        }
+        append("return half4(${rgb(CdShine.SPECTRUM.last())}, half(1.0 - (pos - ${n}.0)));\n")
+    }
+    return """
+        uniform float2 uCenter;
+        uniform float uRadius;
+        uniform float uLightAngle;
+        uniform float uPhase;
+        uniform float uBlend;
+        uniform float2 uVirtualCenter;
+        uniform float uWedgeWidth;
+        uniform float uGlareEdge;
+        uniform float uRainbowSpan;
+
+        half4 spectrum(float pos) {
+            $body
+        }
+
+        // One spectrum pass for t in 0..1, nothing outside (no repeats)
+        half4 once(float t) {
+            if (t < 0.0 || t > 1.0) return half4(0.0);
+            half4 c = spectrum(t * ${n + 1}.0);
+            return half4(c.rgb * c.a, c.a);
+        }
+
+        half4 main(float2 p) {
+            float2 d = p - uCenter;
+            float r = length(d) / uRadius;
+            float a = atan(d.y, d.x) - uLightAngle;
+            float ca = cos(a);
+            // Flat: angular distance to the nearest lobe axis (mirrored across the axis and across both lobes)
+            float da = abs(asin(clamp(sin(a), -1.0, 1.0)));
+            half4 conical = once(da / uWedgeWidth);
+            // Upright: arcs concentric around a virtual center outside the disc, white glare first, then one spectrum pass
+            float dv = length(p - uVirtualCenter) / uRadius;
+            float t = (dv - uGlareEdge) / uRainbowSpan - uPhase;
+            half4 radial = once(t);
+            half g = half(1.0 - smoothstep(0.0, ${CdShine.GLARE_SOFTNESS}, abs(t + 0.2)));
+            radial = half4(radial.rgb + g, max(radial.a, g));
+            // w: 0 flat or on lobe B side, up to 1 on lobe A at upright
+            float w = uBlend * smoothstep(0.0, 1.0, ca);
+            half4 c = mix(conical, radial, half(w));
+            c.rgb = mix(c.rgb, half3(c.a), half(w * ${CdShine.RADIAL_WHITEN}));
+            return c;
+        }
+    """.trimIndent()
+}
+
+/** Returns null below API 33. Typed as Any to keep RuntimeShader out of signatures on older devices. */
+private fun createSpectralShader(): Any? =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) createSpectralShaderApi33() else null
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+private fun createSpectralShaderApi33(): Any = RuntimeShader(buildSpectralAgsl())
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+private fun DrawScope.drawSpectralShader(
+    shader: RuntimeShader,
+    center: Offset,
+    radius: Float,
+    lightAngleDeg: Float,
+    tilt: Float,
+    blend: Float,
+    alpha: Float
+) {
+    shader.setFloatUniform("uCenter", center.x, center.y)
+    shader.setFloatUniform("uRadius", radius)
+    shader.setFloatUniform("uLightAngle", Math.toRadians(lightAngleDeg.toDouble()).toFloat())
+    shader.setFloatUniform("uPhase", tilt * CdShine.PHASE_PER_TILT)
+    val theta = Math.toRadians(lightAngleDeg.toDouble())
+    val dist = radius * CdShine.VIRTUAL_CENTER_DIST
+    shader.setFloatUniform(
+        "uVirtualCenter",
+        center.x + kotlin.math.cos(theta).toFloat() * dist,
+        center.y + kotlin.math.sin(theta).toFloat() * dist
+    )
+    shader.setFloatUniform("uWedgeWidth", Math.toRadians(CdShine.WEDGE_WIDTH_DEG.toDouble()).toFloat())
+    shader.setFloatUniform("uGlareEdge", CdShine.VIRTUAL_CENTER_DIST - 1f + CdShine.GLARE_WIDTH)
+    shader.setFloatUniform("uRainbowSpan", CdShine.RAINBOW_SPAN)
+    shader.setFloatUniform("uBlend", blend)
+    drawRect(brush = ShaderBrush(shader), alpha = alpha)
+}
+
 @Composable
 private fun SongArtworkBox(
     song: Song,
@@ -1017,6 +1204,8 @@ private fun SongArtworkBox(
     shineTiltX: Float = 0f,
     shineTiltY: Float = 0f
 ) {
+    val spectralShader = remember { createSpectralShader() }
+
     Box(
         modifier = modifier
             .graphicsLayer {
@@ -1051,25 +1240,120 @@ private fun SongArtworkBox(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(CircleShape)
-                    .graphicsLayer { alpha = shineAlpha }
+                    .graphicsLayer {
+                        alpha = shineAlpha
+                        compositingStrategy = CompositingStrategy.Offscreen // needed for DstIn masking
+                    }
             ) {
-                val shiftX = shineTiltX * size.width * 0.45f
-                val shiftY = shineTiltY * size.height * 0.45f
+                val c = center
+                val radius = size.minDimension / 2f
+                val tilt = kotlin.math.hypot(shineTiltX, shineTiltY)
+                val strength = (tilt / CdShine.MAX_TILT).coerceIn(0f, 1f)
+                val energy = (CdShine.IDLE_STRENGTH + (1f - CdShine.IDLE_STRENGTH) * strength) *
+                    CdShine.INTENSITY
+                val blend = tilt.coerceIn(0f, 1f)
+                // Canvas y points down, so negate tiltY to get screen angle of world-up
+                val angleDeg = Math.toDegrees(
+                    kotlin.math.atan2(-shineTiltY, shineTiltX).toDouble()
+                ).toFloat() + CdShine.LIGHT_AZIMUTH_DEG
+                val bandRotation = angleDeg * CdShine.BAND_ANGLE_FACTOR +
+                    tilt * CdShine.BAND_TRAVEL_DEG_PER_TILT
 
-                val shineBrush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.0f),
-                        Color.White.copy(alpha = 0.05f),
-                        Color.White.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.45f),
-                        Color.White.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.05f),
-                        Color.White.copy(alpha = 0.0f),
-                    ),
-                    start = Offset(shiftX, shiftY),
-                    end = Offset(size.width + shiftX, size.height + shiftY)
+                val dimB = 1f - CdShine.LOBE_B_UPRIGHT_DIM * blend
+                val maskStops = buildLobeStops(
+                    androidx.compose.ui.util.lerp(CdShine.LOBE_HALF_WIDTH, CdShine.LOBE_A_UPRIGHT_HALF_WIDTH, blend),
+                    androidx.compose.ui.util.lerp(CdShine.LOBE_HALF_WIDTH, CdShine.LOBE_B_UPRIGHT_HALF_WIDTH, blend),
+                    Color.Black, Color.Black.copy(alpha = dimB)
                 )
-                drawRect(brush = shineBrush, blendMode = BlendMode.Screen)
+                val highlightStops = buildLobeStops(
+                    androidx.compose.ui.util.lerp(CdShine.HIGHLIGHT_HALF_WIDTH, CdShine.HIGHLIGHT_A_UPRIGHT_HALF_WIDTH, blend),
+                    CdShine.HIGHLIGHT_HALF_WIDTH,
+                    Color.White, Color.White.copy(alpha = dimB)
+                )
+
+                // 1. Spectral diffraction bands (narrow, with dark gaps)
+                if (spectralShader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    drawSpectralShader(
+                        shader = spectralShader as RuntimeShader,
+                        center = c,
+                        radius = radius,
+                        lightAngleDeg = angleDeg,
+                        tilt = tilt,
+                        blend = blend,
+                        alpha = CdShine.SPECTRAL_ALPHA * energy
+                    )
+                } else {
+                    // Fallback (API < 33): no radial hue shift
+                    rotate(bandRotation, c) {
+                        drawRect(
+                            brush = Brush.sweepGradient(*SpectralStops, center = c),
+                            alpha = CdShine.SPECTRAL_ALPHA * energy
+                        )
+                    }
+                }
+
+                // 1b. Faint metallic base sheen
+                drawRect(color = CdShine.METAL_COLOR, alpha = CdShine.METAL_SHEEN_ALPHA * energy)
+
+                // 2. Concentric grooves
+                val spacing = CdShine.GROOVE_SPACING_DP.dp.toPx()
+                val grooveStroke = Stroke(width = CdShine.GROOVE_STROKE_DP.dp.toPx())
+                var r = spacing
+                while (r < radius) {
+                    drawCircle(
+                        color = Color.White,
+                        radius = r,
+                        center = c,
+                        alpha = CdShine.GROOVE_ALPHA * energy,
+                        style = grooveStroke
+                    )
+                    r += spacing
+                }
+
+                // 3. Specular highlight lobes (additive)
+                rotate(angleDeg, c) {
+                    drawRect(
+                        brush = Brush.sweepGradient(*highlightStops, center = c),
+                        alpha = CdShine.HIGHLIGHT_ALPHA * energy,
+                        blendMode = BlendMode.Plus
+                    )
+                }
+
+                // 4. Mask everything to the two opposing lobes (bow-tie)
+                rotate(angleDeg, c) {
+                    drawRect(
+                        brush = Brush.sweepGradient(*maskStops, center = c),
+                        blendMode = BlendMode.DstIn
+                    )
+                }
+
+                // 5. Fade out near the center to avoid the pinch point
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Black.copy(alpha = 0f),
+                            CdShine.CENTER_FADE_START to Color.Black.copy(alpha = 0f),
+                            CdShine.CENTER_FADE_END to Color.Black,
+                            1f to Color.Black
+                        ),
+                        center = c,
+                        radius = radius
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+
+                // 6. Rim highlight (drawn after fade so it stays crisp)
+                val rimStroke = CdShine.RIM_STROKE_DP.dp.toPx()
+                rotate(angleDeg, c) {
+                    drawCircle(
+                        brush = Brush.sweepGradient(*highlightStops, center = c),
+                        radius = radius - rimStroke / 2f,
+                        center = c,
+                        alpha = CdShine.RIM_ALPHA * energy,
+                        style = Stroke(width = rimStroke),
+                        blendMode = BlendMode.Plus
+                    )
+                }
             }
         }
     }
