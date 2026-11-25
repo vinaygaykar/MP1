@@ -1,7 +1,12 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
+
 package io.github.vinaygaykar.mp1.ui.artist
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -82,6 +87,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -114,6 +120,8 @@ import io.github.vinaygaykar.mp1.ui.album.SongCardItem
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
+import io.github.vinaygaykar.mp1.ui.components.LocalAnimatedVisibilityScope
+import io.github.vinaygaykar.mp1.ui.components.artistSharedElement
 import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
@@ -460,6 +468,7 @@ fun ArtistDetailScreen(
                             imageContent = { imageModifier ->
                                 Box(
                                     modifier = imageModifier
+                                        .artistSharedElement(key = "artist_image_${currentArtist?.id ?: viewModel.artistId}")
                                         .clip(artistShape)
                                         .background(MaterialTheme.colorScheme.primaryContainer)
                                         .clickable {
@@ -471,21 +480,26 @@ fun ArtistDetailScreen(
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (!artistImageUrl.isNullOrEmpty()) {
-                                        AsyncImage(
-                                            model = artistImageUrl,
-                                            contentDescription = displayedArtistName,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Person,
-                                            contentDescription = displayedArtistName,
-                                            modifier = Modifier.size(80.dp),
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
+                                    val personPlaceholder = rememberVectorPainter(Icons.Default.Person)
+                                    val detailImageRequest = remember(artistImageUrl) {
+                                        ImageRequest.Builder(context)
+                                            .data(artistImageUrl)
+                                            .apply {
+                                                if (!artistImageUrl.isNullOrEmpty()) {
+                                                    placeholderMemoryCacheKey(artistImageUrl)
+                                                }
+                                            }
+                                            .crossfade(false)
+                                            .build()
                                     }
+
+                                    AsyncImage(
+                                        model = detailImageRequest,
+                                        contentDescription = displayedArtistName,
+                                        error = personPlaceholder,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
                             }
                         )
@@ -1101,83 +1115,118 @@ private fun ArtistHeaderWithAutoResizedName(
 
         val isSingleLine = line2Text.isBlank()
 
+        val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+        val isTransitionCompleted by remember(animatedVisibilityScope) {
+            derivedStateOf {
+                if (animatedVisibilityScope == null) {
+                    true
+                } else {
+                    val transition = animatedVisibilityScope.transition
+                    transition.currentState == transition.targetState && transition.targetState == EnterExitState.Visible
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f),
             contentAlignment = Alignment.Center
         ) {
-            // Line 1 above the artist image (drawn BEFORE image in Box so image overlays if overlapping)
-            if (!isSingleLine) {
-                AutoResizedText(
-                    text = line1Text,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontSize = line1MaxFontSize,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = textColor,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    minFontSize = line1MinFontSize,
-                    maxFontSize = line1MaxFontSize,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .padding(horizontal = 8.dp)
-                        .offset(y = (-12).dp)
-                )
+            // 1. Top text (Line 1) - Drawn FIRST so it sits behind the artist image
+            AnimatedVisibility(
+                visible = isTransitionCompleted,
+                enter = slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(durationMillis = 350, easing = EaseOutCubic)
+                ) + fadeIn(animationSpec = tween(durationMillis = 350)),
+                exit = fadeOut(animationSpec = tween(durationMillis = 150)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+            ) {
+                if (!isSingleLine) {
+                    AutoResizedText(
+                        text = line1Text,
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontSize = line1MaxFontSize,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = textColor,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        minFontSize = line1MinFontSize,
+                        maxFontSize = line1MaxFontSize,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                            .offset(y = (-16).dp)
+                    )
+                } else {
+                    // Overlapping Artist Name on top of image (1-liner mode, edge-to-edge)
+                    AutoResizedText(
+                        text = line1Text,
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontSize = line1SingleLineMaxFontSize,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = textColor,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        minFontSize = line1MinFontSize,
+                        maxFontSize = line1SingleLineMaxFontSize,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                            .offset(y = (-16).dp)
+                    )
+                }
             }
 
-            // Artist Image (kept at same dimension: 0.85f width, 1:1 aspect ratio)
+            // 2. Artist Image (Drawn in middle - above top text, behind bottom text)
             imageContent(
                 Modifier
                     .fillMaxSize(0.85f)
                     .align(Alignment.Center)
+                    .offset(y = 24.dp)
             )
 
-            if (isSingleLine) {
-                // Overlapping Artist Name on top of image (1-liner mode, edge-to-edge)
-                AutoResizedText(
-                    text = line1Text,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontSize = line1SingleLineMaxFontSize,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = textColor,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    minFontSize = line1MinFontSize,
-                    maxFontSize = line1SingleLineMaxFontSize,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .padding(horizontal = 8.dp)
-                        .offset(y = (-12).dp)
-                )
-            } else if (line2Text.isNotBlank()) {
-                // Line 2 below the image OVERLAPPING it (edge-to-edge)
-                AutoResizedText(
-                    text = line2Text,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = line2MaxFontSize,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = textColor,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    minFontSize = line2MinFontSize,
-                    maxFontSize = line2MaxFontSize,
-                    overflow = TextOverflow.Ellipsis,
+            // 3. Bottom text (Line 2) - Drawn LAST so it is on top of ALL 3 (above image and top text)
+            if (!isSingleLine && line2Text.isNotBlank()) {
+                AnimatedVisibility(
+                    visible = isTransitionCompleted,
+                    enter = slideInVertically(
+                        initialOffsetY = { fullHeight -> -fullHeight },
+                        animationSpec = tween(durationMillis = 350, easing = EaseOutCubic)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 350)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 150)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(horizontal = 8.dp, vertical = 8.dp)
-                )
+                        .offset(y = 24.dp)
+                ) {
+                    AutoResizedText(
+                        text = line2Text,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = line2MaxFontSize,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = textColor,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        minFontSize = line2MinFontSize,
+                        maxFontSize = line2MaxFontSize,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
+                    )
+                }
             }
         }
     }

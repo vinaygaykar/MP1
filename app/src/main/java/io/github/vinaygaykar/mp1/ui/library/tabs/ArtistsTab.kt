@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
+
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
 import android.content.res.Configuration
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,9 +49,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.EmptyState
+import io.github.vinaygaykar.mp1.ui.components.artistSharedElement
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
 import io.github.vinaygaykar.mp1.ui.library.LibraryViewModel
@@ -63,7 +69,7 @@ private const val EMPTY_STATE_MESSAGE = "No Artists found.\nScan a folder from S
 @Composable
 fun ArtistGrid(
     artists: List<Artist>,
-    onArtistClick: (Artist) -> Unit,
+    onArtistClick: (Artist, String?) -> Unit,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     detailProgress: Float = 1f,
     categoryKey: Any? = null,
@@ -118,7 +124,7 @@ fun ArtistGrid(
                             playingArtist = playingArtist,
                             playingAlbum = playingAlbum,
                             isPlaying = isPlaying,
-                            onClick = { onArtistClick(artist) },
+                            onClick = { imageUrl -> onArtistClick(artist, imageUrl) },
                             onFetchImageUrl = { name, id ->
                                 libraryViewModel?.getArtistImageUrl(
                                     name,
@@ -146,7 +152,7 @@ fun ArtistGrid(
 @Composable
 fun ArtistGridItem(
     artist: Artist,
-    onClick: () -> Unit,
+    onClick: (String?) -> Unit,
     playingArtist: String = "",
     playingAlbum: String = "",
     isPlaying: Boolean = false,
@@ -182,7 +188,7 @@ fun ArtistGridItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable { onClick(displayImageUrl) }
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -191,28 +197,32 @@ fun ArtistGridItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
+                .artistSharedElement(key = "artist_image_${artist.id}")
                 .clip(artistShape)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            if (!displayImageUrl.isNullOrEmpty()) {
-                val personPlaceholder = rememberVectorPainter(Icons.Default.Person)
-                AsyncImage(
-                    model = displayImageUrl,
-                    contentDescription = artist.name,
-                    error = personPlaceholder,
-                    placeholder = personPlaceholder,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            val context = LocalContext.current
+            val personPlaceholder = rememberVectorPainter(Icons.Default.Person)
+            val gridImageRequest = remember(displayImageUrl) {
+                ImageRequest.Builder(context)
+                    .data(displayImageUrl)
+                    .apply {
+                        if (!displayImageUrl.isNullOrEmpty()) {
+                            placeholderMemoryCacheKey(displayImageUrl)
+                        }
+                    }
+                    .crossfade(false)
+                    .build()
             }
+
+            AsyncImage(
+                model = gridImageRequest,
+                contentDescription = artist.name,
+                error = personPlaceholder,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         Spacer(modifier = Modifier.size(8.dp))
@@ -265,7 +275,7 @@ private fun ArtistsTabPreview() {
         Surface(modifier = Modifier.fillMaxSize()) {
             ArtistGrid(
                 artists = sampleArtists,
-                onArtistClick = {}
+                onArtistClick = { _, _ -> }
             )
         }
     }

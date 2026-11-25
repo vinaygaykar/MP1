@@ -36,6 +36,7 @@ class ArtistDetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     val artistId: String = savedStateHandle.get<String>("artistId") ?: ""
+    val initialImageUrl: String? = savedStateHandle.get<String>("imageUrl")
 
     private val _candidateImages = MutableStateFlow<List<DeezerArtist>>(emptyList())
     val candidateImages: StateFlow<List<DeezerArtist>> = _candidateImages.asStateFlow()
@@ -52,6 +53,7 @@ class ArtistDetailViewModel @Inject constructor(
             if (currentArtist != null && currentArtist.name.isNotBlank()) {
                 flow<String?> {
                     val cachedOrFetchedUrl = currentArtist.imageUrl
+                        ?: initialImageUrl
                         ?: artistImageRepository.getArtistImageUrl(
                             artistName = currentArtist.name,
                             artistId = currentArtist.id,
@@ -60,10 +62,10 @@ class ArtistDetailViewModel @Inject constructor(
                     emit(cachedOrFetchedUrl)
                 }
             } else {
-                flowOf<String?>(null)
+                flowOf<String?>(initialImageUrl)
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialImageUrl)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val albums: StateFlow<List<Album>> = artist
