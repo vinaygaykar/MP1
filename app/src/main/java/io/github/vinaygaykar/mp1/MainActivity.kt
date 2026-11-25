@@ -224,6 +224,7 @@ fun MainScreen(
                             LibraryScreenV2(
                                 bottomPadding = bottomPadding,
                                 isSplashActive = isSplashActive,
+                                isNowPlayingExpanded = expansionProgress.floatValue > 0.1f,
                                 miniPlayerTargetOffset = miniPlayerTargetOffset,
                                 onBulgeMiniPlayer = {
                                     miniPlayerBulgeTrigger = System.currentTimeMillis()

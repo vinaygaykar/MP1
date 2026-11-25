@@ -34,11 +34,13 @@ import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
 import io.github.vinaygaykar.mp1.playback.session.ensureQueueUid
 import io.github.vinaygaykar.mp1.playback.session.queueUid
 import io.github.vinaygaykar.mp1.playback.session.withQueueUid
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -55,6 +57,21 @@ class PlaybackService : MediaSessionService() {
 
     private var playListJob: Job? = null
     private var saveQueueJob: Job? = null
+
+    private class QueueRequest(val songIds: List<String>, val playNext: Boolean, val epoch: Int)
+    private class QueueOp(val items: List<MediaItem>, val playNext: Boolean)
+
+    /** Add-to-queue / play-next requests, resolved one at a time so they keep the order they arrived in. */
+    private val queueRequests = Channel<QueueRequest>(Channel.UNLIMITED)
+
+    /** Queue edits held back until the queue is restored / the list from [playList] is fully loaded. Main thread only. */
+    private val pendingQueueOps = ArrayList<QueueOp>()
+
+    /** True from the moment [playList] starts until its last chunk is added. Main thread only. */
+    private var isPlayListLoading = false
+
+    /** Bumped by every [playList]: requests made before it targeted the queue it replaced. Main thread only. */
+    private var queueEpoch = 0
 
     /**
      * Shuffle is an app-level flag: the queue is always one concrete order, and switching shuffle
@@ -130,7 +147,22 @@ class PlaybackService : MediaSessionService() {
                 }
 
                 isRestoringState = false
+                flushPendingQueueOps()
                 mediaSession?.setMediaButtonPreferences(buildMediaButtonPreferences(player))
+            }
+        }
+
+        serviceScope.launch {
+            for (request in queueRequests) {
+                val items = try {
+                    withContext(Dispatchers.IO) { resolveQueueItems(request.songIds) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    continue
+                }
+                if (items.isEmpty() || request.epoch != queueEpoch) continue
+                dispatchQueueOp(QueueOp(items, request.playNext))
             }
         }
 
@@ -191,6 +223,8 @@ class PlaybackService : MediaSessionService() {
                 val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
                     .add(PlaybackSessionContract.ToggleRepeatCommand)
                     .add(PlaybackSessionContract.PlayListCommand)
+                    .add(PlaybackSessionContract.AddToQueueCommand)
+                    .add(PlaybackSessionContract.PlayNextCommand)
                     .build()
 
                 return MediaSession.ConnectionResult.accept(
@@ -223,6 +257,19 @@ class PlaybackService : MediaSessionService() {
                         else -> 0
                     }
                     playList(songIds, startIndex, shuffleOn)
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+                if (customCommand == PlaybackSessionContract.AddToQueueCommand ||
+                    customCommand == PlaybackSessionContract.PlayNextCommand
+                ) {
+                    val songIds = args.getStringArrayList(PlaybackSessionContract.EXTRA_SONG_IDS) ?: emptyList()
+                    queueRequests.trySend(
+                        QueueRequest(
+                            songIds = songIds,
+                            playNext = customCommand == PlaybackSessionContract.PlayNextCommand,
+                            epoch = queueEpoch,
+                        )
+                    )
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
                 return super.onCustomCommand(session, controller, customCommand, args)
@@ -280,7 +327,13 @@ class PlaybackService : MediaSessionService() {
 
         val player = mediaSession?.player ?: return
 
-        playListJob = serviceScope.launch(Dispatchers.IO) {
+        // This list replaces the queue: drop edits aimed at the old one and hold back new ones
+        // until the last chunk below is in, so nothing lands in the middle of the list.
+        queueEpoch++
+        pendingQueueOps.clear()
+        isPlayListLoading = true
+
+        val job = serviceScope.launch(Dispatchers.IO) {
             val targetSong = musicRepository.getSongById(songIds[startIndex]) ?: return@launch
             val targetItem = targetSong.toMediaItem().withQueueUid()
 
@@ -342,6 +395,49 @@ class PlaybackService : MediaSessionService() {
                 insertPos += chunk.size
                 delay(50)
             }
+        }
+        playListJob = job
+        job.invokeOnCompletion {
+            serviceScope.launch {
+                // A newer playList() owns the flag now.
+                if (playListJob !== job) return@launch
+                isPlayListLoading = false
+                flushPendingQueueOps()
+            }
+        }
+    }
+
+    /** Songs for [songIds] as new queue entries, in the same order. A repeated id gives a repeated entry. */
+    private suspend fun resolveQueueItems(songIds: List<String>): List<MediaItem> {
+        if (songIds.isEmpty()) return emptyList()
+        val byId = musicRepository.getSongsByIdsSync(songIds.distinct()).associateBy { it.id }
+        return songIds.mapNotNull { id -> byId[id]?.toMediaItem()?.withQueueUid() }
+    }
+
+    private fun dispatchQueueOp(op: QueueOp) {
+        if (isRestoringState || isPlayListLoading) pendingQueueOps.add(op) else applyQueueOp(op)
+    }
+
+    private fun flushPendingQueueOps() {
+        if (isRestoringState || isPlayListLoading || pendingQueueOps.isEmpty()) return
+        val ops = pendingQueueOps.toList()
+        pendingQueueOps.clear()
+        ops.forEach(::applyQueueOp)
+    }
+
+    private fun applyQueueOp(op: QueueOp) {
+        val player = mediaSession?.player ?: return
+        val count = player.mediaItemCount
+        when {
+            count == 0 -> {
+                originalRanks.clear()
+                player.setMediaItems(op.items, true)
+                player.prepare()
+                player.play()
+            }
+            // Insert after the current song; each later play-next goes in front of the earlier ones.
+            op.playNext -> player.addMediaItems((player.currentMediaItemIndex + 1).coerceIn(0, count), op.items)
+            else -> player.addMediaItems(op.items)
         }
     }
 

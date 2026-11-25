@@ -8,6 +8,12 @@ object PlaybackSessionContract {
     val PlayListCommand = SessionCommand("ACTION_PLAY_LIST", Bundle.EMPTY)
     val ToggleRepeatCommand = SessionCommand("ACTION_TOGGLE_REPEAT", Bundle.EMPTY)
 
+    /** Adds the songs in [EXTRA_SONG_IDS] to the end of the queue (starts playing if the queue is empty). */
+    val AddToQueueCommand = SessionCommand("ACTION_ADD_TO_QUEUE", Bundle.EMPTY)
+
+    /** Adds the songs in [EXTRA_SONG_IDS], in order, right after the current song (starts playing if the queue is empty). */
+    val PlayNextCommand = SessionCommand("ACTION_PLAY_NEXT", Bundle.EMPTY)
+
     const val EXTRA_SONG_IDS = "song_ids"
     const val EXTRA_START_INDEX = "start_index"
     const val EXTRA_ALBUM_ID = "album_id"

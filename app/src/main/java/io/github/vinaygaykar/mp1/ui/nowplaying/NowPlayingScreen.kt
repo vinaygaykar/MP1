@@ -144,9 +144,16 @@ fun NowPlayingScreen(
             targetState?.let { state.moveToState(it) }
         }
 
+        val isBackHandlerEnabled = state.showArtistsDialog ||
+                state.showLyrics ||
+                state.showQueue ||
+                state.queueProgress > 0f ||
+                state.anchoredDraggableState.currentValue != DragValue.COLLAPSED ||
+                state.anchoredDraggableState.targetValue != DragValue.COLLAPSED ||
+                state.progress > 0.01f
+
         BackHandler(
-            enabled = state.anchoredDraggableState.currentValue != DragValue.COLLAPSED ||
-                    state.queueProgress > 0f || state.showQueue
+            enabled = isBackHandlerEnabled
         ) {
             if (state.showArtistsDialog) {
                 state.showArtistsDialog = false

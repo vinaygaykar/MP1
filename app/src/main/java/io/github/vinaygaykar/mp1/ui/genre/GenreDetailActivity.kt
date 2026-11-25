@@ -143,7 +143,10 @@ fun GenreDetailScreen(
         }
     }
 
-    BackHandler(enabled = isSelectionMode) {
+    val expansionProgress = remember { mutableFloatStateOf(0f) }
+    val isNowPlayingExpanded = expansionProgress.floatValue > 0.1f
+
+    BackHandler(enabled = !isNowPlayingExpanded && isSelectionMode) {
         selectedSongIds = emptySet()
     }
 
@@ -162,7 +165,6 @@ fun GenreDetailScreen(
 
     MaterialTheme(colorScheme = themeColorScheme) {
         val isPlayerActive = playbackState.trackTitle.isNotEmpty()
-        val expansionProgress = remember { mutableFloatStateOf(0f) }
         val lazyListState = rememberLazyListState()
 
         val showTopBarTitle by remember {

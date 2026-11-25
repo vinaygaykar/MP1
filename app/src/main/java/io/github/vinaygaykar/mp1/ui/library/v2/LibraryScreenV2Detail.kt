@@ -89,7 +89,8 @@ internal fun CategoryDetailScreen(
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
     onPlaySong: (Song, List<Song>) -> Unit,
-    onAddToQueue: (Song) -> Unit,
+    onPlayNext: (List<Song>) -> Unit,
+    onAddToQueue: (List<Song>) -> Unit,
     onImportPlaylistLauncher: () -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
@@ -98,6 +99,7 @@ internal fun CategoryDetailScreen(
     onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onCheckHasOfflineLyrics: suspend (Song) -> Boolean = { false },
     isSplashActive: Boolean = false,
+    isNowPlayingExpanded: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -140,12 +142,12 @@ internal fun CategoryDetailScreen(
     val isActionPopupOpen = isSongsSelectionActive && libraryState.showMultiSelectionSheet
 
     // Back Handler Level 1: When expanded, back press collapses the overlay back to compact mode
-    BackHandler(enabled = isActionPopupOpen) {
+    BackHandler(enabled = !isNowPlayingExpanded && isActionPopupOpen) {
         libraryState.showMultiSelectionSheet = false
     }
 
     // Back Handler Level 2: When collapsed in selection mode, back press exits selection mode and deselects all
-    BackHandler(enabled = isSongsSelectionActive && !libraryState.showMultiSelectionSheet) {
+    BackHandler(enabled = !isNowPlayingExpanded && isSongsSelectionActive && !libraryState.showMultiSelectionSheet) {
         libraryState.clearSongSelection()
     }
 
@@ -174,6 +176,8 @@ internal fun CategoryDetailScreen(
             },
         overlayData = activeOverlayData,
         onDismiss = { activeOverlayData = null },
+        onPlayNext = { song -> onPlayNext(listOf(song)) },
+        onAddToQueue = { song -> onAddToQueue(listOf(song)) },
         onAlbumClick = onAlbumClick
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -419,7 +423,7 @@ internal fun CategoryDetailScreen(
                 },
                 onPlayNext = { activeSongs ->
                     if (activeSongs.isNotEmpty()) {
-                        activeSongs.forEach { song -> onAddToQueue(song) }
+                        onPlayNext(activeSongs)
                         libraryState.clearSongSelection()
                     }
                 },
@@ -429,7 +433,7 @@ internal fun CategoryDetailScreen(
                 },
                 onAddToQueue = { activeSongs ->
                     if (activeSongs.isNotEmpty()) {
-                        activeSongs.forEach { song -> onAddToQueue(song) }
+                        onAddToQueue(activeSongs)
                         libraryState.clearSongSelection()
                     }
                 },

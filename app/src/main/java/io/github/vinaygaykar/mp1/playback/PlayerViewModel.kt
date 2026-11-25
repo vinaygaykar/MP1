@@ -128,6 +128,8 @@ class PlayerViewModel @Inject constructor(
                 ) {
                     if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
                         updateState()
+                    } else {
+                        refreshNavigationAvailability()
                     }
                     val isPlaylistChanged = reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
                     updateQueueFromTimeline(timeline, forceRebuild = isPlaylistChanged)
@@ -243,6 +245,17 @@ class PlayerViewModel @Inject constructor(
 
         if (_lyricsState.value is LyricsUiState.None) {
             fetchLyrics(mediaId)
+        }
+    }
+
+    /** Next/previous availability depends on the queue, so it must follow queue edits (e.g. songs added after the last one). */
+    private fun refreshNavigationAvailability() {
+        val player = controller ?: return
+        val hasNext = player.hasNextMediaItem()
+        val hasPrevious = player.hasPreviousMediaItem()
+        _playbackState.update {
+            if (it.hasNext == hasNext && it.hasPrevious == hasPrevious) it
+            else it.copy(hasNext = hasNext, hasPrevious = hasPrevious)
         }
     }
 

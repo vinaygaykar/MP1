@@ -113,8 +113,12 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    fun addToQueue(song: Song) {
-        viewModelScope.launch { playback.addToQueue(song) }
+    fun addToQueue(songs: List<Song>) {
+        viewModelScope.launch { playback.addToQueue(songs) }
+    }
+
+    fun playNext(songs: List<Song>) {
+        viewModelScope.launch { playback.playNext(songs) }
     }
 
     suspend fun checkHasOfflineLyrics(song: Song): Boolean {

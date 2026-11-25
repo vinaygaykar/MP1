@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 fun LibraryScreenV2(
     bottomPadding: Dp = 0.dp,
     isSplashActive: Boolean = false,
+    isNowPlayingExpanded: Boolean = false,
     miniPlayerTargetOffset: Offset? = null,
     onBulgeMiniPlayer: () -> Unit = {},
     onSearchClick: () -> Unit = {},
@@ -104,6 +105,7 @@ fun LibraryScreenV2(
         uiState = uiState,
         bottomPadding = bottomPadding,
         isSplashActive = isSplashActive,
+        isNowPlayingExpanded = isNowPlayingExpanded,
         miniPlayerTargetOffset = miniPlayerTargetOffset,
         onDismissImportError = { viewModel.clearImportError() },
         onBulgeMiniPlayer = onBulgeMiniPlayer,
@@ -116,6 +118,7 @@ fun LibraryScreenV2(
         onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
         onNowPlayingOffsetYChange = onNowPlayingOffsetYChange,
         onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
+        onPlayNext = { viewModel.playNext(it) },
         onAddToQueue = { viewModel.addToQueue(it) },
         onCreatePlaylist = { viewModel.createPlaylist(it) },
         onDeletePlaylists = { viewModel.deletePlaylists(it) },
@@ -141,6 +144,7 @@ fun LibraryContentV2(
     uiState: LibraryUiState,
     bottomPadding: Dp = 0.dp,
     isSplashActive: Boolean = false,
+    isNowPlayingExpanded: Boolean = false,
     miniPlayerTargetOffset: Offset? = null,
     onDismissImportError: () -> Unit = {},
     onBulgeMiniPlayer: () -> Unit = {},
@@ -153,7 +157,8 @@ fun LibraryContentV2(
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onNowPlayingOffsetYChange: (Float) -> Unit = {},
     onPlaySong: (io.github.vinaygaykar.mp1.domain.models.Song, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> },
-    onAddToQueue: (io.github.vinaygaykar.mp1.domain.models.Song) -> Unit = {},
+    onPlayNext: (List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = {},
+    onAddToQueue: (List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = {},
     onCreatePlaylist: (String) -> Unit = {},
     onDeletePlaylists: (Set<Long>) -> Unit = {},
     onImportPlaylist: (Uri) -> Unit = {},
@@ -322,9 +327,11 @@ fun LibraryContentV2(
     }
 
     BackHandler(
-        enabled = libraryState.isSelectionMode ||
-                libraryState.isPlaylistSelectionMode ||
-                anchoredDraggableState.currentValue == DragValue.EXPANDED
+        enabled = !isNowPlayingExpanded && (
+            libraryState.isSelectionMode ||
+            libraryState.isPlaylistSelectionMode ||
+            anchoredDraggableState.currentValue == DragValue.EXPANDED
+        )
     ) {
         if (libraryState.isSelectionMode) {
             libraryState.clearSongSelection()
@@ -433,6 +440,7 @@ fun LibraryContentV2(
                 bottomPadding = bottomPadding,
                 detailProgress = detailProgress,
                 isSplashActive = isSplashActive,
+                isNowPlayingExpanded = isNowPlayingExpanded,
                 scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
@@ -443,6 +451,7 @@ fun LibraryContentV2(
                 onArtistClick = onArtistClick,
                 onPlaylistClick = onPlaylistClick,
                 onPlaySong = onPlaySong,
+                onPlayNext = onPlayNext,
                 onAddToQueue = onAddToQueue,
                 onCheckHasOfflineLyrics = onCheckHasOfflineLyrics,
                 onImportPlaylistLauncher = {

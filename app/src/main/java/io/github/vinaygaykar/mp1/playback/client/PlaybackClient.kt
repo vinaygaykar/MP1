@@ -2,6 +2,7 @@ package io.github.vinaygaykar.mp1.playback.client
 
 import android.os.Bundle
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.domain.models.toMediaItem
 import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
@@ -59,8 +60,34 @@ class PlaybackClient @Inject constructor(
         connection.controller().playSingle(song)
     }
 
-    suspend fun addToQueue(song: Song) = withContext(Dispatchers.Main.immediate) {
-        connection.controller().addMediaItem(song.toMediaItem())
+    /** Adds [song] to the end of the queue. Starts playing if the queue is empty. */
+    suspend fun addToQueue(song: Song) = addToQueue(listOf(song))
+
+    /** Adds [songs], in the given order, to the end of the queue. Starts playing if the queue is empty. */
+    suspend fun addToQueue(songs: List<Song>) =
+        sendQueueCommand(PlaybackSessionContract.AddToQueueCommand, songs)
+
+    /**
+     * Adds [songs], in the given order, right after the current song. Songs already added with
+     * an earlier play-next end up after these. Starts playing if the queue is empty.
+     */
+    suspend fun playNext(songs: List<Song>) =
+        sendQueueCommand(PlaybackSessionContract.PlayNextCommand, songs)
+
+    // The service owns the queue, so it can hold these back while a long list is still loading.
+    private suspend fun sendQueueCommand(command: SessionCommand, songs: List<Song>) {
+        if (songs.isEmpty()) return
+        withContext(Dispatchers.Main.immediate) {
+            connection.controller().sendCustomCommand(
+                command,
+                Bundle().apply {
+                    putStringArrayList(
+                        PlaybackSessionContract.EXTRA_SONG_IDS,
+                        ArrayList(songs.map { it.id }),
+                    )
+                },
+            ).await()
+        }
     }
 
     private fun MediaController.playSingle(song: Song) {
