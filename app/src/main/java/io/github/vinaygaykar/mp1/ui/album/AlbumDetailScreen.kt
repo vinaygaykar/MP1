@@ -1,13 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.album
 
+import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -57,11 +51,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import android.view.HapticFeedbackConstants
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -105,6 +96,9 @@ import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
 import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
+import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
+import io.github.vinaygaykar.mp1.ui.components.SongListItem
+import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
@@ -120,6 +114,8 @@ import kotlin.math.ceil
 fun AlbumDetailScreen(
     onBack: () -> Unit,
     onArtistClick: (String) -> Unit,
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
     viewModel: AlbumDetailViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -128,9 +124,17 @@ fun AlbumDetailScreen(
     val songs by viewModel.songs.collectAsState()
     val featuredArtists by viewModel.featuredArtists.collectAsState()
     val playbackState by playerViewModel.playbackState.collectAsState()
-    val queueState by playerViewModel.queueState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
+    var activeOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
+
+    LaunchedEffect(activeOverlayData != null) {
+        if (activeOverlayData != null) {
+            onHideNowPlayingView()
+        } else {
+            onShowNowPlayingView()
+        }
+    }
     var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
     val isSelectionMode = selectedSongIds.isNotEmpty()
     var showMultiSelectionSheet by remember { mutableStateOf(false) }
@@ -173,27 +177,6 @@ fun AlbumDetailScreen(
         val isPlayerActive = playbackState.trackTitle.isNotEmpty()
 
         val lazyListState = rememberLazyListState()
-
-        val showTopBarTitle by remember {
-            derivedStateOf {
-                lazyListState.firstVisibleItemIndex > 1 ||
-                        (lazyListState.firstVisibleItemIndex == 1 && lazyListState.firstVisibleItemScrollOffset > 40)
-            }
-        }
-
-        val topBarContainerColor = if (showTopBarTitle) {
-            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)
-        } else {
-            Color.Transparent
-        }
-
-        val cardColor = Color.Transparent
-
-        val currentPlayingMediaId = remember(queueState.items, queueState.currentIndex) {
-            if (queueState.currentIndex in queueState.items.indices) {
-                queueState.items[queueState.currentIndex].mediaId
-            } else null
-        }
 
         val artistName = remember(album?.artist) {
             album?.artist?.splitArtistsByDelimiters()?.joinArtistsForDisplay() ?: album?.artist
@@ -238,19 +221,6 @@ fun AlbumDetailScreen(
         var rootSize by remember { mutableStateOf(IntSize.Zero) }
 
         val density = LocalDensity.current
-
-        val handleAddToQueue: (Song, Offset, IntSize) -> Unit = { song, offset, size ->
-            viewModel.addToQueue(song)
-            if (isPlayerActive) {
-                flyingArtworks.add(
-                    FlyingArtworkItem(
-                        artworkUri = song.artworkUri ?: album?.artworkUri,
-                        startOffset = offset,
-                        startSize = size
-                    )
-                )
-            }
-        }
 
         Box(
             modifier = Modifier
@@ -298,6 +268,7 @@ fun AlbumDetailScreen(
             }
 
             val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val bottomPadding = if (isPlayerActive) 72.dp + 16.dp + navBarBottom else 16.dp + navBarBottom
 
             if (showCreatePlaylistForSelectionDialog) {
@@ -310,238 +281,219 @@ fun AlbumDetailScreen(
                 )
             }
 
-            Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-                topBar = {
-                    if (isSelectionMode) {
-                        SelectionActionRow(
-                            selectedCount = selectedSongIds.size,
-                            onSelectAll = { selectedSongIds = songs.map { it.id }.toSet() },
-                            onDeselect = { selectedSongIds = emptySet() },
-                            onOptionsClick = { showMultiSelectionSheet = true },
-                            modifier = Modifier.padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
-                        )
-                    } else {
-                        TopAppBar(
-                            title = {
-                                AnimatedVisibility(
-                                    visible = showTopBarTitle,
-                                    enter = fadeIn(tween(200)) + slideInVertically(animationSpec = tween(200)) { it / 2 },
-                                    exit = fadeOut(tween(150)) + slideOutVertically(animationSpec = tween(150)) { it / 2 }
-                                ) {
-                                    Column(modifier = Modifier.padding(start = 4.dp)) {
-                                        Text(
-                                            text = album?.name ?: "",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.basicMarquee()
-                                        )
-                                        if (artistName != null && hasArtist) {
-                                            Text(
-                                                text = artistName,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.basicMarquee()
-                                            )
-                                        }
-                                    }
-                                }
-                            },
-                            navigationIcon = {
-                                FilledTonalIconButton(
-                                    onClick = onBack,
-                                    modifier = Modifier.padding(start = 8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Back"
-                                    )
-                                }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = topBarContainerColor
-                            )
-                        )
-                    }
+            SongHeroOverlayContainer(
+                modifier = Modifier.fillMaxSize(),
+                overlayData = activeOverlayData,
+                onDismiss = { activeOverlayData = null },
+                onPlayNext = { song -> viewModel.addToQueue(song) },
+                onAddToQueue = { song -> viewModel.addToQueue(song) },
+                onAddToPlaylist = { song ->
+                    selectedSongIds = setOf(song.id)
+                    showPlaylistSelectionSheet = true
                 }
-            ) { innerPadding ->
-                LazyColumn(
-                    state = lazyListState,
+            ) {
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = bottomPadding
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .background(MaterialTheme.colorScheme.background)
                 ) {
-                    // 1. Album Name in Hero Text
-                    item {
-                        AutoResizedText(
-                            text = album?.name ?: "Loading Album...",
-                            style = MaterialTheme.typography.displaySmall,
-                            maxLines = 5,
-                            minFontSize = 20.sp,
-                            maxFontSize = 56.sp,
-                            fontWeight = FontWeight.Bold,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        )
-                    }
-
-                    // 2. Album Art (Square shape, no rounded corners, edge-to-edge minus screen padding)
-                    item {
-                        val artworkUri = album?.artworkUri
-                        if (artworkUri != null) {
-                            val request = remember(artworkUri) {
-                                ImageRequest.Builder(context)
-                                    .data(artworkUri)
-                                    .size(800, 800)
-                                    .crossfade(true)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = request,
-                                contentDescription = album?.name,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Album,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(96.dp),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            top = statusBarTop + 52.dp,
+                            bottom = bottomPadding
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // 1. Album Artwork (First, sharp corners with horizontal padding)
+                        item {
+                            val artworkUri = album?.artworkUri
+                            if (artworkUri != null) {
+                                val request = remember(artworkUri) {
+                                    ImageRequest.Builder(context)
+                                        .data(artworkUri)
+                                        .size(800, 800)
+                                        .crossfade(true)
+                                        .build()
+                                }
+                                AsyncImage(
+                                    model = request,
+                                    contentDescription = album?.name,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .aspectRatio(1f),
+                                    contentScale = ContentScale.Crop
                                 )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .aspectRatio(1f)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Album,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(96.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    // 3. Album Artist (or primary artist)
-                    if (artistName != null && hasArtist) {
+                        // 2. Album Name (Changed to title typography, second)
                         item {
-                            Text(
-                                text = artistName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
+                            AutoResizedText(
+                                text = album?.name ?: "Loading Album...",
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 3,
+                                minFontSize = 18.sp,
+                                maxFontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { primaryArtist?.let { onArtistClick(it.id) } }
-                                    .basicMarquee()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
                             )
                         }
-                    }
 
-                    // 4. Release Year
-                    item {
-                        val yearText = remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
-                        if (yearText != null) {
-                            Text(
-                                text = yearText,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
-                    // Row before song list: Track Count & Duration (left) and Shuffle Button (right)
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp, bottom = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val trackCount = songs.size
-                            val tracksText = if (trackCount == 1) "1 track" else "$trackCount tracks"
-                            val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
-                            val durationText = remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
-
-                            Column {
+                        // 3. Album Artist (or primary artist)
+                        if (artistName != null && hasArtist) {
+                            item {
                                 Text(
-                                    text = tracksText,
+                                    text = artistName,
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .clickable { primaryArtist?.let { onArtistClick(it.id) } }
+                                        .basicMarquee()
                                 )
-                                if (durationText.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(2.dp))
+                            }
+                        }
+
+                        // 4. Release Year
+                        item {
+                            val yearText = remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
+                            if (yearText != null) {
+                                Text(
+                                    text = yearText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                )
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        // Row before song list: Track Count & Duration (left) and Shuffle Button (right)
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val trackCount = songs.size
+                                val tracksText = if (trackCount == 1) "1 track" else "$trackCount tracks"
+                                val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
+                                val durationText = remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
+
+                                Column {
                                     Text(
-                                        text = durationText,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                        fontWeight = FontWeight.Medium
+                                        text = tracksText,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (durationText.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = durationText,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                FilledTonalIconButton(
+                                    onClick = { viewModel.playAlbum(shuffle = true) },
+                                    enabled = songs.isNotEmpty(),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.secondary,
+                                        contentColor = MaterialTheme.colorScheme.onSecondary
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = "Shuffle"
                                     )
                                 }
                             }
-
-                            FilledTonalIconButton(
-                                onClick = { viewModel.playAlbum(shuffle = true) },
-                                enabled = songs.isNotEmpty(),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary,
-                                    contentColor = MaterialTheme.colorScheme.onSecondary
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Shuffle,
-                                    contentDescription = "Shuffle"
-                                )
-                            }
                         }
-                    }
 
-                    // 5. List of Songs (Grouped by Disc if multi-disc, else flat list)
-                    if (hasMultipleDiscs) {
-                        songsByDisc.forEach { (discNumber, discSongs) ->
-                            item(key = "disc_header_$discNumber") {
-                                Text(
-                                    text = "Disc $discNumber",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp, bottom = 4.dp, start = 4.dp)
-                                )
+                        // 5. List of Songs (Grouped by Disc if multi-disc, else flat list)
+                        if (hasMultipleDiscs) {
+                            songsByDisc.forEach { (discNumber, discSongs) ->
+                                item(key = "disc_header_$discNumber") {
+                                    Text(
+                                        text = "Disc $discNumber",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
+                                    )
+                                }
+                                itemsIndexed(discSongs, key = { _, song -> song.id }) { _, song ->
+                                    val isSelected = selectedSongIds.contains(song.id)
+                                    SongListItem(
+                                        song = song,
+                                        onClick = {
+                                            if (isSelectionMode) {
+                                                toggleSongSelection(song)
+                                            } else {
+                                                viewModel.playSong(song)
+                                            }
+                                        },
+                                        isSelected = isSelected,
+                                        isSelectionMode = isSelectionMode,
+                                        showTrackNumber = true,
+                                        onLongClick = { toggleSongSelection(song) },
+                                        onMoreClick = { offset, size ->
+                                            activeOverlayData = SongOverlayData(
+                                                song = song,
+                                                startOffset = offset,
+                                                startSize = size
+                                            )
+                                        }
+                                    )
+                                }
                             }
-                            itemsIndexed(discSongs, key = { _, song -> song.id }) { index, song ->
-                                val isCurrentSong = (currentPlayingMediaId == song.id) ||
-                                        (currentPlayingMediaId.isNullOrEmpty() && playbackState.trackTitle == song.title)
-                                SongCardItem(
+                        } else {
+                            itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
+                                val isSelected = selectedSongIds.contains(song.id)
+                                SongListItem(
                                     song = song,
-                                    trackIndex = index + 1,
-                                    isCurrentSong = isCurrentSong,
-                                    cardColor = cardColor,
                                     onClick = {
                                         if (isSelectionMode) {
                                             toggleSongSelection(song)
@@ -549,72 +501,87 @@ fun AlbumDetailScreen(
                                             viewModel.playSong(song)
                                         }
                                     },
-                                    onAddToQueue = { offset, size -> handleAddToQueue(song, offset, size) },
-                                    isSelected = selectedSongIds.contains(song.id),
+                                    isSelected = isSelected,
                                     isSelectionMode = isSelectionMode,
-                                    onLongClick = { toggleSongSelection(song) }
+                                    showTrackNumber = true,
+                                    onLongClick = { toggleSongSelection(song) },
+                                    onMoreClick = { offset, size ->
+                                        activeOverlayData = SongOverlayData(
+                                            song = song,
+                                            startOffset = offset,
+                                            startSize = size
+                                        )
+                                    }
                                 )
                             }
                         }
-                    } else {
-                        itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
-                            val isCurrentSong = (currentPlayingMediaId == song.id) ||
-                                    (currentPlayingMediaId.isNullOrEmpty() && playbackState.trackTitle == song.title)
-                            SongCardItem(
-                                song = song,
-                                trackIndex = index + 1,
-                                isCurrentSong = isCurrentSong,
-                                cardColor = cardColor,
-                                onClick = {
-                                    if (isSelectionMode) {
-                                        toggleSongSelection(song)
-                                    } else {
-                                        viewModel.playSong(song)
-                                    }
-                                },
-                                onAddToQueue = { offset, size -> handleAddToQueue(song, offset, size) },
-                                isSelected = selectedSongIds.contains(song.id),
-                                isSelectionMode = isSelectionMode,
-                                onLongClick = { toggleSongSelection(song) }
-                            )
-                        }
-                    }
 
-                    // Featured Artists Horizontal List (after song list)
-                    if (featuredArtists.isNotEmpty()) {
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 16.dp, bottom = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                val title = if (featuredArtists.size == 1) "Featured Artist" else "Featured Artists"
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground,
+                        // Featured Artists Horizontal List (after song list)
+                        if (featuredArtists.isNotEmpty()) {
+                            item {
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 4.dp)
-                                )
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(top = 16.dp, bottom = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(featuredArtists, key = { it.id }) { artist ->
-                                        CollaboratorArtistCard(
-                                            artist = artist,
-                                            playingArtist = playbackState.artist,
-                                            playingAlbum = playbackState.album,
-                                            isPlaying = playbackState.isPlaying,
-                                            onClick = { onArtistClick(artist.id) }
-                                        )
+                                    val title = if (featuredArtists.size == 1) "Featured Artist" else "Featured Artists"
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp)
+                                    )
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        items(featuredArtists, key = { it.id }) { artist ->
+                                            CollaboratorArtistCard(
+                                                artist = artist,
+                                                playingArtist = playbackState.artist,
+                                                playingAlbum = playbackState.album,
+                                                isPlaying = playbackState.isPlaying,
+                                                onClick = { onArtistClick(artist.id) }
+                                            )
+                                        }
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    // Floating Back Arrow / Selection Action Row
+                    if (isSelectionMode) {
+                        SelectionActionRow(
+                            selectedCount = selectedSongIds.size,
+                            onSelectAll = { selectedSongIds = songs.map { it.id }.toSet() },
+                            onDeselect = { selectedSongIds = emptySet() },
+                            onOptionsClick = { showMultiSelectionSheet = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f))
+                                .padding(top = statusBarTop)
+                        )
+                    } else {
+                        FilledTonalIconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(top = statusBarTop, start = 16.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f),
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
                         }
                     }
                 }

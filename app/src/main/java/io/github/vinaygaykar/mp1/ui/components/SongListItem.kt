@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ fun SongListItem(
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
     showTrackNumber: Boolean = false,
+    containerColor: Color = Color.Transparent,
     onLongClick: () -> Unit = {},
     onMoreClick: (Offset, IntSize) -> Unit = { _, _ -> }
 ) {
@@ -161,7 +163,7 @@ fun SongListItem(
         },
         colors = ListItemDefaults.colors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surface
+            else containerColor
         ),
         modifier = modifier
             .fillMaxWidth()

@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -49,6 +47,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
+import io.github.vinaygaykar.mp1.ui.nowplaying.rememberNowPlayingVisibilityController
 import io.github.vinaygaykar.mp1.ui.library.DragValue
 import io.github.vinaygaykar.mp1.ui.library.LibraryViewModel
 import io.github.vinaygaykar.mp1.ui.settings.SettingsViewModel
@@ -67,7 +66,7 @@ fun LibraryScreenV2(
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
     onAlbumClick: (String) -> Unit = {},
-    onArtistClick: (String) -> Unit = {},
+    onArtistClick: (String, String?) -> Unit = { _, _ -> },
     onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onNowPlayingOffsetYChange: (Float) -> Unit = {},
@@ -152,7 +151,7 @@ fun LibraryContentV2(
     onSettingsClick: () -> Unit = {},
     onOpenScanLocations: () -> Unit = {},
     onAlbumClick: (String) -> Unit = {},
-    onArtistClick: (String) -> Unit = {},
+    onArtistClick: (String, String?) -> Unit = { _, _ -> },
     onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onNowPlayingOffsetYChange: (Float) -> Unit = {},
@@ -234,7 +233,6 @@ fun LibraryContentV2(
         anchoredDraggableState.updateAnchors(anchors)
     }
 
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     var previousOpenedCategory by remember { mutableStateOf<LibraryCategory?>(null) }
 
     val nestedScrollConnection = remember(onMiniPlayerCollapseChange, anchoredDraggableState, screenWidthPx) {
@@ -265,10 +263,6 @@ fun LibraryContentV2(
     fun openCategory(category: LibraryCategory) {
         if (category.isListCategory) {
             onMiniPlayerCollapseChange(false)
-            val isNewCategory = previousOpenedCategory != category
-            if (isNewCategory) {
-                scrollBehavior.state.heightOffset = 0f
-            }
             previousOpenedCategory = category
             libraryState.lastOpenedCategory = category
             coroutineScope.launch {
@@ -289,42 +283,13 @@ fun LibraryContentV2(
         }
     }
 
-    val nowPlayingOffsetY = remember { Animatable(0f) }
+    val nowPlayingController = rememberNowPlayingVisibilityController(
+        bottomPadding = bottomPadding,
+        onNowPlayingOffsetYChange = onNowPlayingOffsetYChange
+    )
 
-    LaunchedEffect(nowPlayingOffsetY.value) {
-        onNowPlayingOffsetYChange(nowPlayingOffsetY.value)
-    }
-
-    /**
-     * Slides the collapsed Now Playing view downward below the screen bounds.
-     */
-    fun hideNowPlayingView() {
-        coroutineScope.launch {
-            val slideDistancePx = with(density) { (72.dp + bottomPadding).toPx() }
-            nowPlayingOffsetY.animateTo(
-                targetValue = slideDistancePx,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            )
-        }
-    }
-
-    /**
-     * Slides the collapsed Now Playing view back up into its original screen position.
-     */
-    fun showNowPlayingView() {
-        coroutineScope.launch {
-            nowPlayingOffsetY.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            )
-        }
-    }
+    fun hideNowPlayingView() = nowPlayingController.hide()
+    fun showNowPlayingView() = nowPlayingController.show()
 
     BackHandler(
         enabled = !isNowPlayingExpanded && (
@@ -441,7 +406,6 @@ fun LibraryContentV2(
                 detailProgress = detailProgress,
                 isSplashActive = isSplashActive,
                 isNowPlayingExpanded = isNowPlayingExpanded,
-                scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 onOpenScanLocations = onOpenScanLocations,

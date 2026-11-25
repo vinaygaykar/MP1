@@ -20,23 +20,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -84,7 +83,6 @@ internal fun CategoryDetailScreen(
     displayFolder: String?,
     bottomPadding: Dp,
     detailProgress: Float,
-    scrollBehavior: TopAppBarScrollBehavior,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
@@ -95,7 +93,7 @@ internal fun CategoryDetailScreen(
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
     onAlbumClick: (String) -> Unit = {},
-    onArtistClick: (String) -> Unit = {},
+    onArtistClick: (String, String?) -> Unit = { _, _ -> },
     onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onCheckHasOfflineLyrics: suspend (Song) -> Boolean = { false },
     isSplashActive: Boolean = false,
@@ -107,16 +105,21 @@ internal fun CategoryDetailScreen(
 
     var noticeBannerHeightPx by remember { mutableFloatStateOf(0f) }
 
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
+    LaunchedEffect(libraryState.lastOpenedCategory) {
+        scrollBehavior.state.heightOffset = 0f
+    }
+
     LaunchedEffect(uiState.isScanning) {
         if (!uiState.isScanning) {
             noticeBannerHeightPx = 0f
         }
     }
 
-    val isFloatingVisible by remember(scrollBehavior, libraryState) {
+    val isFloatingVisible by remember(libraryState) {
         derivedStateOf {
-            scrollBehavior.state.collapsedFraction > 0.9f &&
-                    !libraryState.isSelectionMode &&
+            !libraryState.isSelectionMode &&
                     !libraryState.isPlaylistSelectionMode
         }
     }
@@ -166,6 +169,12 @@ internal fun CategoryDetailScreen(
     }
 
     val hazeState = remember { HazeState() }
+
+    val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val noticeBannerHeightDp = with(density) {
+        if (uiState.isScanning) noticeBannerHeightPx.toDp() else 0.dp
+    }
+    val listTopPadding = statusBarTopPadding + 64.dp + noticeBannerHeightDp
 
     SongHeroOverlayContainer(
         modifier = modifier
@@ -222,41 +231,7 @@ internal fun CategoryDetailScreen(
                     )
                 }
 
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = libraryState.lastOpenedCategory.title,
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    actions = {
-                        IconButton(onClick = onSearchClick) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        IconButton(onClick = onSettingsClick) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                    windowInsets = TopAppBarDefaults.windowInsets,
-                    scrollBehavior = scrollBehavior,
-                )
-
-                // Sticky Selection Row if Active (Preserved - replaced by floating OverlappingArtworksRow2 for SONGS)
+                // Sticky Selection Row if Active
                 AnimatedVisibility(
                     visible = (libraryState.lastOpenedCategory == LibraryCategory.PLAYLISTS && libraryState.isPlaylistSelectionMode),
                     enter = expandVertically() + fadeIn(),
@@ -304,7 +279,7 @@ internal fun CategoryDetailScreen(
                                 onPlaylistLongClick = { playlist ->
                                     libraryState.togglePlaylistSelection(playlist)
                                 },
-                                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
+                                contentPadding = PaddingValues(top = listTopPadding, bottom = bottomPadding)
                             )
                         }
 
@@ -333,7 +308,7 @@ internal fun CategoryDetailScreen(
                                 },
                                 selectedSongIds = libraryState.selectedSongIds,
                                 isSelectionMode = libraryState.isSelectionMode,
-                                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
+                                contentPadding = PaddingValues(top = listTopPadding, bottom = bottomPadding),
                                 headerHeight = 104.dp
                             )
                         }
@@ -346,7 +321,7 @@ internal fun CategoryDetailScreen(
                                 categoryKey = libraryState.lastOpenedCategory,
                                 isSplashActive = isSplashActive,
                                 isCategoryEntranceComplete = isCategoryEntranceComplete,
-                                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
+                                contentPadding = PaddingValues(top = listTopPadding, bottom = bottomPadding)
                             )
                         }
 
@@ -357,8 +332,8 @@ internal fun CategoryDetailScreen(
                                 categoryKey = libraryState.lastOpenedCategory,
                                 isSplashActive = isSplashActive,
                                 isCategoryEntranceComplete = isCategoryEntranceComplete,
-                                onArtistClick = { artist -> onArtistClick(artist.id) },
-                                contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
+                                onArtistClick = { artist, imageUrl -> onArtistClick(artist.id, imageUrl ?: artist.imageUrl) },
+                                contentPadding = PaddingValues(top = listTopPadding, bottom = bottomPadding)
                             )
                         }
 
@@ -367,44 +342,54 @@ internal fun CategoryDetailScreen(
                 }
             }
 
-            // Floating Search Button visible when action bar is hidden (hidden when detail overlay is open)
-            if (isFloatingVisible && activeOverlayData == null) {
-                val noticeBannerHeightDp = with(density) {
-                    if (uiState.isScanning) noticeBannerHeightPx.toDp() else 0.dp
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(top = noticeBannerHeightDp)
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .align(Alignment.TopCenter)
-                        .zIndex(3f)
-                ) {
-                    Surface(
-                        onClick = onSearchClick,
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tonalElevation = 6.dp,
-                        shadowElevation = 8.dp,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(44.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
+            // TopAppBar with transparent background that collapses completely above status bar
+            AnimatedVisibility(
+                visible = isFloatingVisible && activeOverlayData == null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = noticeBannerHeightDp)
+                    .align(Alignment.TopCenter)
+                    .zIndex(3f)
+            ) {
+                val statusBarTopPaddingPx = with(density) { statusBarTopPadding.toPx() }
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = libraryState.lastOpenedCategory.title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = onSearchClick) {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                contentDescription = "Search"
                             )
                         }
-                    }
-                }
-            }
-
-            // Unified OverlappingArtworksRow2 floating overlay (Compact top bar when closed, full-screen scrollable overlay when expanded)
-            val noticeBannerHeightDp = with(density) {
-                if (uiState.isScanning) noticeBannerHeightPx.toDp() else 0.dp
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    scrollBehavior = scrollBehavior,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .graphicsLayer {
+                            val limit = scrollBehavior.state.heightOffsetLimit
+                            val collapseFraction = if (limit < 0f) {
+                                (scrollBehavior.state.heightOffset / limit).coerceIn(0f, 1f)
+                            } else 0f
+                            translationY = -collapseFraction * statusBarTopPaddingPx
+                        }
+                )
             }
 
             val isActionPopupVisible = libraryState.showMultiSelectionSheet &&

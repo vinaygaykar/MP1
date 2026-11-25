@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,8 +58,11 @@ import dagger.hilt.android.AndroidEntryPoint
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.album.AlbumDetailScreen
 import io.github.vinaygaykar.mp1.ui.artist.ArtistDetailScreen
+import io.github.vinaygaykar.mp1.ui.components.LocalAnimatedVisibilityScope
+import io.github.vinaygaykar.mp1.ui.components.LocalSharedTransitionScope
 import io.github.vinaygaykar.mp1.ui.library.v2.LibraryScreenV2
 import io.github.vinaygaykar.mp1.ui.nowplaying.NowPlayingScreen
+import io.github.vinaygaykar.mp1.ui.nowplaying.rememberNowPlayingVisibilityController
 import io.github.vinaygaykar.mp1.ui.playlist.PlaylistDetailScreen
 import io.github.vinaygaykar.mp1.ui.search.SearchScreen
 import io.github.vinaygaykar.mp1.ui.settings.ScanLocationScreen
@@ -95,10 +99,15 @@ class MainActivity : ComponentActivity() {
 }
 
 object Routes {
-    const val ARTIST_DETAIL = "artist_detail/{artistId}"
+    const val ARTIST_DETAIL = "artist_detail/{artistId}?imageUrl={imageUrl}"
     const val PLAYLIST_DETAIL = "playlist_detail/{playlistId}?playlistName={playlistName}"
 
-    fun artistDetail(id: String) = "artist_detail/${Uri.encode(id)}"
+    fun artistDetail(id: String, imageUrl: String? = null) =
+        if (!imageUrl.isNullOrEmpty()) {
+            "artist_detail/${Uri.encode(id)}?imageUrl=${Uri.encode(imageUrl)}"
+        } else {
+            "artist_detail/${Uri.encode(id)}"
+        }
     fun playlistDetail(id: Long, name: String) =
         "playlist_detail/$id?playlistName=${Uri.encode(name)}"
 }
@@ -200,126 +209,148 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(innerPadding)) {
                 SharedTransitionLayout {
-                    NavHost(
-                        navController = navController,
-                        startDestination = startDestination,
-                        modifier = Modifier.fillMaxSize()
+                    CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout
                     ) {
-                        composable(
-                            route = Screen.Library.route,
-                            exitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 3 },
-                                    animationSpec = tween(350)
-                                ) + fadeOut(tween(350))
-                            },
-                            popEnterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { -it / 3 },
-                                    animationSpec = tween(350)
-                                ) + fadeIn(tween(350))
-                            }
+                        NavHost(
+                            navController = navController,
+                            startDestination = startDestination,
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            val isSplashActive = (showSplash != false && !splashFinished)
-                            LibraryScreenV2(
-                                bottomPadding = bottomPadding,
-                                isSplashActive = isSplashActive,
-                                isNowPlayingExpanded = expansionProgress.floatValue > 0.1f,
-                                miniPlayerTargetOffset = miniPlayerTargetOffset,
-                                onBulgeMiniPlayer = {
-                                    miniPlayerBulgeTrigger = System.currentTimeMillis()
+                            composable(
+                                route = Screen.Library.route,
+                                exitTransition = {
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -it / 3 },
+                                        animationSpec = tween(350)
+                                    ) + fadeOut(tween(350))
                                 },
-                                onSearchClick = { navController.navigate(Screen.Search.route) },
-                                onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                                onOpenScanLocations = { navController.navigate("scan_locations") },
-                                onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
-                                onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
-                                onPlaylistClick = { id, name -> navController.navigate(Routes.playlistDetail(id, name)) },
-                                onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
-                                onNowPlayingOffsetYChange = { nowPlayingOffsetY = it }
-                            )
-                        }
-                        composable(
-                            route = Screen.Search.route,
-                            enterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { it },
-                                    animationSpec = tween(350)
-                                ) + fadeIn(tween(350))
-                            },
-                            exitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 3 },
-                                    animationSpec = tween(350)
-                                ) + fadeOut(tween(350))
-                            },
-                            popEnterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { -it / 3 },
-                                    animationSpec = tween(350)
-                                ) + fadeIn(tween(350))
-                            },
-                            popExitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { it },
-                                    animationSpec = tween(350)
-                                ) + fadeOut(tween(350))
+                                popEnterTransition = {
+                                    slideInHorizontally(
+                                        initialOffsetX = { -it / 3 },
+                                        animationSpec = tween(350)
+                                    ) + fadeIn(tween(350))
+                                }
+                            ) {
+                                CompositionLocalProvider(
+                                    LocalAnimatedVisibilityScope provides this@composable
+                                ) {
+                                    val isSplashActive = (showSplash != false && !splashFinished)
+                                    LibraryScreenV2(
+                                        bottomPadding = bottomPadding,
+                                        isSplashActive = isSplashActive,
+                                        isNowPlayingExpanded = expansionProgress.floatValue > 0.1f,
+                                        miniPlayerTargetOffset = miniPlayerTargetOffset,
+                                        onBulgeMiniPlayer = {
+                                            miniPlayerBulgeTrigger = System.currentTimeMillis()
+                                        },
+                                        onSearchClick = { navController.navigate(Screen.Search.route) },
+                                        onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                                        onOpenScanLocations = { navController.navigate("scan_locations") },
+                                        onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
+                                        onArtistClick = { id, imageUrl -> navController.navigate(Routes.artistDetail(id, imageUrl)) },
+                                        onPlaylistClick = { id, name -> navController.navigate(Routes.playlistDetail(id, name)) },
+                                        onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
+                                        onNowPlayingOffsetYChange = { nowPlayingOffsetY = it }
+                                    )
+                                }
                             }
-                        ) {
-                            SearchScreen(
-                                bottomPadding = bottomPadding,
-                                onBack = { navController.popBackStack() },
-                                onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
-                                onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
-                            )
-                        }
-                        composable(
-                            route = "album_detail/{albumId}",
-                            arguments = listOf(navArgument("albumId") { type = NavType.StringType }),
-                            enterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { it },
-                                    animationSpec = tween(350)
-                                ) + fadeIn(tween(350))
-                            },
-                            exitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 3 },
-                                    animationSpec = tween(350)
-                                ) + fadeOut(tween(350))
-                            },
-                            popEnterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { -it / 3 },
-                                    animationSpec = tween(350)
-                                ) + fadeIn(tween(350))
-                            },
-                            popExitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { it },
-                                    animationSpec = tween(350)
-                                ) + fadeOut(tween(350))
+                            composable(
+                                route = Screen.Search.route,
+                                enterTransition = {
+                                    slideInHorizontally(
+                                        initialOffsetX = { it },
+                                        animationSpec = tween(350)
+                                    ) + fadeIn(tween(350))
+                                },
+                                exitTransition = {
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -it / 3 },
+                                        animationSpec = tween(350)
+                                    ) + fadeOut(tween(350))
+                                },
+                                popEnterTransition = {
+                                    slideInHorizontally(
+                                        initialOffsetX = { -it / 3 },
+                                        animationSpec = tween(350)
+                                    ) + fadeIn(tween(350))
+                                },
+                                popExitTransition = {
+                                    slideOutHorizontally(
+                                        targetOffsetX = { it },
+                                        animationSpec = tween(350)
+                                    ) + fadeOut(tween(350))
+                                }
+                            ) {
+                                CompositionLocalProvider(
+                                    LocalAnimatedVisibilityScope provides this@composable
+                                ) {
+                                    SearchScreen(
+                                        bottomPadding = bottomPadding,
+                                        onBack = { navController.popBackStack() },
+                                        onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
+                                        onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
+                                    )
+                                }
                             }
-                        ) {
-                            AlbumDetailScreen(
-                                onBack = { navController.popBackStack() },
-                                onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
-                            )
-                        }
-                        composable(
-                            route = Routes.ARTIST_DETAIL,
-                            arguments = listOf(navArgument("artistId") { type = NavType.StringType }),
-                            enterTransition = slideEnter,
-                            exitTransition = slideExit,
-                            popEnterTransition = slidePopEnter,
-                            popExitTransition = slidePopExit
-                        ) {
-                            ArtistDetailScreen(
-                                onBack = { navController.popBackStack() },
-                                onAlbumClick = { navController.navigate("album_detail/$it") },
-                                onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
-                            )
-                        }
+                            composable(
+                                route = "album_detail/{albumId}",
+                                arguments = listOf(navArgument("albumId") { type = NavType.StringType }),
+                                enterTransition = {
+                                    slideInHorizontally(
+                                        initialOffsetX = { it },
+                                        animationSpec = tween(350)
+                                    ) + fadeIn(tween(350))
+                                },
+                                exitTransition = {
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -it / 3 },
+                                        animationSpec = tween(350)
+                                    ) + fadeOut(tween(350))
+                                },
+                                popEnterTransition = {
+                                    slideInHorizontally(
+                                        initialOffsetX = { -it / 3 },
+                                        animationSpec = tween(350)
+                                    ) + fadeIn(tween(350))
+                                },
+                                popExitTransition = {
+                                    slideOutHorizontally(
+                                        targetOffsetX = { it },
+                                        animationSpec = tween(350)
+                                    ) + fadeOut(tween(350))
+                                }
+                            ) {
+                                AlbumDetailScreen(
+                                    onBack = { navController.popBackStack() },
+                                    onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
+                                )
+                            }
+                            composable(
+                                route = Routes.ARTIST_DETAIL,
+                                arguments = listOf(
+                                    navArgument("artistId") { type = NavType.StringType },
+                                    navArgument("imageUrl") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    }
+                                ),
+                                enterTransition = slideEnter,
+                                exitTransition = slideExit,
+                                popEnterTransition = slidePopEnter,
+                                popExitTransition = slidePopExit
+                            ) {
+                                CompositionLocalProvider(
+                                    LocalAnimatedVisibilityScope provides this@composable
+                                ) {
+                                    ArtistDetailScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onAlbumClick = { navController.navigate("album_detail/$it") },
+                                        onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
+                                    )
+                                }
+                            }
                         composable(
                             route = Routes.PLAYLIST_DETAIL,
                             arguments = listOf(
@@ -391,6 +422,7 @@ fun MainScreen(
                     }
                 }
             }
+        }
         }
 
         // Now Playing Screen - Sits on top

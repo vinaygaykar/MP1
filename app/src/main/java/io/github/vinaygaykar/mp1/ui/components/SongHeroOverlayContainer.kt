@@ -79,9 +79,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -121,13 +125,14 @@ data class SongOverlayData(
 )
 
 /**
- * Reusable wrapper container that applies background blur to parent layout contents
+ * Reusable wrapper container that applies Haze backdrop blur to parent layout contents
  * and hosts the hero circular artwork animation overlay when a song's kebab option is triggered.
  */
 @Composable
 fun SongHeroOverlayContainer(
     modifier: Modifier = Modifier,
     overlayData: SongOverlayData? = null,
+    hazeState: HazeState? = null,
     onDismiss: () -> Unit = {},
     onPlayNext: ((Song) -> Unit)? = null,
     onAddToQueue: ((Song) -> Unit)? = null,
@@ -136,9 +141,18 @@ fun SongHeroOverlayContainer(
     onAlbumClick: ((String) -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    val effectiveHazeState = hazeState ?: remember { HazeState() }
+
     val blurRadius by animateDpAsState(
         targetValue = if (overlayData != null) 24.dp else 0.dp,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "songHeroOverlayBlur"
+    )
+
+    val backdropAlpha by animateFloatAsState(
+        targetValue = if (overlayData != null) 1f else 0f,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "songHeroOverlayBackdropAlpha"
     )
 
     Box(
@@ -146,13 +160,31 @@ fun SongHeroOverlayContainer(
             .fillMaxSize()
             .zIndex(if (overlayData != null) 100f else 0f)
     ) {
-        // Parent Screen Content (blurred when overlayData != null)
+        // Parent Screen Content (Haze blur source)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier)
+                .hazeSource(state = effectiveHazeState)
         ) {
             content()
+        }
+
+        // Haze backdrop blur overlay when overlayData != null
+        if (backdropAlpha > 0f) {
+            val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = backdropAlpha }
+                    .hazeEffect(
+                        state = effectiveHazeState,
+                        style = HazeStyle(
+                            backgroundColor = containerColor,
+                            blurRadius = blurRadius,
+                            tint = HazeTint(containerColor.copy(alpha = 0.35f))
+                        )
+                    )
+            )
         }
 
         // Single-Window Hero Artwork Overlay
