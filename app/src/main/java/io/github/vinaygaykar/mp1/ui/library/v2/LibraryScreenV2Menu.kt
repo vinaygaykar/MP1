@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -93,10 +94,24 @@ internal fun CategoryMenuScreen(
     onOpenCategory: (LibraryCategory) -> Unit,
     onSettingsClick: () -> Unit,
     onOpenScanLocations: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    val isMenuVisible = detailProgress < 0.5f
+    DisposableEffect(isMenuVisible) {
+        if (isMenuVisible) {
+            onHideNowPlayingView()
+        } else {
+            onShowNowPlayingView()
+        }
+        onDispose {
+            onShowNowPlayingView()
+        }
+    }
 
     Box(
         modifier = modifier

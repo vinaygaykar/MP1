@@ -333,6 +333,7 @@ fun MainScreen(
                                 AlbumDetailScreen(
                                     onBack = { navController.popBackStack() },
                                     onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
+                                    onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
                                     onHideNowPlayingView = { nowPlayingController.hide() },
                                     onShowNowPlayingView = { nowPlayingController.show() }
                                 )
@@ -359,6 +360,7 @@ fun MainScreen(
                                         onBack = { navController.popBackStack() },
                                         onAlbumClick = { navController.navigate("album_detail/$it") },
                                         onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
+                                        onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
                                         onHideNowPlayingView = { nowPlayingController.hide() },
                                         onShowNowPlayingView = { nowPlayingController.show() }
                                     )
@@ -380,6 +382,7 @@ fun MainScreen(
                         ) {
                             PlaylistDetailScreen(
                                 onBack = { navController.popBackStack() },
+                                onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
                                 onHideNowPlayingView = { nowPlayingController.hide() },
                                 onShowNowPlayingView = { nowPlayingController.show() }
                             )

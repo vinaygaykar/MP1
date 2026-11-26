@@ -110,6 +110,7 @@ fun AlbumDetailScreen(
     onArtistClick: (String) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
+    onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     viewModel: AlbumDetailViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -200,26 +201,23 @@ fun AlbumDetailScreen(
 
         var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
         var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
-        var isMiniPlayerCollapsedOnScroll by remember { mutableStateOf(false) }
 
         LaunchedEffect(playbackState.trackTitle) {
-            isMiniPlayerCollapsedOnScroll = false
+            onMiniPlayerCollapseChange(false)
         }
 
         LaunchedEffect(playbackState.isPlaying) {
-            if (isMiniPlayerCollapsedOnScroll) {
-                isMiniPlayerCollapsedOnScroll = false
-            }
+            onMiniPlayerCollapseChange(false)
         }
 
-        val nestedScrollConnection = remember {
+        val nestedScrollConnection = remember(onMiniPlayerCollapseChange) {
             object : NestedScrollConnection {
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                     val deltaY = available.y
                     if (deltaY < -8f) {
-                        isMiniPlayerCollapsedOnScroll = true
+                        onMiniPlayerCollapseChange(true)
                     } else if (deltaY > 8f) {
-                        isMiniPlayerCollapsedOnScroll = false
+                        onMiniPlayerCollapseChange(false)
                     }
                     return Offset.Zero
                 }
@@ -309,7 +307,8 @@ fun AlbumDetailScreen(
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    LazyColumn(
+                    key(seedColor) {
+                        LazyColumn(
                         state = lazyListState,
                         modifier = Modifier
                             .fillMaxSize()
@@ -568,6 +567,7 @@ fun AlbumDetailScreen(
                             }
                         }
                     }
+                }
 
                     // Floating Back Arrow
                     if (!isActionPopupOpen) {

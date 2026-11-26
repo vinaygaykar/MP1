@@ -392,7 +392,9 @@ fun LibraryContentV2(
                 screenWidthPx = screenWidthPx,
                 onOpenCategory = { openCategory(it) },
                 onSettingsClick = onSettingsClick,
-                onOpenScanLocations = onOpenScanLocations
+                onOpenScanLocations = onOpenScanLocations,
+                onHideNowPlayingView = onHideNowPlayingView,
+                onShowNowPlayingView = onShowNowPlayingView
             )
 
             // LEVEL 2: Detail List Screen

@@ -66,15 +66,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -104,9 +101,9 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -137,6 +134,7 @@ fun ArtistDetailScreen(
     onArtistClick: (String) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
+    onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     viewModel: ArtistDetailViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -233,19 +231,6 @@ fun ArtistDetailScreen(
 
     val lazyListState = rememberLazyListState()
 
-    val showTopBarTitle by remember {
-        derivedStateOf {
-            lazyListState.firstVisibleItemIndex > 1 ||
-                    (lazyListState.firstVisibleItemIndex == 1 && lazyListState.firstVisibleItemScrollOffset > 40)
-        }
-    }
-
-    val topBarContainerColor = if (showTopBarTitle) {
-        MaterialTheme.colorScheme.surfaceContainer
-    } else {
-        Color.Transparent
-    }
-
     val cardColor = Color.Transparent
 
     val currentPlayingMediaId = remember(queueState.items, queueState.currentIndex) {
@@ -256,26 +241,23 @@ fun ArtistDetailScreen(
 
     var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
     var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
-    var isMiniPlayerCollapsedOnScroll by remember { mutableStateOf(false) }
 
     LaunchedEffect(playbackState.trackTitle) {
-        isMiniPlayerCollapsedOnScroll = false
+        onMiniPlayerCollapseChange(false)
     }
 
     LaunchedEffect(playbackState.isPlaying) {
-        if (isMiniPlayerCollapsedOnScroll) {
-            isMiniPlayerCollapsedOnScroll = false
-        }
+        onMiniPlayerCollapseChange(false)
     }
 
-    val nestedScrollConnection = remember {
+    val nestedScrollConnection = remember(onMiniPlayerCollapseChange) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val deltaY = available.y
                 if (deltaY < -8f) {
-                    isMiniPlayerCollapsedOnScroll = true
+                    onMiniPlayerCollapseChange(true)
                 } else if (deltaY > 8f) {
-                    isMiniPlayerCollapsedOnScroll = false
+                    onMiniPlayerCollapseChange(false)
                 }
                 return Offset.Zero
             }
@@ -349,6 +331,8 @@ fun ArtistDetailScreen(
 
             val navBarBottom =
                 WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val statusBarTop =
+                WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val bottomPadding =
                 if (isPlayerActive) 72.dp + 16.dp + navBarBottom else 16.dp + navBarBottom
 
@@ -362,6 +346,22 @@ fun ArtistDetailScreen(
                 )
             }
 
+            // Floating Back Arrow
+            if (!isSelectionMode) {
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(top = statusBarTop + 8.dp, start = 16.dp)
+                        .zIndex(3f)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+            }
+
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
@@ -372,58 +372,14 @@ fun ArtistDetailScreen(
                             onDeselect = { selectedSongIds = emptySet() },
                             onOptionsClick = { showMultiSelectionSheet = true },
                             modifier = Modifier.padding(
-                                top = WindowInsets.statusBars.asPaddingValues()
-                                    .calculateTopPadding()
-                            )
-                        )
-                    } else {
-                        TopAppBar(
-                            title = {
-                                AnimatedVisibility(
-                                    visible = showTopBarTitle,
-                                    enter = fadeIn(tween(200)) + slideInVertically(
-                                        animationSpec = tween(
-                                            200
-                                        )
-                                    ) { it / 2 },
-                                    exit = fadeOut(tween(150)) + slideOutVertically(
-                                        animationSpec = tween(
-                                            150
-                                        )
-                                    ) { it / 2 }
-                                ) {
-                                    Column(modifier = Modifier.padding(start = 4.dp)) {
-                                        Text(
-                                            text = artist?.name ?: "",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.secondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.basicMarquee()
-                                        )
-                                    }
-                                }
-                            },
-                            navigationIcon = {
-                                FilledTonalIconButton(
-                                    onClick = onBack,
-                                    modifier = Modifier.padding(start = 4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Back"
-                                    )
-                                }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = topBarContainerColor
+                                top = statusBarTop
                             )
                         )
                     }
                 }
             ) { innerPadding ->
-                LazyColumn(
+                key(artistSeedColor) {
+                    LazyColumn(
                     state = lazyListState,
                     modifier = Modifier
                         .fillMaxSize()
@@ -431,7 +387,7 @@ fun ArtistDetailScreen(
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
-                        top = 8.dp,
+                        top = if (isSelectionMode) 8.dp else statusBarTop + 64.dp,
                         bottom = bottomPadding
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -481,7 +437,8 @@ fun ArtistDetailScreen(
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    val personPlaceholder = rememberVectorPainter(Icons.Default.Person)
+                                    val personPlaceholder =
+                                        rememberVectorPainter(Icons.Default.Person)
                                     val detailImageRequest = remember(artistImageUrl) {
                                         ImageRequest.Builder(context)
                                             .data(artistImageUrl)
@@ -741,6 +698,7 @@ fun ArtistDetailScreen(
                     }
                 }
             }
+        }
 
             // Multi-selection Bottom Sheet
             if (showMultiSelectionSheet) {
