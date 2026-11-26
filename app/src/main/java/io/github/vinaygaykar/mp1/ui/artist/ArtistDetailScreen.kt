@@ -2,6 +2,8 @@
 
 package io.github.vinaygaykar.mp1.ui.artist
 
+import android.content.res.Configuration
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
@@ -94,6 +96,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -109,7 +112,9 @@ import dev.chrisbanes.haze.hazeSource
 import io.github.vinaygaykar.mp1.data.network.models.DeezerArtist
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
+import io.github.vinaygaykar.mp1.domain.models.Playlist
 import io.github.vinaygaykar.mp1.domain.models.Song
+import io.github.vinaygaykar.mp1.playback.PlaybackUiState
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
@@ -123,10 +128,10 @@ import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
+import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.ui.theme.isArtistMatchingPlayingTrack
 import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArtistDetailScreen(
     onBack: () -> Unit,
@@ -146,12 +151,74 @@ fun ArtistDetailScreen(
     val songs by viewModel.songs.collectAsState()
     val playbackState by playerViewModel.playbackState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
+    val candidateImages by viewModel.candidateImages.collectAsState()
+    val isSearchingImages by viewModel.isSearchingImages.collectAsState()
 
+    ArtistDetailContent(
+        artist = artist,
+        artistImageUrl = artistImageUrl,
+        albums = albums,
+        featuredAlbums = featuredAlbums,
+        collaborators = collaborators,
+        songs = songs,
+        playbackState = playbackState,
+        playlists = playlists,
+        candidateImages = candidateImages,
+        isSearchingImages = isSearchingImages,
+        artistId = viewModel.artistId,
+        onBack = onBack,
+        onAlbumClick = onAlbumClick,
+        onArtistClick = onArtistClick,
+        onHideNowPlayingView = onHideNowPlayingView,
+        onShowNowPlayingView = onShowNowPlayingView,
+        onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
+        onPlaySong = { viewModel.playSong(it) },
+        onPlayNext = { viewModel.playNext(it) },
+        onAddToQueue = { viewModel.addToQueue(it) },
+        onAddSongsToQueue = { viewModel.addToQueue(it) },
+        onAddSongsToPlaylist = { playlistId, songList -> viewModel.addSongsToPlaylist(playlistId, songList) },
+        onCreatePlaylistAndAddSongs = { name, songList -> viewModel.createPlaylistAndAddSongs(name, songList) },
+        onSearchArtistImages = { query -> viewModel.searchArtistImages(query) },
+        onSelectArtistImage = { selectedUrl -> viewModel.selectArtistImage(selectedUrl) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ArtistDetailContent(
+    artist: Artist?,
+    artistImageUrl: String?,
+    albums: List<Album>,
+    featuredAlbums: List<Album>,
+    collaborators: List<Artist>,
+    songs: List<Song>,
+    playbackState: PlaybackUiState,
+    playlists: List<Playlist>,
+    candidateImages: List<DeezerArtist> = emptyList(),
+    isSearchingImages: Boolean = false,
+    artistId: String = "",
+    onBack: () -> Unit,
+    onAlbumClick: (String) -> Unit,
+    onArtistClick: (String) -> Unit,
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
+    onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
+    onPlaySong: (Song) -> Unit = {},
+    onPlayNext: (List<Song>) -> Unit = {},
+    onAddToQueue: (Song) -> Unit = {},
+    onAddSongsToQueue: (List<Song>) -> Unit = {},
+    onAddSongsToPlaylist: (Long, List<Song>) -> Unit = { _, _ -> },
+    onCreatePlaylistAndAddSongs: (String, List<Song>) -> Unit = { _, _ -> },
+    onSearchArtistImages: (String) -> Unit = {},
+    onSelectArtistImage: (String) -> Unit = {},
+    initialSelectedSongIds: Set<String> = emptySet(),
+    initialShowMultiSelectionSheet: Boolean = false
+) {
     val hazeState = remember { HazeState() }
     var activeOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
-    var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
+    var selectedSongIds by remember(initialSelectedSongIds) { mutableStateOf(initialSelectedSongIds) }
     val isSelectionMode = selectedSongIds.isNotEmpty()
-    var showMultiSelectionSheet by remember { mutableStateOf(false) }
+    var showMultiSelectionSheet by remember(initialShowMultiSelectionSheet) { mutableStateOf(initialShowMultiSelectionSheet) }
     var showPlaylistSelectionSheet by remember { mutableStateOf(false) }
     var showCreatePlaylistForSelectionDialog by remember { mutableStateOf(false) }
 
@@ -193,9 +260,6 @@ fun ArtistDetailScreen(
             selectedSongIds + song.id
         }
     }
-
-    val candidateImages by viewModel.candidateImages.collectAsState()
-    val isSearchingImages by viewModel.isSearchingImages.collectAsState()
 
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
     var showSearchImageDialog by remember { mutableStateOf(false) }
@@ -343,7 +407,7 @@ fun ArtistDetailScreen(
                 CreatePlaylistDialog(
                     onDismiss = { showCreatePlaylistForSelectionDialog = false },
                     onCreate = { name ->
-                        viewModel.createPlaylistAndAddSongs(name, selectedSongsInSelectionOrder)
+                        onCreatePlaylistAndAddSongs(name, selectedSongsInSelectionOrder)
                         selectedSongIds = emptySet()
                     }
                 )
@@ -353,8 +417,8 @@ fun ArtistDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 overlayData = activeOverlayData,
                 onDismiss = { activeOverlayData = null },
-                onPlayNext = { song -> viewModel.playNext(listOf(song)) },
-                onAddToQueue = { song -> viewModel.addToQueue(song) },
+                onPlayNext = { song -> onPlayNext(listOf(song)) },
+                onAddToQueue = { song -> onAddToQueue(song) },
                 onAddToPlaylist = { song ->
                     selectedSongIds = setOf(song.id)
                     showPlaylistSelectionSheet = true
@@ -417,7 +481,7 @@ fun ArtistDetailScreen(
                                         imageContent = { imageModifier ->
                                             Box(
                                                 modifier = imageModifier
-                                                    .artistSharedElement(key = "artist_image_${currentArtist?.id ?: viewModel.artistId}")
+                                                    .artistSharedElement(key = "artist_image_${currentArtist?.id ?: artistId}")
                                                     .clip(artistShape)
                                                     .background(MaterialTheme.colorScheme.primaryContainer)
                                                     .clickable {
@@ -633,7 +697,7 @@ fun ArtistDetailScreen(
                                                 if (isSelectionMode) {
                                                     toggleSongSelection(song)
                                                 } else {
-                                                    viewModel.playSong(song)
+                                                    onPlaySong(song)
                                                 }
                                             },
                                             isSelected = isSelected,
@@ -719,7 +783,7 @@ fun ArtistDetailScreen(
                         },
                         onPlayNext = { activeSongs ->
                             if (activeSongs.isNotEmpty()) {
-                                viewModel.playNext(activeSongs)
+                                onPlayNext(activeSongs)
                                 selectedSongIds = emptySet()
                             }
                         },
@@ -729,7 +793,7 @@ fun ArtistDetailScreen(
                         },
                         onAddToQueue = { activeSongs ->
                             if (activeSongs.isNotEmpty()) {
-                                viewModel.addToQueue(activeSongs)
+                                onAddSongsToQueue(activeSongs)
                                 selectedSongIds = emptySet()
                             }
                         },
@@ -749,7 +813,7 @@ fun ArtistDetailScreen(
                     playlists = playlists,
                     onDismiss = { showPlaylistSelectionSheet = false },
                     onSelectPlaylist = { playlist ->
-                        viewModel.addSongsToPlaylist(playlist.id, selectedSongsInSelectionOrder)
+                        onAddSongsToPlaylist(playlist.id, selectedSongsInSelectionOrder)
                         selectedSongIds = emptySet()
                     },
                     onCreateNewPlaylist = {
@@ -836,14 +900,182 @@ fun ArtistDetailScreen(
                     initialQuery = artist?.name ?: "",
                     candidateImages = candidateImages,
                     isSearching = isSearchingImages,
-                    onSearch = { query -> viewModel.searchArtistImages(query) },
+                    onSearch = { query -> onSearchArtistImages(query) },
                     onSelectImage = { selectedUrl ->
-                        viewModel.selectArtistImage(selectedUrl)
+                        onSelectArtistImage(selectedUrl)
                         showSearchImageDialog = false
                     },
                     onDismiss = { showSearchImageDialog = false }
                 )
             }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PREVIEWS
+// -----------------------------------------------------------------------------
+
+private val samplePreviewArtist = Artist(
+    id = "artist_1",
+    name = "Lorem Ipsum Dolor Sit Amet",
+    trackCount = 12
+)
+
+private val samplePreviewAlbums = listOf(
+    Album(
+        id = "album_1",
+        name = "Dolor Sit Amet",
+        artist = "Lorem Ipsum",
+        year = 2023,
+        artworkUri = null,
+        trackCount = 6
+    ),
+    Album(
+        id = "album_2",
+        name = "Consectetur Adipiscing",
+        artist = "Lorem Ipsum",
+        year = 2021,
+        artworkUri = null,
+        trackCount = 6
+    )
+)
+
+private val samplePreviewFeaturedAlbums = listOf(
+    Album(
+        id = "album_3",
+        name = "Elit Sed Do",
+        artist = "Eiusmod Tempor",
+        year = 2022,
+        artworkUri = null,
+        trackCount = 10
+    )
+)
+
+private val samplePreviewCollaborators = listOf(
+    Artist(id = "artist_2", name = "Incididunt Ut", trackCount = 4),
+    Artist(id = "artist_3", name = "Labore Et", trackCount = 2)
+)
+
+private val samplePreviewSongs = listOf(
+    Song(
+        id = "song_1",
+        uri = Uri.EMPTY,
+        title = "Magna Aliqua",
+        artist = "Lorem Ipsum",
+        album = "Dolor Sit Amet",
+        durationMs = 210000L,
+        trackNumber = 1,
+        discNumber = 1,
+        year = 2023,
+        artworkUri = null,
+        fileName = "track1.mp3",
+        lastModified = 0L,
+        artistsDisplayString = "Lorem Ipsum"
+    ),
+    Song(
+        id = "song_2",
+        uri = Uri.EMPTY,
+        title = "Ut Enim Ad Minim",
+        artist = "Lorem Ipsum feat. Incididunt Ut",
+        album = "Dolor Sit Amet",
+        durationMs = 195000L,
+        trackNumber = 2,
+        discNumber = 1,
+        year = 2023,
+        artworkUri = null,
+        fileName = "track2.mp3",
+        lastModified = 0L,
+        artistsDisplayString = "Lorem Ipsum, Incididunt Ut"
+    ),
+    Song(
+        id = "song_3",
+        uri = Uri.EMPTY,
+        title = "Venia Quis Nostrud",
+        artist = "Lorem Ipsum",
+        album = "Consectetur Adipiscing",
+        durationMs = 240000L,
+        trackNumber = 1,
+        discNumber = 1,
+        year = 2021,
+        artworkUri = null,
+        fileName = "track3.mp3",
+        lastModified = 0L,
+        artistsDisplayString = "Lorem Ipsum"
+    )
+)
+
+private val samplePreviewPlaybackState = PlaybackUiState(
+    trackTitle = "Magna Aliqua",
+    artist = "Lorem Ipsum",
+    album = "Dolor Sit Amet",
+    isPlaying = true
+)
+
+private val samplePreviewPlaylists = listOf(
+    Playlist(id = 1, name = "Exercitation", songCount = 15),
+    Playlist(id = 2, name = "Ullamco Laboris", songCount = 30)
+)
+
+@Preview(
+    name = "Portrait Light",
+    group = "Artist Detail Screen",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Portrait Dark",
+    group = "Artist Detail Screen",
+    showBackground = true,
+    device = "spec:width=411dp,height=891dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Landscape Light",
+    group = "Artist Detail Screen",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Dark",
+    group = "Artist Detail Screen",
+    showBackground = true,
+    device = "spec:width=891dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Preview(
+    name = "Portrait Split",
+    group = "Artist Detail Screen",
+    showBackground = true,
+    device = "spec:width=411dp,height=445dp,orientation=portrait",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "Landscape Split",
+    group = "Artist Detail Screen",
+    showBackground = true,
+    device = "spec:width=445dp,height=411dp,orientation=landscape",
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Composable
+private fun ArtistDetailScreenPreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            ArtistDetailContent(
+                artist = samplePreviewArtist,
+                artistImageUrl = null,
+                albums = samplePreviewAlbums,
+                featuredAlbums = samplePreviewFeaturedAlbums,
+                collaborators = samplePreviewCollaborators,
+                songs = samplePreviewSongs,
+                playbackState = samplePreviewPlaybackState,
+                playlists = samplePreviewPlaylists,
+                onBack = {},
+                onAlbumClick = {},
+                onArtistClick = {}
+            )
         }
     }
 }
