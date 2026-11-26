@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -145,12 +147,12 @@ internal fun CategoryDetailScreen(
     val isActionPopupOpen = isSongsSelectionActive && libraryState.showMultiSelectionSheet
 
     // Back Handler Level 1: When expanded, back press collapses the overlay back to compact mode
-    BackHandler(enabled = !isNowPlayingExpanded && isActionPopupOpen) {
+    BackHandler(enabled = !isSplashActive && !isNowPlayingExpanded && isActionPopupOpen) {
         libraryState.showMultiSelectionSheet = false
     }
 
     // Back Handler Level 2: When collapsed in selection mode, back press exits selection mode and deselects all
-    BackHandler(enabled = !isNowPlayingExpanded && isSongsSelectionActive && !libraryState.showMultiSelectionSheet) {
+    BackHandler(enabled = !isSplashActive && !isNowPlayingExpanded && isSongsSelectionActive && !libraryState.showMultiSelectionSheet) {
         libraryState.clearSongSelection()
     }
 
@@ -179,6 +181,18 @@ internal fun CategoryDetailScreen(
     SongHeroOverlayContainer(
         modifier = modifier
             .fillMaxSize()
+            .then(
+                if (isSplashActive) {
+                    Modifier.pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                } else Modifier
+            )
             .graphicsLayer {
                 translationX = (1f - detailProgress) * size.width
                 clip = false

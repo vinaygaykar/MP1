@@ -102,6 +102,8 @@ private fun getDeterministicVibrantSeedColor(title: String): Color {
 @Composable
 fun PlaylistDetailScreen(
     onBack: () -> Unit,
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
     viewModel: PlaylistDetailViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {

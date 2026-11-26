@@ -179,6 +179,11 @@ fun MainScreen(
     var isMiniPlayerCollapsedOnScroll by remember { mutableStateOf(false) }
     var nowPlayingOffsetY by remember { mutableFloatStateOf(0f) }
 
+    val nowPlayingController = rememberNowPlayingVisibilityController(
+        bottomPadding = bottomPadding,
+        onNowPlayingOffsetYChange = { nowPlayingOffsetY = it }
+    )
+
     LaunchedEffect(playbackState.trackTitle) {
         isMiniPlayerCollapsedOnScroll = false
     }
@@ -251,7 +256,9 @@ fun MainScreen(
                                         onArtistClick = { id, imageUrl -> navController.navigate(Routes.artistDetail(id, imageUrl)) },
                                         onPlaylistClick = { id, name -> navController.navigate(Routes.playlistDetail(id, name)) },
                                         onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
-                                        onNowPlayingOffsetYChange = { nowPlayingOffsetY = it }
+                                        onNowPlayingOffsetYChange = { nowPlayingOffsetY = it },
+                                        onHideNowPlayingView = { nowPlayingController.hide() },
+                                        onShowNowPlayingView = { nowPlayingController.show() }
                                     )
                                 }
                             }
@@ -289,7 +296,9 @@ fun MainScreen(
                                         bottomPadding = bottomPadding,
                                         onBack = { navController.popBackStack() },
                                         onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
-                                        onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
+                                        onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
+                                        onHideNowPlayingView = { nowPlayingController.hide() },
+                                        onShowNowPlayingView = { nowPlayingController.show() }
                                     )
                                 }
                             }
@@ -323,7 +332,9 @@ fun MainScreen(
                             ) {
                                 AlbumDetailScreen(
                                     onBack = { navController.popBackStack() },
-                                    onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
+                                    onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
+                                    onHideNowPlayingView = { nowPlayingController.hide() },
+                                    onShowNowPlayingView = { nowPlayingController.show() }
                                 )
                             }
                             composable(
@@ -347,7 +358,9 @@ fun MainScreen(
                                     ArtistDetailScreen(
                                         onBack = { navController.popBackStack() },
                                         onAlbumClick = { navController.navigate("album_detail/$it") },
-                                        onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
+                                        onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
+                                        onHideNowPlayingView = { nowPlayingController.hide() },
+                                        onShowNowPlayingView = { nowPlayingController.show() }
                                     )
                                 }
                             }
@@ -365,7 +378,11 @@ fun MainScreen(
                             popEnterTransition = slidePopEnter,
                             popExitTransition = slidePopExit
                         ) {
-                            PlaylistDetailScreen(onBack = { navController.popBackStack() })
+                            PlaylistDetailScreen(
+                                onBack = { navController.popBackStack() },
+                                onHideNowPlayingView = { nowPlayingController.hide() },
+                                onShowNowPlayingView = { nowPlayingController.show() }
+                            )
                         }
                         composable(
                             route = Screen.Settings.route,

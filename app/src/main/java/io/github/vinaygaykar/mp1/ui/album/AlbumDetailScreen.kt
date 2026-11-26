@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -37,29 +38,21 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -95,10 +88,10 @@ import io.github.vinaygaykar.mp1.ui.artist.CollaboratorArtistCard
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
-import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
+import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
 import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
@@ -106,7 +99,6 @@ import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
 import kotlin.math.ceil
-
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -267,9 +259,11 @@ fun AlbumDetailScreen(
                 }
             }
 
-            val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val navBarBottom =
+                WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            val bottomPadding = if (isPlayerActive) 72.dp + 16.dp + navBarBottom else 16.dp + navBarBottom
+            val bottomPadding =
+                if (isPlayerActive) 72.dp + 16.dp + navBarBottom else 16.dp + navBarBottom
 
             if (showCreatePlaylistForSelectionDialog) {
                 CreatePlaylistDialog(
@@ -307,41 +301,48 @@ fun AlbumDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 1. Album Artwork (First, sharp corners with horizontal padding)
+                        // 1. Album Artwork (Centered, 65% screen width up to max 260dp, sharp corners)
                         item {
                             val artworkUri = album?.artworkUri
-                            if (artworkUri != null) {
-                                val request = remember(artworkUri) {
-                                    ImageRequest.Builder(context)
-                                        .data(artworkUri)
-                                        .size(800, 800)
-                                        .crossfade(true)
-                                        .build()
-                                }
-                                AsyncImage(
-                                    model = request,
-                                    contentDescription = album?.name,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp)
-                                        .aspectRatio(1f),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp)
-                                        .aspectRatio(1f)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Album,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(96.dp),
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (artworkUri != null) {
+                                    val request = remember(artworkUri) {
+                                        ImageRequest.Builder(context)
+                                            .data(artworkUri)
+                                            .size(600, 600)
+                                            .crossfade(true)
+                                            .build()
+                                    }
+                                    AsyncImage(
+                                        model = request,
+                                        contentDescription = album?.name,
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .widthIn(max = 260.dp)
+                                            .aspectRatio(1f),
+                                        contentScale = ContentScale.Crop
                                     )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .widthIn(max = 260.dp)
+                                            .aspectRatio(1f)
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Album,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(80.dp),
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -384,7 +385,8 @@ fun AlbumDetailScreen(
 
                         // 4. Release Year
                         item {
-                            val yearText = remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
+                            val yearText =
+                                remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
                             if (yearText != null) {
                                 Text(
                                     text = yearText,
@@ -402,49 +404,35 @@ fun AlbumDetailScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                         }
 
-                        // Row before song list: Track Count & Duration (left) and Shuffle Button (right)
+                        // Track Count & Duration before song list
                         item {
-                            Row(
+                            val trackCount = songs.size
+                            val tracksText =
+                                remember(trackCount) { if (trackCount == 1) "1 track" else "$trackCount tracks" }
+                            val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
+                            val durationText =
+                                remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
+
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
                             ) {
-                                val trackCount = songs.size
-                                val tracksText = if (trackCount == 1) "1 track" else "$trackCount tracks"
-                                val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
-                                val durationText = remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
-
-                                Column {
+                                Text(
+                                    text = tracksText,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                if (durationText.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = tracksText,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (durationText.isNotEmpty()) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = durationText,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-
-                                FilledTonalIconButton(
-                                    onClick = { viewModel.playAlbum(shuffle = true) },
-                                    enabled = songs.isNotEmpty(),
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondary,
-                                        contentColor = MaterialTheme.colorScheme.onSecondary
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shuffle,
-                                        contentDescription = "Shuffle"
+                                        text = durationText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                            alpha = 0.8f
+                                        ),
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
                             }
@@ -461,7 +449,12 @@ fun AlbumDetailScreen(
                                         color = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
+                                            .padding(
+                                                top = 8.dp,
+                                                bottom = 4.dp,
+                                                start = 16.dp,
+                                                end = 16.dp
+                                            )
                                     )
                                 }
                                 itemsIndexed(discSongs, key = { _, song -> song.id }) { _, song ->
@@ -525,7 +518,8 @@ fun AlbumDetailScreen(
                                         .padding(top = 16.dp, bottom = 8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    val title = if (featuredArtists.size == 1) "Featured Artist" else "Featured Artists"
+                                    val title =
+                                        if (featuredArtists.size == 1) "Featured Artist" else "Featured Artists"
                                     Text(
                                         text = title,
                                         style = MaterialTheme.typography.titleMedium,
@@ -572,11 +566,7 @@ fun AlbumDetailScreen(
                             onClick = onBack,
                             modifier = Modifier
                                 .align(Alignment.TopStart)
-                                .padding(top = statusBarTop, start = 16.dp),
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f),
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            )
+                                .padding(top = statusBarTop, start = 16.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,

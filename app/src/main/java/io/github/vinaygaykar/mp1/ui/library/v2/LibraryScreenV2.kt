@@ -70,6 +70,8 @@ fun LibraryScreenV2(
     onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onNowPlayingOffsetYChange: (Float) -> Unit = {},
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -116,6 +118,8 @@ fun LibraryScreenV2(
         onPlaylistClick = onPlaylistClick,
         onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
         onNowPlayingOffsetYChange = onNowPlayingOffsetYChange,
+        onHideNowPlayingView = onHideNowPlayingView,
+        onShowNowPlayingView = onShowNowPlayingView,
         onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
         onPlayNext = { viewModel.playNext(it) },
         onAddToQueue = { viewModel.addToQueue(it) },
@@ -155,6 +159,8 @@ fun LibraryContentV2(
     onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
     onNowPlayingOffsetYChange: (Float) -> Unit = {},
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
     onPlaySong: (io.github.vinaygaykar.mp1.domain.models.Song, List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = { _, _ -> },
     onPlayNext: (List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = {},
     onAddToQueue: (List<io.github.vinaygaykar.mp1.domain.models.Song>) -> Unit = {},
@@ -283,14 +289,6 @@ fun LibraryContentV2(
         }
     }
 
-    val nowPlayingController = rememberNowPlayingVisibilityController(
-        bottomPadding = bottomPadding,
-        onNowPlayingOffsetYChange = onNowPlayingOffsetYChange
-    )
-
-    fun hideNowPlayingView() = nowPlayingController.hide()
-    fun showNowPlayingView() = nowPlayingController.show()
-
     BackHandler(
         enabled = !isNowPlayingExpanded && (
             libraryState.isSelectionMode ||
@@ -409,8 +407,8 @@ fun LibraryContentV2(
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 onOpenScanLocations = onOpenScanLocations,
-                onHideNowPlayingView = { hideNowPlayingView() },
-                onShowNowPlayingView = { showNowPlayingView() },
+                onHideNowPlayingView = onHideNowPlayingView,
+                onShowNowPlayingView = onShowNowPlayingView,
                 onAlbumClick = onAlbumClick,
                 onArtistClick = onArtistClick,
                 onPlaylistClick = onPlaylistClick,

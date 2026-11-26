@@ -83,6 +83,8 @@ fun SearchScreen(
     onBack: () -> Unit = {},
     onAlbumClick: (String) -> Unit = {},
     onArtistClick: (String) -> Unit = {},
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val query by viewModel.searchQuery.collectAsState()

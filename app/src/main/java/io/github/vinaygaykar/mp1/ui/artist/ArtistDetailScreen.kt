@@ -54,7 +54,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,7 +61,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -106,6 +104,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -136,6 +135,8 @@ fun ArtistDetailScreen(
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
     onArtistClick: (String) -> Unit,
+    onHideNowPlayingView: () -> Unit = {},
+    onShowNowPlayingView: () -> Unit = {},
     viewModel: ArtistDetailViewModel = hiltViewModel(),
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -503,6 +504,7 @@ fun ArtistDetailScreen(
                                 }
                             }
                         )
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
 
                     // Song Count
@@ -588,33 +590,15 @@ fun ArtistDetailScreen(
                     // Discography (Songs grouped by Album)
                     if (discographyGroups.isNotEmpty()) {
                         item(key = "discography_header") {
-                            Row(
+                            Text(
+                                text = "Discography",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 32.dp, bottom = 8.dp, start = 4.dp, end = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Discography",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                FilledTonalIconButton(
-                                    onClick = { viewModel.playArtist(shuffle = true) },
-                                    enabled = songs.isNotEmpty(),
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shuffle,
-                                        contentDescription = "Shuffle"
-                                    )
-                                }
-                            }
+                                    .padding(top = 32.dp, bottom = 8.dp, start = 4.dp, end = 4.dp)
+                            )
                         }
 
                         discographyGroups.forEach { (albumName, matchingAlbum, albumSongs) ->
@@ -1133,7 +1117,51 @@ private fun ArtistHeaderWithAutoResizedName(
                 .aspectRatio(1f),
             contentAlignment = Alignment.Center
         ) {
-            // 1. Top text (Line 1) - Drawn FIRST so it sits behind the artist image
+            // 1. Bottom text (Line 2) - Higher Z-index (2f) than image (1f) when 2 lines are present
+            if (!isSingleLine && line2Text.isNotBlank()) {
+                AnimatedVisibility(
+                    visible = isTransitionCompleted,
+                    enter = slideInVertically(
+                        initialOffsetY = { fullHeight -> -fullHeight },
+                        animationSpec = tween(durationMillis = 350, easing = EaseOutCubic)
+                    ) + fadeIn(animationSpec = tween(durationMillis = 350)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 150)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .offset(y = 24.dp)
+                        .zIndex(2f)
+                ) {
+                    AutoResizedText(
+                        text = line2Text,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = line2MaxFontSize,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = textColor,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        minFontSize = line2MinFontSize,
+                        maxFontSize = line2MaxFontSize,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
+            // 2. Artist Image (Middle Z-index = 1f)
+            imageContent(
+                Modifier
+                    .fillMaxSize(0.85f)
+                    .align(Alignment.Center)
+                    .offset(y = 24.dp)
+                    .zIndex(1f)
+            )
+
+            // 3. Top text (Line 1) - zIndex = 2f if 1-line (above image), 0f if 2-lines (behind image)
             AnimatedVisibility(
                 visible = isTransitionCompleted,
                 enter = slideInVertically(
@@ -1144,6 +1172,7 @@ private fun ArtistHeaderWithAutoResizedName(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
+                    .zIndex(if (isSingleLine) 2f else 0f)
             ) {
                 if (!isSingleLine) {
                     AutoResizedText(
@@ -1183,48 +1212,6 @@ private fun ArtistHeaderWithAutoResizedName(
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp)
                             .offset(y = (-16).dp)
-                    )
-                }
-            }
-
-            // 2. Artist Image (Drawn in middle - above top text, behind bottom text)
-            imageContent(
-                Modifier
-                    .fillMaxSize(0.85f)
-                    .align(Alignment.Center)
-                    .offset(y = 24.dp)
-            )
-
-            // 3. Bottom text (Line 2) - Drawn LAST so it is on top of ALL 3 (above image and top text)
-            if (!isSingleLine && line2Text.isNotBlank()) {
-                AnimatedVisibility(
-                    visible = isTransitionCompleted,
-                    enter = slideInVertically(
-                        initialOffsetY = { fullHeight -> -fullHeight },
-                        animationSpec = tween(durationMillis = 350, easing = EaseOutCubic)
-                    ) + fadeIn(animationSpec = tween(durationMillis = 350)),
-                    exit = fadeOut(animationSpec = tween(durationMillis = 150)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .offset(y = 24.dp)
-                ) {
-                    AutoResizedText(
-                        text = line2Text,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontSize = line2MaxFontSize,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = textColor,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        minFontSize = line2MinFontSize,
-                        maxFontSize = line2MaxFontSize,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp)
                     )
                 }
             }

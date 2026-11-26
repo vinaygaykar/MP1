@@ -3,6 +3,7 @@ package io.github.vinaygaykar.mp1.ui.splash
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -27,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -245,6 +248,10 @@ fun SplashComposeScreen(
     val animProgress = remember { Animatable(if (isPreview) 0.35f else 0f) }
     val currentOnAnimationEnd = rememberUpdatedState(onAnimationEnd)
 
+    BackHandler(enabled = !isPreview) {
+        // Block back button interactions while splash screen is active
+    }
+
     LaunchedEffect(startAnimation) {
         if (!isPreview && startAnimation) {
             animProgress.animateTo(
@@ -264,6 +271,14 @@ fun SplashComposeScreen(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            }
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
