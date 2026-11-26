@@ -11,9 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -63,7 +61,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -107,19 +104,22 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import io.github.vinaygaykar.mp1.data.network.models.DeezerArtist
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.domain.models.Artist
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
-import io.github.vinaygaykar.mp1.ui.album.SongCardItem
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
 import io.github.vinaygaykar.mp1.ui.components.LocalAnimatedVisibilityScope
+import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
+import io.github.vinaygaykar.mp1.ui.components.SongListItem
+import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
 import io.github.vinaygaykar.mp1.ui.components.artistSharedElement
-import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
-import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
+import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
@@ -145,17 +145,45 @@ fun ArtistDetailScreen(
     val collaborators by viewModel.collaborators.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val playbackState by playerViewModel.playbackState.collectAsState()
-    val queueState by playerViewModel.queueState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
+    val hazeState = remember { HazeState() }
+    var activeOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
     var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
     val isSelectionMode = selectedSongIds.isNotEmpty()
     var showMultiSelectionSheet by remember { mutableStateOf(false) }
     var showPlaylistSelectionSheet by remember { mutableStateOf(false) }
     var showCreatePlaylistForSelectionDialog by remember { mutableStateOf(false) }
 
-    val selectedSongs = remember(songs, selectedSongIds) {
-        songs.filter { selectedSongIds.contains(it.id) }
+    val songsMap = remember(songs) { songs.associateBy { it.id } }
+    val selectedSongsInSelectionOrder = remember(songsMap, selectedSongIds) {
+        selectedSongIds.mapNotNull { songsMap[it] }
+    }
+
+    val isActionPopupOpen = isSelectionMode && showMultiSelectionSheet
+
+    // Back Handler Level 1: When expanded, back press collapses the overlay back to compact mode
+    BackHandler(enabled = isActionPopupOpen) {
+        showMultiSelectionSheet = false
+    }
+
+    // Back Handler Level 2: When collapsed in selection mode, back press exits selection mode and deselects all
+    BackHandler(enabled = isSelectionMode && !showMultiSelectionSheet) {
+        selectedSongIds = emptySet()
+    }
+
+    LaunchedEffect(isSelectionMode) {
+        if (!isSelectionMode) {
+            showMultiSelectionSheet = false
+        }
+    }
+
+    LaunchedEffect(activeOverlayData != null, isActionPopupOpen) {
+        if (activeOverlayData != null || isActionPopupOpen) {
+            onHideNowPlayingView()
+        } else {
+            onShowNowPlayingView()
+        }
     }
 
     fun toggleSongSelection(song: Song) {
@@ -164,10 +192,6 @@ fun ArtistDetailScreen(
         } else {
             selectedSongIds + song.id
         }
-    }
-
-    BackHandler(enabled = isSelectionMode) {
-        selectedSongIds = emptySet()
     }
 
     val candidateImages by viewModel.candidateImages.collectAsState()
@@ -231,14 +255,6 @@ fun ArtistDetailScreen(
 
     val lazyListState = rememberLazyListState()
 
-    val cardColor = Color.Transparent
-
-    val currentPlayingMediaId = remember(queueState.items, queueState.currentIndex) {
-        if (queueState.currentIndex in queueState.items.indices) {
-            queueState.items[queueState.currentIndex].mediaId
-        } else null
-    }
-
     var miniPlayerBulgeTrigger by remember { mutableLongStateOf(0L) }
     var miniPlayerTargetOffset by remember { mutableStateOf<Offset?>(null) }
 
@@ -269,19 +285,6 @@ fun ArtistDetailScreen(
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
 
     val density = LocalDensity.current
-
-    val handleAddToQueue: (Song, Offset, IntSize) -> Unit = { song, offset, size ->
-        viewModel.addToQueue(song)
-        if (isPlayerActive) {
-            flyingArtworks.add(
-                FlyingArtworkItem(
-                    artworkUri = song.artworkUri,
-                    startOffset = offset,
-                    startSize = size
-                )
-            )
-        }
-    }
 
     MaterialTheme(colorScheme = currentColorScheme) {
         Box(
@@ -340,387 +343,404 @@ fun ArtistDetailScreen(
                 CreatePlaylistDialog(
                     onDismiss = { showCreatePlaylistForSelectionDialog = false },
                     onCreate = { name ->
-                        viewModel.createPlaylistAndAddSongs(name, selectedSongs)
+                        viewModel.createPlaylistAndAddSongs(name, selectedSongsInSelectionOrder)
                         selectedSongIds = emptySet()
                     }
                 )
             }
 
-            // Floating Back Arrow
-            if (!isSelectionMode) {
-                FilledTonalIconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(top = statusBarTop + 8.dp, start = 16.dp)
-                        .zIndex(3f)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-            }
-
-            Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-                topBar = {
-                    if (isSelectionMode) {
-                        SelectionActionRow(
-                            selectedCount = selectedSongIds.size,
-                            onSelectAll = { selectedSongIds = songs.map { it.id }.toSet() },
-                            onDeselect = { selectedSongIds = emptySet() },
-                            onOptionsClick = { showMultiSelectionSheet = true },
-                            modifier = Modifier.padding(
-                                top = statusBarTop
-                            )
-                        )
-                    }
-                }
-            ) { innerPadding ->
-                key(artistSeedColor) {
-                    LazyColumn(
-                    state = lazyListState,
+            SongHeroOverlayContainer(
+                modifier = Modifier.fillMaxSize(),
+                overlayData = activeOverlayData,
+                onDismiss = { activeOverlayData = null },
+                onPlayNext = { song -> viewModel.playNext(listOf(song)) },
+                onAddToQueue = { song -> viewModel.addToQueue(song) },
+                onAddToPlaylist = { song ->
+                    selectedSongIds = setOf(song.id)
+                    showPlaylistSelectionSheet = true
+                },
+                onAlbumClick = onAlbumClick
+            ) {
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = if (isSelectionMode) 8.dp else statusBarTop + 64.dp,
-                        bottom = bottomPadding
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .background(MaterialTheme.colorScheme.background)
                 ) {
-                    // Artist Header Image & Name Redesign with AutoResizedText
-                    item {
-                        val currentArtist = artist
-                        val displayedArtistName = currentArtist?.name ?: "Loading Artist..."
-                        val currentPlayingArtist = playbackState.artist
-                        val currentPlayingAlbum = playbackState.album
-
-                        val isMatchingArtist = remember(
-                            displayedArtistName,
-                            currentPlayingArtist,
-                            currentPlayingAlbum
+                    key(artistSeedColor) {
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .hazeSource(hazeState),
+                            contentPadding = PaddingValues(
+                                top = statusBarTop + 64.dp,
+                                bottom = bottomPadding
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            isArtistMatchingPlayingTrack(
-                                artistName = displayedArtistName,
-                                playingArtistString = currentPlayingArtist,
-                                playingAlbumString = currentPlayingAlbum
-                            )
-                        }
+                            // Artist Header Image & Name Redesign with AutoResizedText
+                            item {
+                                val currentArtist = artist
+                                val displayedArtistName = currentArtist?.name ?: "Loading Artist..."
+                                val currentPlayingArtist = playbackState.artist
+                                val currentPlayingAlbum = playbackState.album
 
-                        val isMorphing = playbackState.isPlaying && isMatchingArtist
-
-                        val artistShape = rememberMorphingArtistShape(
-                            artistId = currentArtist?.id ?: "",
-                            artistName = currentArtist?.name ?: "",
-                            isMorphing = isMorphing
-                        )
-
-                        ArtistHeaderWithAutoResizedName(
-                            artistName = displayedArtistName,
-                            imageContent = { imageModifier ->
-                                Box(
-                                    modifier = imageModifier
-                                        .artistSharedElement(key = "artist_image_${currentArtist?.id ?: viewModel.artistId}")
-                                        .clip(artistShape)
-                                        .background(MaterialTheme.colorScheme.primaryContainer)
-                                        .clickable {
-                                            if (!artistImageUrl.isNullOrEmpty()) {
-                                                previewImageUrl = artistImageUrl
-                                            } else {
-                                                showSearchImageDialog = true
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
+                                val isMatchingArtist = remember(
+                                    displayedArtistName,
+                                    currentPlayingArtist,
+                                    currentPlayingAlbum
                                 ) {
-                                    val personPlaceholder =
-                                        rememberVectorPainter(Icons.Default.Person)
-                                    val detailImageRequest = remember(artistImageUrl) {
-                                        ImageRequest.Builder(context)
-                                            .data(artistImageUrl)
-                                            .apply {
-                                                if (!artistImageUrl.isNullOrEmpty()) {
-                                                    placeholderMemoryCacheKey(artistImageUrl)
-                                                }
-                                            }
-                                            .crossfade(false)
-                                            .build()
-                                    }
-
-                                    AsyncImage(
-                                        model = detailImageRequest,
-                                        contentDescription = displayedArtistName,
-                                        error = personPlaceholder,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
+                                    isArtistMatchingPlayingTrack(
+                                        artistName = displayedArtistName,
+                                        playingArtistString = currentPlayingArtist,
+                                        playingAlbumString = currentPlayingAlbum
                                     )
                                 }
-                            }
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
 
-                    // Song Count
-                    item {
-                        val count = songs.size
-                        Text(
-                            text = "$count ${if (count == 1) "song" else "songs"}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                                val isMorphing = playbackState.isPlaying && isMatchingArtist
 
-                    // Albums Horizontal List
-                    if (sortedAlbums.isNotEmpty()) {
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "Albums",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
+                                val artistShape = rememberMorphingArtistShape(
+                                    artistId = currentArtist?.id ?: "",
+                                    artistName = currentArtist?.name ?: "",
+                                    isMorphing = isMorphing
+                                )
+
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 4.dp)
-                                )
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(horizontal = 16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    items(sortedAlbums, key = { it.id }) { album ->
-                                        ArtistAlbumCard(
-                                            album = album,
-                                            onClick = { onAlbumClick(album.id) }
-                                        )
-                                    }
+                                    ArtistHeaderWithAutoResizedName(
+                                        artistName = displayedArtistName,
+                                        imageContent = { imageModifier ->
+                                            Box(
+                                                modifier = imageModifier
+                                                    .artistSharedElement(key = "artist_image_${currentArtist?.id ?: viewModel.artistId}")
+                                                    .clip(artistShape)
+                                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                                    .clickable {
+                                                        if (!artistImageUrl.isNullOrEmpty()) {
+                                                            previewImageUrl = artistImageUrl
+                                                        } else {
+                                                            showSearchImageDialog = true
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                val personPlaceholder =
+                                                    rememberVectorPainter(Icons.Default.Person)
+                                                val detailImageRequest = remember(artistImageUrl) {
+                                                    ImageRequest.Builder(context)
+                                                        .data(artistImageUrl)
+                                                        .apply {
+                                                            if (!artistImageUrl.isNullOrEmpty()) {
+                                                                placeholderMemoryCacheKey(artistImageUrl)
+                                                            }
+                                                        }
+                                                        .crossfade(false)
+                                                        .build()
+                                                }
+
+                                                AsyncImage(
+                                                    model = detailImageRequest,
+                                                    contentDescription = displayedArtistName,
+                                                    error = personPlaceholder,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.fillMaxSize()
+                                                )
+                                            }
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(24.dp))
                                 }
                             }
-                        }
-                    }
 
-                    // Featured On Horizontal List
-                    if (sortedFeaturedAlbums.isNotEmpty()) {
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            // Song Count
+                            item {
+                                val count = songs.size
                                 Text(
-                                    text = "Features",
+                                    text = "$count ${if (count == 1) "song" else "songs"}",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 4.dp)
+                                        .padding(horizontal = 16.dp)
                                 )
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    items(sortedFeaturedAlbums, key = { it.id }) { album ->
-                                        ArtistAlbumCard(
-                                            album = album,
-                                            onClick = { onAlbumClick(album.id) }
-                                        )
-                                    }
-                                }
                             }
-                        }
-                    }
 
-                    // Discography (Songs grouped by Album)
-                    if (discographyGroups.isNotEmpty()) {
-                        item(key = "discography_header") {
-                            Text(
-                                text = "Discography",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 32.dp, bottom = 8.dp, start = 4.dp, end = 4.dp)
-                            )
-                        }
-
-                        discographyGroups.forEach { (albumName, matchingAlbum, albumSongs) ->
-                            item(key = "discography_album_header_$albumName") {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            top = 12.dp,
-                                            bottom = 6.dp,
-                                            start = 4.dp,
-                                            end = 4.dp
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val albumArtwork = matchingAlbum?.artworkUri
-                                        ?: albumSongs.firstOrNull { it.artworkUri != null }?.artworkUri
-                                    if (albumArtwork != null) {
-                                        val request = remember(albumArtwork) {
-                                            ImageRequest.Builder(context)
-                                                .data(albumArtwork)
-                                                .size(150, 150)
-                                                .crossfade(true)
-                                                .build()
-                                        }
-                                        AsyncImage(
-                                            model = request,
-                                            contentDescription = albumName,
-                                            modifier = Modifier.size(52.dp),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(52.dp)
-                                                .background(MaterialTheme.colorScheme.primaryContainer),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Album,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(32.dp),
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column(modifier = Modifier.weight(1f)) {
+                            // Albums Horizontal List
+                            if (sortedAlbums.isNotEmpty()) {
+                                item {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
                                         Text(
-                                            text = albumName,
+                                            text = "Albums",
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
                                         )
-                                        val yearStr =
-                                            matchingAlbum?.year?.takeIf { it > 0 }?.toString()
-                                        val trackCountStr =
-                                            "${albumSongs.size} ${if (albumSongs.size == 1) "song" else "tracks"}"
-                                        val subtitle = listOfNotNull(
-                                            yearStr,
-                                            trackCountStr
-                                        ).joinToString(" • ")
-                                        Text(
-                                            text = subtitle,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-
-                            itemsIndexed(albumSongs, key = { _, song -> song.id }) { index, song ->
-                                val isCurrentSong = (currentPlayingMediaId == song.id) ||
-                                        (currentPlayingMediaId.isNullOrEmpty() && playbackState.trackTitle == song.title)
-                                SongCardItem(
-                                    song = song,
-                                    trackIndex = song.trackNumber ?: (index + 1),
-                                    isCurrentSong = isCurrentSong,
-                                    cardColor = cardColor,
-                                    onClick = {
-                                        if (isSelectionMode) {
-                                            toggleSongSelection(song)
-                                        } else {
-                                            viewModel.playSong(song)
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            contentPadding = PaddingValues(horizontal = 16.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            items(sortedAlbums, key = { it.id }) { album ->
+                                                ArtistAlbumCard(
+                                                    album = album,
+                                                    onClick = { onAlbumClick(album.id) }
+                                                )
+                                            }
                                         }
-                                    },
-                                    onAddToQueue = { offset, size ->
-                                        handleAddToQueue(
-                                            song,
-                                            offset,
-                                            size
-                                        )
-                                    },
-                                    isSelected = selectedSongIds.contains(song.id),
-                                    isSelectionMode = isSelectionMode,
-                                    onLongClick = { toggleSongSelection(song) }
-                                )
+                                    }
+                                }
                             }
-                        }
-                    }
 
-                    // Collaborators Horizontal List (after songs list)
-                    if (collaborators.isNotEmpty()) {
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 12.dp, bottom = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = if (collaborators.size == 1) "Featured Artist" else "Featured Artists",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 4.dp)
-                                )
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    items(collaborators, key = { it.id }) { collaborator ->
-                                        CollaboratorArtistCard(
-                                            artist = collaborator,
-                                            playingArtist = playbackState.artist,
-                                            playingAlbum = playbackState.album,
-                                            isPlaying = playbackState.isPlaying,
-                                            onClick = { onArtistClick(collaborator.id) }
+                            // Featured On Horizontal List
+                            if (sortedFeaturedAlbums.isNotEmpty()) {
+                                item {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "Features",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
                                         )
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            contentPadding = PaddingValues(horizontal = 16.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            items(sortedFeaturedAlbums, key = { it.id }) { album ->
+                                                ArtistAlbumCard(
+                                                    album = album,
+                                                    onClick = { onAlbumClick(album.id) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Discography (Songs grouped by Album)
+                            if (discographyGroups.isNotEmpty()) {
+                                item(key = "discography_header") {
+                                    Text(
+                                        text = "Discography",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 32.dp, bottom = 8.dp, start = 16.dp, end = 16.dp)
+                                    )
+                                }
+
+                                discographyGroups.forEach { (albumName, matchingAlbum, albumSongs) ->
+                                    item(key = "discography_album_header_$albumName") {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    top = 12.dp,
+                                                    bottom = 6.dp,
+                                                    start = 16.dp,
+                                                    end = 16.dp
+                                                ),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val albumArtwork = matchingAlbum?.artworkUri
+                                                ?: albumSongs.firstOrNull { it.artworkUri != null }?.artworkUri
+                                            if (albumArtwork != null) {
+                                                val request = remember(albumArtwork) {
+                                                    ImageRequest.Builder(context)
+                                                        .data(albumArtwork)
+                                                        .size(150, 150)
+                                                        .crossfade(true)
+                                                        .build()
+                                                }
+                                                AsyncImage(
+                                                    model = request,
+                                                    contentDescription = albumName,
+                                                    modifier = Modifier.size(52.dp),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(52.dp)
+                                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Album,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(32.dp),
+                                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = albumName,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                val yearStr =
+                                                    matchingAlbum?.year?.takeIf { it > 0 }?.toString()
+                                                val trackCountStr =
+                                                    "${albumSongs.size} ${if (albumSongs.size == 1) "song" else "tracks"}"
+                                                val subtitle = listOfNotNull(
+                                                    yearStr,
+                                                    trackCountStr
+                                                ).joinToString(" • ")
+                                                Text(
+                                                    text = subtitle,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    itemsIndexed(albumSongs, key = { _, song -> song.id }) { _, song ->
+                                        val isSelected = selectedSongIds.contains(song.id)
+                                        SongListItem(
+                                            song = song,
+                                            onClick = {
+                                                if (isSelectionMode) {
+                                                    toggleSongSelection(song)
+                                                } else {
+                                                    viewModel.playSong(song)
+                                                }
+                                            },
+                                            isSelected = isSelected,
+                                            isSelectionMode = isSelectionMode,
+                                            showTrackNumber = true,
+                                            onLongClick = { toggleSongSelection(song) },
+                                            onMoreClick = { offset, size ->
+                                                activeOverlayData = SongOverlayData(
+                                                    song = song,
+                                                    startOffset = offset,
+                                                    startSize = size
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Collaborators Horizontal List (after songs list)
+                            if (collaborators.isNotEmpty()) {
+                                item {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 12.dp, bottom = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = if (collaborators.size == 1) "Featured Artist" else "Featured Artists",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
+                                        )
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            contentPadding = PaddingValues(horizontal = 16.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            items(collaborators, key = { it.id }) { collaborator ->
+                                                CollaboratorArtistCard(
+                                                    artist = collaborator,
+                                                    playingArtist = playbackState.artist,
+                                                    playingAlbum = playbackState.album,
+                                                    isPlaying = playbackState.isPlaying,
+                                                    onClick = { onArtistClick(collaborator.id) }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-            }
-        }
 
-            // Multi-selection Bottom Sheet
-            if (showMultiSelectionSheet) {
-                MultiSelectionBottomSheet(
-                    selectedSongs = selectedSongs,
-                    onDismiss = { showMultiSelectionSheet = false },
-                    onPlayAll = {
-                        if (selectedSongs.isNotEmpty()) {
-                            viewModel.playSong(selectedSongs.first())
-                            selectedSongs.drop(1).forEach { viewModel.addToQueue(it) }
-                            selectedSongIds = emptySet()
+                    // Floating Back Arrow
+                    if (!isActionPopupOpen) {
+                        FilledTonalIconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(top = statusBarTop + 8.dp, start = 16.dp)
+                                .zIndex(3f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
                         }
-                    },
-                    onAddToPlaylist = {
-                        showMultiSelectionSheet = false
-                        showPlaylistSelectionSheet = true
-                    },
-                    onAddToQueue = {
-                        selectedSongs.forEach { viewModel.addToQueue(it) }
-                        selectedSongIds = emptySet()
                     }
-                )
+
+                    SongsMultiSelectOverlay(
+                        songs = selectedSongsInSelectionOrder,
+                        visible = isSelectionMode,
+                        isExpanded = isActionPopupOpen,
+                        onClick = {
+                            showMultiSelectionSheet = !showMultiSelectionSheet
+                        },
+                        onDismiss = {
+                            showMultiSelectionSheet = false
+                        },
+                        onPlayNext = { activeSongs ->
+                            if (activeSongs.isNotEmpty()) {
+                                viewModel.playNext(activeSongs)
+                                selectedSongIds = emptySet()
+                            }
+                        },
+                        onAddToPlaylist = { _ ->
+                            showMultiSelectionSheet = false
+                            showPlaylistSelectionSheet = true
+                        },
+                        onAddToQueue = { activeSongs ->
+                            if (activeSongs.isNotEmpty()) {
+                                viewModel.addToQueue(activeSongs)
+                                selectedSongIds = emptySet()
+                            }
+                        },
+                        hazeState = hazeState,
+                        bottomPadding = bottomPadding,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .zIndex(5f)
+                    )
+                }
             }
 
             // Playlist Selection Bottom Sheet
@@ -729,7 +749,7 @@ fun ArtistDetailScreen(
                     playlists = playlists,
                     onDismiss = { showPlaylistSelectionSheet = false },
                     onSelectPlaylist = { playlist ->
-                        viewModel.addSongsToPlaylist(playlist.id, selectedSongs)
+                        viewModel.addSongsToPlaylist(playlist.id, selectedSongsInSelectionOrder)
                         selectedSongIds = emptySet()
                     },
                     onCreateNewPlaylist = {
