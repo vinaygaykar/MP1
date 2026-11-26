@@ -91,8 +91,10 @@ import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
-import io.github.vinaygaykar.mp1.ui.library.MultiSelectionBottomSheet
-import io.github.vinaygaykar.mp1.ui.library.SelectionActionRow
+import androidx.compose.ui.zIndex
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
@@ -118,23 +120,43 @@ fun AlbumDetailScreen(
     val playbackState by playerViewModel.playbackState.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
+    val hazeState = remember { HazeState() }
     var activeOverlayData by remember { mutableStateOf<SongOverlayData?>(null) }
-
-    LaunchedEffect(activeOverlayData != null) {
-        if (activeOverlayData != null) {
-            onHideNowPlayingView()
-        } else {
-            onShowNowPlayingView()
-        }
-    }
     var selectedSongIds by remember { mutableStateOf(setOf<String>()) }
     val isSelectionMode = selectedSongIds.isNotEmpty()
     var showMultiSelectionSheet by remember { mutableStateOf(false) }
     var showPlaylistSelectionSheet by remember { mutableStateOf(false) }
     var showCreatePlaylistForSelectionDialog by remember { mutableStateOf(false) }
 
-    val selectedSongs = remember(songs, selectedSongIds) {
-        songs.filter { selectedSongIds.contains(it.id) }
+    val songsMap = remember(songs) { songs.associateBy { it.id } }
+    val selectedSongsInSelectionOrder = remember(songsMap, selectedSongIds) {
+        selectedSongIds.mapNotNull { songsMap[it] }
+    }
+
+    val isActionPopupOpen = isSelectionMode && showMultiSelectionSheet
+
+    // Back Handler Level 1: When expanded, back press collapses the overlay back to compact mode
+    BackHandler(enabled = isActionPopupOpen) {
+        showMultiSelectionSheet = false
+    }
+
+    // Back Handler Level 2: When collapsed in selection mode, back press exits selection mode and deselects all
+    BackHandler(enabled = isSelectionMode && !showMultiSelectionSheet) {
+        selectedSongIds = emptySet()
+    }
+
+    LaunchedEffect(isSelectionMode) {
+        if (!isSelectionMode) {
+            showMultiSelectionSheet = false
+        }
+    }
+
+    LaunchedEffect(activeOverlayData != null, isActionPopupOpen) {
+        if (activeOverlayData != null || isActionPopupOpen) {
+            onHideNowPlayingView()
+        } else {
+            onShowNowPlayingView()
+        }
     }
 
     fun toggleSongSelection(song: Song) {
@@ -143,10 +165,6 @@ fun AlbumDetailScreen(
         } else {
             selectedSongIds + song.id
         }
-    }
-
-    BackHandler(enabled = isSelectionMode) {
-        selectedSongIds = emptySet()
     }
 
     val context = LocalContext.current
@@ -269,7 +287,7 @@ fun AlbumDetailScreen(
                 CreatePlaylistDialog(
                     onDismiss = { showCreatePlaylistForSelectionDialog = false },
                     onCreate = { name ->
-                        viewModel.createPlaylistAndAddSongs(name, selectedSongs)
+                        viewModel.createPlaylistAndAddSongs(name, selectedSongsInSelectionOrder)
                         selectedSongIds = emptySet()
                     }
                 )
@@ -279,7 +297,7 @@ fun AlbumDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 overlayData = activeOverlayData,
                 onDismiss = { activeOverlayData = null },
-                onPlayNext = { song -> viewModel.addToQueue(song) },
+                onPlayNext = { song -> viewModel.playNext(listOf(song)) },
                 onAddToQueue = { song -> viewModel.addToQueue(song) },
                 onAddToPlaylist = { song ->
                     selectedSongIds = setOf(song.id)
@@ -293,7 +311,9 @@ fun AlbumDetailScreen(
                 ) {
                     LazyColumn(
                         state = lazyListState,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .hazeSource(hazeState),
                         contentPadding = PaddingValues(
                             top = statusBarTop + 52.dp,
                             bottom = bottomPadding
@@ -549,24 +569,14 @@ fun AlbumDetailScreen(
                         }
                     }
 
-                    // Floating Back Arrow / Selection Action Row
-                    if (isSelectionMode) {
-                        SelectionActionRow(
-                            selectedCount = selectedSongIds.size,
-                            onSelectAll = { selectedSongIds = songs.map { it.id }.toSet() },
-                            onDeselect = { selectedSongIds = emptySet() },
-                            onOptionsClick = { showMultiSelectionSheet = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f))
-                                .padding(top = statusBarTop)
-                        )
-                    } else {
+                    // Floating Back Arrow
+                    if (!isActionPopupOpen) {
                         FilledTonalIconButton(
                             onClick = onBack,
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .padding(top = statusBarTop, start = 16.dp)
+                                .zIndex(3f)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -574,30 +584,41 @@ fun AlbumDetailScreen(
                             )
                         }
                     }
-                }
-            }
 
-            // Multi-selection Bottom Sheet
-            if (showMultiSelectionSheet) {
-                MultiSelectionBottomSheet(
-                    selectedSongs = selectedSongs,
-                    onDismiss = { showMultiSelectionSheet = false },
-                    onPlayAll = {
-                        if (selectedSongs.isNotEmpty()) {
-                            viewModel.playSong(selectedSongs.first())
-                            selectedSongs.drop(1).forEach { viewModel.addToQueue(it) }
-                            selectedSongIds = emptySet()
-                        }
-                    },
-                    onAddToPlaylist = {
-                        showMultiSelectionSheet = false
-                        showPlaylistSelectionSheet = true
-                    },
-                    onAddToQueue = {
-                        selectedSongs.forEach { viewModel.addToQueue(it) }
-                        selectedSongIds = emptySet()
-                    }
-                )
+                    SongsMultiSelectOverlay(
+                        songs = selectedSongsInSelectionOrder,
+                        visible = isSelectionMode,
+                        isExpanded = isActionPopupOpen,
+                        onClick = {
+                            showMultiSelectionSheet = !showMultiSelectionSheet
+                        },
+                        onDismiss = {
+                            showMultiSelectionSheet = false
+                        },
+                        onPlayNext = { activeSongs ->
+                            if (activeSongs.isNotEmpty()) {
+                                viewModel.playNext(activeSongs)
+                                selectedSongIds = emptySet()
+                            }
+                        },
+                        onAddToPlaylist = { activeSongs ->
+                            showMultiSelectionSheet = false
+                            showPlaylistSelectionSheet = true
+                        },
+                        onAddToQueue = { activeSongs ->
+                            if (activeSongs.isNotEmpty()) {
+                                viewModel.addToQueue(activeSongs)
+                                selectedSongIds = emptySet()
+                            }
+                        },
+                        hazeState = hazeState,
+                        bottomPadding = bottomPadding,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .zIndex(5f)
+                    )
+                }
             }
 
             // Playlist Selection Bottom Sheet
@@ -606,7 +627,7 @@ fun AlbumDetailScreen(
                     playlists = playlists,
                     onDismiss = { showPlaylistSelectionSheet = false },
                     onSelectPlaylist = { playlist ->
-                        viewModel.addSongsToPlaylist(playlist.id, selectedSongs)
+                        viewModel.addSongsToPlaylist(playlist.id, selectedSongsInSelectionOrder)
                         selectedSongIds = emptySet()
                     },
                     onCreateNewPlaylist = {

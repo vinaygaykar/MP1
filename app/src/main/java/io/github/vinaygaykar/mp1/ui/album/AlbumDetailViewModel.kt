@@ -111,7 +111,15 @@ class AlbumDetailViewModel @Inject constructor(
         viewModelScope.launch { playback.play(songs.value, shuffle = shuffle) }
     }
 
+    fun playNext(songs: List<Song>) {
+        viewModelScope.launch { playback.playNext(songs) }
+    }
+
     fun addToQueue(song: Song) {
         viewModelScope.launch { playback.addToQueue(song) }
+    }
+
+    fun addToQueue(songs: List<Song>) {
+        viewModelScope.launch { playback.addToQueue(songs) }
     }
 }
