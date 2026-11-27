@@ -12,6 +12,7 @@ import android.hardware.SensorManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
+import android.view.Surface
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.Animatable
@@ -21,7 +22,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -88,12 +88,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -103,6 +99,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -283,8 +280,8 @@ fun SongDetailOverlay(
         label = "songDetailOverlayExpand"
     )
 
-    // World-fixed light direction (gravity driven) for the CD shine
-    val cdLight = rememberCdLight(active = isExpanded)
+    // World-fixed light direction (gyro + accelerometer driven) for the tilt shine
+    val tiltLight = rememberTiltLight(active = isExpanded)
 
     // Fetch album artwork embedded from song file
     var embeddedArtworkBytes by remember(song.uri) { mutableStateOf<ByteArray?>(null) }
@@ -430,7 +427,7 @@ fun SongDetailOverlay(
                     isExpanded = isExpanded,
                     expandProgress = expandProgress,
                     buttonsAlpha = buttonsAlpha,
-                    cdLight = cdLight,
+                    tiltLight = tiltLight,
                     dismissWithAnimation = dismissWithAnimation,
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
@@ -454,7 +451,7 @@ fun SongDetailOverlay(
                     isExpanded = isExpanded,
                     expandProgress = expandProgress,
                     buttonsAlpha = buttonsAlpha,
-                    cdLight = cdLight,
+                    tiltLight = tiltLight,
                     dismissWithAnimation = dismissWithAnimation,
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
@@ -478,7 +475,7 @@ fun SongDetailOverlay(
                     isExpanded = isExpanded,
                     expandProgress = expandProgress,
                     buttonsAlpha = buttonsAlpha,
-                    cdLight = cdLight,
+                    tiltLight = tiltLight,
                     dismissWithAnimation = dismissWithAnimation,
                     onPlayNext = onPlayNext,
                     onAddToQueue = onAddToQueue,
@@ -521,7 +518,7 @@ private fun SongDetailPortraitContent(
     isExpanded: Boolean,
     expandProgress: Float,
     buttonsAlpha: Float,
-    cdLight: CdLight? = null,
+    tiltLight: TiltLight? = null,
     dismissWithAnimation: () -> Unit,
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
@@ -590,7 +587,7 @@ private fun SongDetailPortraitContent(
                 artworkAnimTranslationY = artworkAnimTranslationY,
                 artworkShadowElevation = artworkShadowElevation,
                 shineAlpha = expandProgress,
-                cdLight = cdLight
+                tiltLight = tiltLight
             )
 
             Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(20.dp))
@@ -671,7 +668,7 @@ private fun SongDetailLandscapeContent(
     isExpanded: Boolean,
     expandProgress: Float,
     buttonsAlpha: Float,
-    cdLight: CdLight? = null,
+    tiltLight: TiltLight? = null,
     dismissWithAnimation: () -> Unit,
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
@@ -739,7 +736,7 @@ private fun SongDetailLandscapeContent(
                 artworkAnimTranslationY = artworkAnimTranslationY,
                 artworkShadowElevation = artworkShadowElevation,
                 shineAlpha = expandProgress,
-                cdLight = cdLight
+                tiltLight = tiltLight
             )
 
             Spacer(modifier = if (isExpanded) Modifier.weight(1f) else Modifier.height(12.dp))
@@ -843,7 +840,7 @@ private fun SongDetailCompactContent(
     isExpanded: Boolean,
     expandProgress: Float,
     buttonsAlpha: Float,
-    cdLight: CdLight? = null,
+    tiltLight: TiltLight? = null,
     dismissWithAnimation: () -> Unit,
     onPlayNext: ((Song) -> Unit)?,
     onAddToQueue: ((Song) -> Unit)?,
@@ -922,7 +919,7 @@ private fun SongDetailCompactContent(
                     artworkAnimTranslationY = artworkAnimTranslationY,
                     artworkShadowElevation = artworkShadowElevation,
                     shineAlpha = expandProgress,
-                    cdLight = cdLight
+                    tiltLight = tiltLight
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -993,343 +990,257 @@ private fun SongDetailCompactContent(
     }
 }
 
-private object CdShine {
-    /** Master knob 0..1. ~0.25 subtle, ~0.55 balanced, ~0.9 bold. */
-    const val INTENSITY = 0.75f
-
-    // Tilt
-    const val MAX_TILT = 1.5f
-    const val IDLE_STRENGTH = 0.15f          // shine level when phone is flat
-
-    // Spectral bands
-    const val BAND_REPEATS = 2
-    const val BAND_FILL_FRACTION = 0.45f     // portion of each segment that has color, rest is dark
-    const val SPECTRAL_ALPHA = 0.75f
-    const val BAND_ANGLE_FACTOR = -0.6f      // bands counter-rotate vs lobes so colors slide through them
-    const val BAND_TRAVEL_DEG_PER_TILT = 70f
-
-    // Highlight lobes (fractions of 360°)
-    const val LOBE_HALF_WIDTH = 0.09f
-    const val HIGHLIGHT_HALF_WIDTH = 0.05f
-    const val HIGHLIGHT_ALPHA = 0.55f
-
-    // Center fade (fractions of radius)
-    const val CENTER_FADE_START = 0.10f
-    const val CENTER_FADE_END = 0.45f
-
-    // Grooves
-    const val GROOVE_SPACING_DP = 2.5f
-    const val GROOVE_STROKE_DP = 0.6f
-    const val GROOVE_ALPHA = 0.18f
-
-    // Rim
-    const val RIM_STROKE_DP = 1.5f
-    const val RIM_ALPHA = 0.7f
-
-    val SPECTRUM = listOf(
-        Color(0xFF8F00FF), // violet
-        Color(0xFF2979FF), // blue
-        Color(0xFF00E676), // green
-        Color(0xFFFFEA00), // yellow
-        Color(0xFFFF1744)  // red
-    )
-}
-
-private fun buildSpectralStops(): Array<Pair<Float, Color>> = buildList {
-    val segment = 1f / CdShine.BAND_REPEATS
-    val bandSpan = segment * CdShine.BAND_FILL_FRACTION
-    val step = bandSpan / (CdShine.SPECTRUM.size + 1)
-    repeat(CdShine.BAND_REPEATS) { k ->
-        val start = k * segment
-        add(start to CdShine.SPECTRUM.first().copy(alpha = 0f))
-        CdShine.SPECTRUM.forEachIndexed { i, c -> add(start + step * (i + 1) to c) }
-        add(start + bandSpan to CdShine.SPECTRUM.last().copy(alpha = 0f))
-    }
-    add(1f to CdShine.SPECTRUM.first().copy(alpha = 0f))
-}.toTypedArray()
-
-private fun buildLobeStops(halfWidth: Float, color: Color): Array<Pair<Float, Color>> {
-    val clear = color.copy(alpha = 0f)
-    return arrayOf(
-        0f to color,
-        halfWidth to clear,
-        0.5f - halfWidth to clear,
-        0.5f to color,
-        0.5f + halfWidth to clear,
-        1f - halfWidth to clear,
-        1f to color
-    )
-}
-
-private val SpectralStops = buildSpectralStops()
-private val MaskLobeStops = buildLobeStops(CdShine.LOBE_HALF_WIDTH, Color.Black)
-private val HighlightLobeStops = buildLobeStops(CdShine.HIGHLIGHT_HALF_WIDTH, Color.White)
-
 // =============================================================================
-// CD SHINE (API 33+ AGSL diffraction shader + gravity-driven world-fixed light)
+// TILT SHINE (API 33+ AGSL, anisotropic concentric-groove shine, gyro + accel driven light)
+// Below API 33 the artwork is drawn as a plain image (no shine, no lines).
 // =============================================================================
 
-private object CdShineConfig {
-    /** Light direction, degrees away from straight up (0 = overhead, 90 = horizontal, toward the viewer). */
-    const val LIGHT_ANGLE_DEG = 15f
+internal object TiltShineConfig {
+    /** Light direction, degrees away from straight up (0 = overhead, 90 = horizontal). */
+    const val LIGHT_ANGLE_DEG = 0f
 
-    /** Light size. Lobe half-width (sine) = 0.08 + 1.2 * softness; also blurs the colour bands. */
-    const val LIGHT_SOFTNESS = 0.05f
+    /** Low-pass factor for the light direction (0..1, higher = snappier). */
+    const val SENSOR_SMOOTHING = 0.18f
 
-    /** Overall brightness of the shine (0..~1.5). */
+    /** Sheen tightness. Higher = narrower bow-tie. */
+    const val SHARPNESS = 30f
+
+    /** Sheen brightness on artwork. */
     const val INTENSITY = 0.4f
 
-    /** Rainbow strength relative to the white zero-order. */
-    const val COLOR_GAIN = 3.0f
-
-    /** Groove pitch in nm. Real CD = 1600. Larger = narrower rainbow, more overlapping orders. */
-    const val GROOVE_PITCH_NM = 1600f
-
-    /** Rainbow brightness outside the lobes (0 = none, 1 = no lobe shaping). */
-    const val SCATTER_FLOOR = 0.04f
-
-    /** Shine fades in between these radii (fraction of disc radius). Hides the centre. */
-    const val FADE_START = 0.10f
-    const val FADE_END = 0.45f
-
-    /** Concentric grooves (drawn only inside the lobes, like the old canvas version). */
-    const val GROOVE_SPACING_DP = 2.5f
-    const val GROOVE_STROKE_DP = 0.6f
-    const val GROOVE_ALPHA = 0.25f
-
-    /** Gravity low-pass factor (0..1, higher = snappier). */
-    const val SENSOR_SMOOTHING = 0.18f
+    /** Concentric lines (dp so they look identical on every density). */
+    const val LINE_SPACING_DP = 2.5f
+    const val LINE_STROKE_DP = 0.3f
+    const val LINE_DEPTH = 0.05f
 }
 
 /**
- * Smoothed gravity direction ("up") in the device frame, plus the world-fixed light derived from it.
- * Device frame: x = right of screen, y = top of screen, z = out of the screen toward the viewer.
- * The light is LIGHT_ANGLE_DEG from vertical, tilted toward the viewer. Gravity only -> no compass dependency.
+ * World-fixed light expressed in the device frame (x = right of screen, y = top of screen,
+ * z = out of the screen toward the viewer).
+ *
+ * Driven by the game rotation vector (gyro + accelerometer fusion, no compass), so both tilt and
+ * yaw move the light. On the first sample the light is anchored in front of the viewer, so the
+ * starting pose always looks the same regardless of where the phone points.
  */
 @Stable
-private class CdLight {
-    var upX by mutableFloatStateOf(0f); private set
-    var upY by mutableFloatStateOf(0f); private set
-    var upZ by mutableFloatStateOf(1f); private set
+class TiltLight {
+    var x by mutableFloatStateOf(DEFAULT_X); private set
+    var y by mutableFloatStateOf(DEFAULT_Y); private set
+    var z by mutableFloatStateOf(DEFAULT_Z); private set
 
-    fun update(gx: Float, gy: Float, gz: Float) {
-        val n = sqrt(gx * gx + gy * gy + gz * gz)
-        if (n < 1e-3f) return
-        val a = CdShineConfig.SENSOR_SMOOTHING
-        var x = upX + (gx / n - upX) * a
-        var y = upY + (gy / n - upY) * a
-        var z = upZ + (gz / n - upZ) * a
-        val m = sqrt(x * x + y * y + z * z).coerceAtLeast(1e-4f)
-        x /= m; y /= m; z /= m
-        upX = x; upY = y; upZ = z
+    // Light direction in the sensor world frame (fixed once anchored)
+    private var wx = 0f
+    private var wy = 0f
+    private var wz = 1f
+    private var anchored = false
+
+    /** [r] is the row-major 3x3 matrix mapping device frame -> world frame. */
+    fun onRotation(r: FloatArray) {
+        val first = !anchored
+        if (first) anchor(r)
+
+        // device = R^T * world
+        val dx = r[0] * wx + r[3] * wy + r[6] * wz
+        val dy = r[1] * wx + r[4] * wy + r[7] * wz
+        val dz = r[2] * wx + r[5] * wy + r[8] * wz
+
+        val a = if (first) 1f else TiltShineConfig.SENSOR_SMOOTHING
+        var nx = x + (dx - x) * a
+        var ny = y + (dy - y) * a
+        var nz = z + (dz - z) * a
+        val m = sqrt(nx * nx + ny * ny + nz * nz).coerceAtLeast(1e-4f)
+        nx /= m; ny /= m; nz /= m
+        x = nx; y = ny; z = nz
+    }
+
+    private fun anchor(r: FloatArray) {
+        // Horizontal part of the device +z axis ("toward the viewer"); fall back to device +y when flat.
+        var hx = r[2]
+        var hy = r[5]
+        var len = sqrt(hx * hx + hy * hy)
+        if (len < 0.3f) {
+            hx = r[1]; hy = r[4]
+            len = sqrt(hx * hx + hy * hy)
+        }
+        if (len < 1e-4f) { hx = 0f; hy = 1f; len = 1f }
+        hx /= len; hy /= len
+
+        val rad = Math.toRadians(TiltShineConfig.LIGHT_ANGLE_DEG.toDouble())
+        wx = (sin(rad) * hx).toFloat()
+        wy = (sin(rad) * hy).toFloat()
+        wz = cos(rad).toFloat()
+        anchored = true
     }
 
     fun reset() {
-        upX = 0f; upY = 0f; upZ = 1f
+        anchored = false
+        x = DEFAULT_X; y = DEFAULT_Y; z = DEFAULT_Z
     }
 
     /** Unit light direction in the device frame, written into [out] (size 3). */
-    fun lightDirection(out: FloatArray) {
-        val ux = upX
-        val uy = upY
-        val uz = upZ
-
-        // Horizontal "toward the viewer": device +z with the vertical component removed.
-        var hzx = -uz * ux
-        var hzy = -uz * uy
-        var hzz = 1f - uz * uz
-        val lenZ = sqrt(hzx * hzx + hzy * hzy + hzz * hzz)
-        // Fallback when the phone is flat (+z is vertical): use the top of the screen instead.
-        var hyx = -uy * ux
-        var hyy = 1f - uy * uy
-        var hyz = -uy * uz
-        val lenY = sqrt(hyx * hyx + hyy * hyy + hyz * hyz)
-
-        val k = smoothstep(0.10f, 0.35f, lenZ)
-        if (lenZ > 1e-4f) { hzx /= lenZ; hzy /= lenZ; hzz /= lenZ } else { hzx = 0f; hzy = 0f; hzz = 0f }
-        if (lenY > 1e-4f) { hyx /= lenY; hyy /= lenY; hyz /= lenY } else { hyx = 0f; hyy = 0f; hyz = 0f }
-
-        var hx = hzx * k + hyx * (1f - k)
-        var hy = hzy * k + hyy * (1f - k)
-        var hz = hzz * k + hyz * (1f - k)
-        val hl = sqrt(hx * hx + hy * hy + hz * hz)
-        if (hl > 1e-4f) { hx /= hl; hy /= hl; hz /= hl }
-
-        val rad = Math.toRadians(CdShineConfig.LIGHT_ANGLE_DEG.toDouble())
-        val ca = cos(rad).toFloat()
-        val sa = sin(rad).toFloat()
-        var lx = ca * ux + sa * hx
-        var ly = ca * uy + sa * hy
-        var lz = ca * uz + sa * hz
-        val ll = sqrt(lx * lx + ly * ly + lz * lz).coerceAtLeast(1e-4f)
-        lx /= ll; ly /= ll; lz /= ll
-        out[0] = lx; out[1] = ly; out[2] = lz
+    fun direction(out: FloatArray) {
+        out[0] = x; out[1] = y; out[2] = z
     }
 
-    /** Approximation of the old tilt scalars, for the pre-API-33 gradient fallback. */
-    val legacyTiltX: Float get() = (-upX * 1.96f).coerceIn(-1.5f, 1.5f)
-    val legacyTiltY: Float get() = (upY * 1.96f).coerceIn(-1.5f, 1.5f)
-
-    private fun smoothstep(e0: Float, e1: Float, x: Float): Float {
-        val t = ((x - e0) / (e1 - e0)).coerceIn(0f, 1f)
-        return t * t * (3f - 2f * t)
+    private companion object {
+        const val DEFAULT_X = 0f
+        const val DEFAULT_Y = 0.259f
+        const val DEFAULT_Z = 0.966f
     }
 }
 
-/** Listens to gravity (TYPE_GRAVITY, falling back to the accelerometer) while [active]. */
+/** Listens to the game rotation vector (falls back to the rotation vector) while [active]. */
 @Composable
-private fun rememberCdLight(active: Boolean): CdLight {
+fun rememberTiltLight(active: Boolean): TiltLight {
     val context = LocalContext.current
-    val light = remember { CdLight() }
+    val view = LocalView.current
+    val light = remember { TiltLight() }
 
     DisposableEffect(active) {
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-        val sensor = sm?.getDefaultSensor(Sensor.TYPE_GRAVITY)
-            ?: sm?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val sensor = sm?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
+            ?: sm?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
         if (!active || sm == null || sensor == null) {
             light.reset()
             onDispose { }
         } else {
+            val raw = FloatArray(9)
+            val mapped = FloatArray(9)
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent?) {
                     val v = event?.values ?: return
-                    // Both sensors read +9.8 along the direction that points up when the phone is at rest.
-                    light.update(v[0], v[1], v[2])
+                    SensorManager.getRotationMatrixFromVector(raw, v)
+
+                    // Express the matrix in the screen frame so landscape / reverse orientations work.
+                    val (ax, ay) = when (view.display?.rotation) {
+                        Surface.ROTATION_90 -> SensorManager.AXIS_Y to SensorManager.AXIS_MINUS_X
+                        Surface.ROTATION_180 -> SensorManager.AXIS_MINUS_X to SensorManager.AXIS_MINUS_Y
+                        Surface.ROTATION_270 -> SensorManager.AXIS_MINUS_Y to SensorManager.AXIS_X
+                        else -> SensorManager.AXIS_X to SensorManager.AXIS_Y
+                    }
+                    if (SensorManager.remapCoordinateSystem(raw, ax, ay, mapped)) {
+                        light.onRotation(mapped)
+                    }
                 }
 
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
             }
             sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
-            onDispose { sm.unregisterListener(listener) }
+            onDispose {
+                sm.unregisterListener(listener)
+                light.reset()
+            }
         }
     }
     return light
 }
 
 /**
- * Draws the diffraction shine over the content (Screen blend). No-op below API 33 or when [light] is null.
- * Apply AFTER `.clip(CircleShape)`. [shineAlpha] fades it in/out.
+ * Two draw passes over the content, in order:
+ *  1. Multiply: fine concentric lines that subtly darken the artwork.
+ *  2. Screen: anisotropic warm-white sheen that moves with the phone.
+ * No-op below API 33 or when [light] is null. Apply AFTER `.clip(CircleShape)`.
+ * [shineAlpha] fades both passes in/out.
  */
 @Composable
-private fun Modifier.cdShine(light: CdLight?, shineAlpha: Float): Modifier =
+fun Modifier.tiltShine(light: TiltLight?, shineAlpha: Float): Modifier =
     if (light != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        cdShineAgsl(light, shineAlpha)
+        tiltShineAgsl(light, shineAlpha)
     } else {
         this
     }
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
-private fun Modifier.cdShineAgsl(light: CdLight, shineAlpha: Float): Modifier {
-    val shader = remember { RuntimeShader(CD_SHINE_AGSL) }
-    val brush = remember(shader) { ShaderBrush(shader) }
+private fun Modifier.tiltShineAgsl(light: TiltLight, shineAlpha: Float): Modifier {
+    val linesShader = remember {
+        RuntimeShader(TILT_SHINE_AGSL).apply { setFloatUniform("uPass", 0f) }
+    }
+    val sheenShader = remember {
+        RuntimeShader(TILT_SHINE_AGSL).apply { setFloatUniform("uPass", 1f) }
+    }
+    val linesBrush = remember(linesShader) { ShaderBrush(linesShader) }
+    val sheenBrush = remember(sheenShader) { ShaderBrush(sheenShader) }
     val dir = remember { FloatArray(3) }
 
     return drawWithContent {
         drawContent()
         if (shineAlpha > 0.001f) {
-            light.lightDirection(dir) // state read happens in draw -> redraw only, no recomposition
-            shader.setFloatUniform("uRes", size.width, size.height)
-            shader.setFloatUniform("uLight", dir[0], dir[1], dir[2])
-            shader.setFloatUniform("uSoft", CdShineConfig.LIGHT_SOFTNESS)
-            shader.setFloatUniform("uGain", CdShineConfig.INTENSITY * shineAlpha)
-            shader.setFloatUniform("uColorGain", CdShineConfig.COLOR_GAIN)
-            shader.setFloatUniform("uPitch", CdShineConfig.GROOVE_PITCH_NM)
-            shader.setFloatUniform("uFloor", CdShineConfig.SCATTER_FLOOR)
-            shader.setFloatUniform("uFade", CdShineConfig.FADE_START, CdShineConfig.FADE_END)
-            shader.setFloatUniform(
-                "uGroove",
-                CdShineConfig.GROOVE_SPACING_DP.dp.toPx(),
-                CdShineConfig.GROOVE_STROKE_DP.dp.toPx(),
-                CdShineConfig.GROOVE_ALPHA
-            )
-            drawRect(brush = brush, blendMode = BlendMode.Screen)
+            light.direction(dir) // state read happens in draw -> redraw only, no recomposition
+            val spacing = TiltShineConfig.LINE_SPACING_DP.dp.toPx()
+            val stroke = TiltShineConfig.LINE_STROKE_DP.dp.toPx()
+            for (s in arrayOf(linesShader, sheenShader)) {
+                s.setFloatUniform("uRes", size.width, size.height)
+                s.setFloatUniform("uLight", dir[0], dir[1], dir[2])
+                s.setFloatUniform("uSharp", TiltShineConfig.SHARPNESS)
+                s.setFloatUniform("uGain", TiltShineConfig.INTENSITY * shineAlpha)
+                s.setFloatUniform(
+                    "uLine",
+                    spacing,
+                    stroke,
+                    TiltShineConfig.LINE_DEPTH * shineAlpha
+                )
+            }
+            drawRect(brush = linesBrush, blendMode = BlendMode.Multiply)
+            drawRect(brush = sheenBrush, blendMode = BlendMode.Screen)
         }
     }
 }
 
 /**
- * Reflection-grating model of a CD (radial groove direction, pitch uPitch nm, orders 1..3).
- * With H = L + V (V = +z, orthographic) at polar angle phi on the disc:
- *   s = H . radial  -> which wavelengths diffract toward the eye: lambda = pitch * |s| / m
- *   t = H . tangent -> must be ~0 (conical condition) -> gives the straight-edged lobes
- * Lobe width is angular: exp(-(t/|H_inplane|)^2 / sa^2), sa = 0.08 + 1.2 * softness.
+ * Concentric grooves reflect light as a bow-tie: bright where the half vector H = L + V is
+ * perpendicular to the groove tangent (Kajiya-Kay), limited to H near the surface normal.
+ * The disc lies in the device plane, so N = V = +z and everything is evaluated in device space.
+ *
+ * uPass 0 = Multiply pass (white = unchanged, lines darken).
+ * uPass 1 = Screen pass (black = unchanged, sheen lightens).
  */
-private const val CD_SHINE_AGSL = """
+private const val TILT_SHINE_AGSL = """
 uniform float2 uRes;
 uniform float3 uLight;
-uniform float uSoft;
+uniform float uPass;
+uniform float uSharp;
 uniform float uGain;
-uniform float uColorGain;
-uniform float uPitch;
-uniform float uFloor;
-uniform float2 uFade;
-uniform float3 uGroove;   // x = spacing px, y = stroke px, z = alpha
-
-float3 spectrum(float l) {
-    float3 c;
-    if (l < 440.0) c = float3(-(l - 440.0) / 60.0, 0.0, 1.0);
-    else if (l < 490.0) c = float3(0.0, (l - 440.0) / 50.0, 1.0);
-    else if (l < 510.0) c = float3(0.0, 1.0, -(l - 510.0) / 20.0);
-    else if (l < 580.0) c = float3((l - 510.0) / 70.0, 1.0, 0.0);
-    else if (l < 645.0) c = float3(1.0, -(l - 645.0) / 65.0, 0.0);
-    else c = float3(1.0, 0.0, 0.0);
-    float f = 1.0;
-    if (l < 420.0) f = 0.3 + 0.7 * (l - 380.0) / 40.0;
-    else if (l > 700.0) f = 0.3 + 0.7 * (750.0 - l) / 50.0;
-    float vis = step(380.0, l) * step(l, 750.0);
-    return c * f * vis;
-}
+uniform float3 uLine;   // x = spacing px, y = stroke px, z = depth
 
 half4 main(float2 fragCoord) {
     float2 uv = (fragCoord - 0.5 * uRes) / (0.5 * min(uRes.x, uRes.y));
     float r = length(uv);
+    float rPx = r * 0.5 * min(uRes.x, uRes.y);
+
+    if (uPass < 0.5) {
+        if (r > 1.0) return half4(1.0);
+        float dRing = abs(fract(rPx / uLine.x) - 0.5) * uLine.x;
+        float ring = 1.0 - smoothstep(uLine.y * 0.5, uLine.y * 0.5 + 1.0, dRing);
+        float v = 1.0 - ring * uLine.z;
+        return half4(half3(v), 1.0);
+    }
+
     if (r > 1.0) return half4(0.0);
 
-    float2 pd = float2(uv.x, -uv.y);              // screen y points down, device y points up
-    float2 rho = pd / max(r, 1e-4);               // groove normal (radial)
-    float2 tau = float2(-rho.y, rho.x);           // along the groove
+    float2 pd = float2(uv.x, -uv.y);                 // screen y points down, device y points up
+    float2 tau = float2(-pd.y, pd.x) / max(r, 1e-4); // along the groove
 
     float3 L = normalize(uLight);
-    float3 H = L + float3(0.0, 0.0, 1.0);         // light + view (view = out of screen)
+    float3 H = normalize(L + float3(0.0, 0.0, 1.0));
+    float lf = smoothstep(0.0, 0.1, L.z);
 
-    float lf = smoothstep(0.0, 0.1, L.z);         // light must hit the data face
-    float s = dot(H.xy, rho);
-    float t = dot(H.xy, tau);
-    float hp = length(H.xy);
-    float cb = t / max(hp, 1e-3);
-    float sa = 0.08 + uSoft * 1.2;
-    float lobe = mix(1.0, exp(-cb * cb / (sa * sa)), smoothstep(0.05, 0.3, hp));
+    float tH = dot(tau, H.xy);
+    float sinTH = sqrt(max(1.0 - tH * tH, 0.0));
+    float nh = max(H.z, 0.0);
 
-    float delta = uSoft * 0.3;
-    float3 df = float3(0.0);
-    for (int i = 0; i < 12; i++) {
-        float ss = abs(s + (float(i) / 11.0 - 0.5) * 2.0 * delta);
-        for (int m = 1; m < 4; m++) {
-            float fm = float(m);
-            float w = 0.2;
-            if (m == 1) w = 1.0;
-            else if (m == 2) w = 0.45;
-            df += spectrum(uPitch * ss / fm) * w;
-        }
-    }
-    df /= 12.0;
-    df *= uFloor + (1.0 - uFloor) * lobe;
+    float fine = 0.88 + 0.12 * cos(6.2832 * rPx / uLine.x);
+    float broad = pow(sinTH, uSharp) * pow(nh, 6.0) * fine;
+    float tight = pow(sinTH, uSharp * 6.0) * pow(nh, 2.0);
 
-    float z = s / (uSoft * 2.0 + 0.05);
-    float w0 = exp(-z * z) * lobe;                // white zero-order
+    float3 warm = float3(1.0, 0.95, 0.88);
+    float3 irid = 0.5 + 0.5 * cos(6.2832 * (r * 3.0 + float3(0.0, 0.33, 0.67)));
+    float3 tint = mix(warm, irid, 0.12);
 
-    float mask = smoothstep(uFade.x, uFade.y, r);
-
-    // Concentric grooves: thin anti-aliased rings, visible only inside the lobes
-    float rPx = r * 0.5 * min(uRes.x, uRes.y);
-    float dRing = abs(fract(rPx / uGroove.x) - 0.5) * uGroove.x;
-    float ring = 1.0 - smoothstep(uGroove.y * 0.5, uGroove.y * 0.5 + 1.0, dRing);
-
-    float3 col = lf * (df * uColorGain + w0 * float3(0.9) + ring * uGroove.z * lobe * float3(1.0)) * mask;
-    col = 1.0 - exp(-col * 1.4);
-    return half4(half3(col * uGain), 1.0);
+    float3 col = (broad * 0.35 + tight * 0.5) * tint * lf * uGain;
+    col = col / (1.0 + col * 0.35);
+    return half4(half3(col), 1.0);
 }
 """
 
@@ -1343,7 +1254,7 @@ private fun SongArtworkBox(
     artworkShadowElevation: Dp,
     modifier: Modifier = Modifier,
     shineAlpha: Float = 0f,
-    cdLight: CdLight? = null
+    tiltLight: TiltLight? = null
 ) {
     Box(
         modifier = modifier
@@ -1359,7 +1270,7 @@ private fun SongArtworkBox(
             )
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .cdShine(cdLight, shineAlpha),
+            .tiltShine(tiltLight, shineAlpha),
         contentAlignment = Alignment.Center
     ) {
         val musicPlaceholder = rememberVectorPainter(Icons.Default.MusicNote)
@@ -1374,100 +1285,6 @@ private fun SongArtworkBox(
                 .clip(CircleShape),
             contentScale = ContentScale.Crop
         )
-
-        if (shineAlpha > 0.001f && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .graphicsLayer {
-                        alpha = shineAlpha
-                        compositingStrategy = CompositingStrategy.Offscreen // needed for DstIn masking
-                    }
-            ) {
-                val c = center
-                val radius = size.minDimension / 2f
-                val shineTiltX = cdLight?.legacyTiltX ?: 0f
-                val shineTiltY = cdLight?.legacyTiltY ?: 0f
-                val tilt = kotlin.math.hypot(shineTiltX, shineTiltY)
-                val strength = (tilt / CdShine.MAX_TILT).coerceIn(0f, 1f)
-                val energy = (CdShine.IDLE_STRENGTH + (1f - CdShine.IDLE_STRENGTH) * strength) *
-                    CdShine.INTENSITY
-                val angleDeg = Math.toDegrees(
-                    kotlin.math.atan2(shineTiltY, shineTiltX).toDouble()
-                ).toFloat()
-                val bandRotation = angleDeg * CdShine.BAND_ANGLE_FACTOR +
-                    tilt * CdShine.BAND_TRAVEL_DEG_PER_TILT
-
-                // 1. Spectral bands
-                rotate(bandRotation, c) {
-                    drawRect(
-                        brush = Brush.sweepGradient(*SpectralStops, center = c),
-                        alpha = CdShine.SPECTRAL_ALPHA * energy
-                    )
-                }
-
-                // 2. Concentric grooves
-                val spacing = CdShine.GROOVE_SPACING_DP.dp.toPx()
-                val grooveStroke = Stroke(width = CdShine.GROOVE_STROKE_DP.dp.toPx())
-                var r = spacing
-                while (r < radius) {
-                    drawCircle(
-                        color = Color.White,
-                        radius = r,
-                        center = c,
-                        alpha = CdShine.GROOVE_ALPHA * energy,
-                        style = grooveStroke
-                    )
-                    r += spacing
-                }
-
-                // 3. Highlight lobes
-                rotate(angleDeg, c) {
-                    drawRect(
-                        brush = Brush.sweepGradient(*HighlightLobeStops, center = c),
-                        alpha = CdShine.HIGHLIGHT_ALPHA * energy,
-                        blendMode = BlendMode.Plus
-                    )
-                }
-
-                // 4. Bow-tie mask
-                rotate(angleDeg, c) {
-                    drawRect(
-                        brush = Brush.sweepGradient(*MaskLobeStops, center = c),
-                        blendMode = BlendMode.DstIn
-                    )
-                }
-
-                // 5. Center fade
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to Color.Black.copy(alpha = 0f),
-                            CdShine.CENTER_FADE_START to Color.Black.copy(alpha = 0f),
-                            CdShine.CENTER_FADE_END to Color.Black,
-                            1f to Color.Black
-                        ),
-                        center = c,
-                        radius = radius
-                    ),
-                    blendMode = BlendMode.DstIn
-                )
-
-                // 6. Rim highlight
-                val rimStroke = CdShine.RIM_STROKE_DP.dp.toPx()
-                rotate(angleDeg, c) {
-                    drawCircle(
-                        brush = Brush.sweepGradient(*HighlightLobeStops, center = c),
-                        radius = radius - rimStroke / 2f,
-                        center = c,
-                        alpha = CdShine.RIM_ALPHA * energy,
-                        style = Stroke(width = rimStroke),
-                        blendMode = BlendMode.Plus
-                    )
-                }
-            }
-        }
     }
 }
 
