@@ -18,9 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,9 +45,6 @@ internal fun NowPlayingTrackInfo(
     onAlbumClick: (String) -> Unit = {},
     onArtistClick: (() -> Unit)? = null
 ) {
-    val context = LocalContext.current
-    val view = LocalView.current
-
     if (pagerState == null) {
         NowPlayingTrackTextContext(
             title = playbackState.trackTitle,
@@ -173,7 +168,7 @@ private fun NowPlayingTrackTextContext(
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Light,
-            letterSpacing = 0.02.em,
+//            letterSpacing = 0.02.em,
             lineHeight = 1.3.em,
             textAlign = TextAlign.Start,
             maxLines = titleMaxLines,
