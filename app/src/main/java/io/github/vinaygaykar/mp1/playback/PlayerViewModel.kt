@@ -20,7 +20,11 @@ import io.github.vinaygaykar.mp1.domain.repository.LyricsNetworkException
 import io.github.vinaygaykar.mp1.domain.repository.LyricsNotFoundException
 import io.github.vinaygaykar.mp1.domain.repository.LyricsRepository
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
+import io.github.vinaygaykar.mp1.playback.client.PlaybackConnection
+import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
 import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,10 +39,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import io.github.vinaygaykar.mp1.playback.client.PlaybackConnection
-import io.github.vinaygaykar.mp1.playback.session.PlaybackSessionContract
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toPersistentList
 import javax.inject.Inject
 
 @HiltViewModel
@@ -131,7 +131,27 @@ class PlayerViewModel @Inject constructor(
                     } else {
                         refreshNavigationAvailability()
                     }
-                    val isPlaylistChanged = reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED
+                    /**
+                     * Force queue rebuild if:
+                     * 1. Media3 reports a structural playlist change ([Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED]), OR
+                     * 2. Media3 reports [Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE] on a single-item queue (window count == 1).
+                     *
+                     * Why this is needed:
+                     * When replacing 1 song with another 1 song (e.g. playing a song from search), the queue length
+                     * remains 1 (1 window before, 1 window after). Media3 reports this as a [Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE].
+                     * Without forcing a rebuild here, QueueManager's optimization (`currentQueueSize == count`) short-circuits
+                     * and retains the old song in queue state while playback plays the new song.
+                     *
+                     * Supported Scenarios (Works):
+                     * - Single-item queue replacements (e.g., queue size = 1, playing a new single song from search replaces it).
+                     * - Structural queue changes (additions, removals, playlist replacements where size changes).
+                     *
+                     * Known Limitations (Fails):
+                     * - In-place song replacements on queues with size > 1 where the total queue length remains unchanged
+                     *   (e.g., replacing a song at index N in a multi-song queue without changing queue size while Media3 emits SOURCE_UPDATE).
+                     */
+                    val isSingleItemSourceUpdate = reason == Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE && timeline.windowCount == 1
+                    val isPlaylistChanged = reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED || isSingleItemSourceUpdate
                     updateQueueFromTimeline(timeline, forceRebuild = isPlaylistChanged)
                 }
             }.also { newController.addListener(it) }
@@ -565,19 +585,8 @@ class PlayerViewModel @Inject constructor(
 
     override fun clearQueue() {
         val player = controller ?: return
-        val count = player.mediaItemCount
-        val currentIndex = player.currentMediaItemIndex
-        if (count <= 1) return
-        if (currentIndex in 0 until count) {
-            if (currentIndex < count - 1) {
-                player.removeMediaItems(currentIndex + 1, count)
-            }
-            if (currentIndex > 0) {
-                player.removeMediaItems(0, currentIndex)
-            }
-        } else {
-            player.clearMediaItems()
-        }
+        if (player.mediaItemCount == 0) return
+        player.clearMediaItems()
     }
 
     override fun removeIndicesFromQueue(indices: Set<Int>) {

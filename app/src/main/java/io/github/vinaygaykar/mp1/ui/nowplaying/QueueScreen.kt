@@ -395,7 +395,7 @@ private fun QueueCompactContent(
         QueueKebabOptionsMenuSheet(
             isShuffleOn = isShuffleOn,
             isShuffleEnabled = queueState.items.size > 1,
-            isClearEnabled = queueState.items.size > 1,
+            isClearEnabled = queueState.items.isNotEmpty(),
             onShuffleToggle = onShuffleToggle,
             onClearQueue = { actions.clearQueue() },
             onDismiss = { showKebabOptionsMenuSheet = false }
@@ -444,6 +444,8 @@ private fun QueueCompactHeader(
                     onOptionsClick = onOptionsClick
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -736,7 +738,7 @@ private fun QueuePortraitContent(
         modifier = modifier.fillMaxSize()
     ) {
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val topBarPadding = topInset + (if (isSelectionMode) 104.dp else 60.dp)
+        val topBarPadding = topInset + (if (isSelectionMode) 116.dp else 72.dp)
 
         // QueueItemList fills the whole screen so scrolling content passes underneath status bar
         QueueItemList(
@@ -826,7 +828,7 @@ private fun QueuePortraitContent(
         QueueKebabOptionsMenuSheet(
             isShuffleOn = isShuffleOn,
             isShuffleEnabled = queueState.items.size > 1,
-            isClearEnabled = queueState.items.size > 1,
+            isClearEnabled = queueState.items.isNotEmpty(),
             onShuffleToggle = onShuffleToggle,
             onClearQueue = { actions.clearQueue() },
             onDismiss = { showKebabOptionsMenuSheet = false }
@@ -909,6 +911,7 @@ private fun QueueLandscapeContent(
                                 QueueHeaderTitle(count = queueState.items.size)
                             }
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
 
@@ -936,7 +939,7 @@ private fun QueueLandscapeContent(
                 QueueKebabOptionsLandscapePaneExtension(
                     isShuffleOn = isShuffleOn,
                     isShuffleEnabled = queueState.items.size > 1,
-                    isClearEnabled = queueState.items.size > 1,
+                    isClearEnabled = queueState.items.isNotEmpty(),
                     onShuffleToggle = {
                         onShuffleToggle()
                         showKebabOptionsMenuSheet = false
@@ -952,7 +955,7 @@ private fun QueueLandscapeContent(
 
         // Right Pane (occupy fixed space to prevent layout shifts when controls hide)
         Surface(
-            color = MaterialTheme.colorScheme.surface,
+            color = MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier.fillMaxHeight()
         ) {
             Column(
@@ -1463,7 +1466,7 @@ fun QueueKebabOptionsLandscapePaneExtension(
         onDismiss()
     }
 
-    val rightPaneColor = MaterialTheme.colorScheme.surface
+    val rightPaneColor = MaterialTheme.colorScheme.primaryContainer
     val horizontalGradient = remember(rightPaneColor) {
         Brush.horizontalGradient(
             colors = listOf(
@@ -1641,7 +1644,7 @@ fun QueueKebabOptionsMenuContent(
     onClearQueue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val baseColor = MaterialTheme.colorScheme.surface
+    val baseColor = MaterialTheme.colorScheme.primaryContainer
     val gradientBackground = remember(baseColor) {
         Brush.verticalGradient(
             colors = listOf(
