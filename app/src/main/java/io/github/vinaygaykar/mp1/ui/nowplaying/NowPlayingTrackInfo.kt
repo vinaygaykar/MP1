@@ -1,7 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
 import android.content.Context
-import android.content.Intent
 import android.view.View
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -178,7 +177,7 @@ private fun NowPlayingTrackTextContext(
     ) {
         AutoResizedText(
             text = title,
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Start,
