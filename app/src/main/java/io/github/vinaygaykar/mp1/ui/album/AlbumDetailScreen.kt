@@ -876,12 +876,12 @@ private fun AlbumDetailCompactContent(
         contentPadding = PaddingValues(bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Compact Header with Album Artwork Background + slight transparent black overlay
+        // Compact Header with Album Artwork Background + slight transparent black overlay (Square Shaped)
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                    .aspectRatio(1f)
             ) {
                 if (album?.artworkUri != null) {
                     AsyncImage(
@@ -908,8 +908,9 @@ private fun AlbumDetailCompactContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .align(Alignment.BottomStart)
                         .padding(
-                            top = statusBarTop + 52.dp,
+                            top = statusBarTop + 16.dp,
                             bottom = 20.dp,
                             start = 16.dp,
                             end = 16.dp
@@ -940,18 +941,18 @@ private fun AlbumDetailCompactContent(
                                 .basicMarquee()
                         )
                     }
-
-                    AlbumDetailsSummary(
-                        album = album,
-                        songs = songs,
-                        textColor = Color.White.copy(alpha = 0.75f)
-                    )
                 }
             }
         }
 
+        // Album detail summary outside of image, above list, left aligned
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            AlbumDetailsSummary(
+                album = album,
+                songs = songs,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                textAlign = TextAlign.Start
+            )
         }
 
         // Songs List starting on actual normal background
