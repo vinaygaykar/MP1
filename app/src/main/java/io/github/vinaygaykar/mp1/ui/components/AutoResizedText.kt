@@ -55,6 +55,8 @@ fun AutoResizedText(
     maxLines: Int = 2,
     minFontSize: TextUnit = 18.sp,
     maxFontSize: TextUnit = 40.sp,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    lineHeight: TextUnit = TextUnit.Unspecified,
     overflow: TextOverflow = TextOverflow.Ellipsis,
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -81,13 +83,26 @@ fun AutoResizedText(
     }
 
     val fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal
-    val letterSpacing = (-0.03).em
+
+    val resolvedLetterSpacing = when {
+        !letterSpacing.isUnspecified -> letterSpacing
+        !style.letterSpacing.isUnspecified -> style.letterSpacing
+        else -> (-0.03).em
+    }
+
+    val explicitLineHeight = if (!lineHeight.isUnspecified) lineHeight else style.lineHeight
 
     fun calculateLineHeight(candidateSp: Float, currentFontSizeSp: Float): TextUnit {
-        return if (!style.lineHeight.isUnspecified && style.lineHeight.isSp && (currentFontSizeSp > 0f)) {
-            (candidateSp * (style.lineHeight.value / currentFontSizeSp)).sp
-        } else {
-            (candidateSp * 1.15f).sp
+        return when {
+            !explicitLineHeight.isUnspecified && explicitLineHeight.isEm -> {
+                (candidateSp * explicitLineHeight.value).sp
+            }
+            !explicitLineHeight.isUnspecified && explicitLineHeight.isSp && (currentFontSizeSp > 0f) -> {
+                (candidateSp * (explicitLineHeight.value / currentFontSizeSp)).sp
+            }
+            else -> {
+                (candidateSp * 1.15f).sp
+            }
         }
     }
 
@@ -109,6 +124,7 @@ fun AutoResizedText(
             text, style, minFontSize, targetFontSize, maxLines,
             stableWidthPx, hasHeight, fontWeight,
             randomMultiLineWeight, randomSingleLineWeight,
+            resolvedLetterSpacing, explicitLineHeight,
         ) {
             if ((stableWidthPx <= 0) || (!hasHeight)) return@LaunchedEffect
 
@@ -133,7 +149,7 @@ fun AutoResizedText(
                 val testStyle = style.copy(
                     fontSize = candidateFontSize,
                     lineHeight = candidateLineHeight,
-                    letterSpacing = letterSpacing,
+                    letterSpacing = resolvedLetterSpacing,
                     fontWeight = candidateWeight,
                     fontStyle = fontStyle,
                 )
@@ -186,7 +202,7 @@ fun AutoResizedText(
             val singleLineTestStyle = style.copy(
                 fontSize = finalFontSize,
                 lineHeight = finalLineHeight,
-                letterSpacing = letterSpacing,
+                letterSpacing = resolvedLetterSpacing,
                 fontWeight = fontWeight ?: randomSingleLineWeight,
                 fontStyle = fontStyle,
             )
@@ -224,7 +240,7 @@ fun AutoResizedText(
                 style = style.copy(
                     fontSize = resizedFontSize,
                     lineHeight = finalLineHeight,
-                    letterSpacing = letterSpacing,
+                    letterSpacing = resolvedLetterSpacing,
                 ),
             )
         }

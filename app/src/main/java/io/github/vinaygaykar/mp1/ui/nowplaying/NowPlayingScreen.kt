@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.FilledTonalIconButton
@@ -52,13 +51,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -482,7 +479,8 @@ private fun NowPlayingCompactContent(
                         repeatMode = playbackState.repeatMode,
                         onLyricsClick = { state.showLyrics = true },
                         onRepeatToggle = { playbackControls.onRepeatToggle() },
-                        onQueueClick = { state.showQueue = true }
+                        onQueueClick = { state.showQueue = true },
+                        isCompact = true
                     )
 
                     DismissIconButton(
@@ -733,26 +731,27 @@ private fun NowPlayingPortraitContent(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
                 ) {
+                    NowPlayingTrackInfo(
+                        modifier = Modifier.weight(1f),
+                        playbackState = playbackState,
+                        queueState = queueState,
+                        pagerState = state.pagerState,
+                        onAlbumClick = { albumId ->
+                            state.collapse()
+                            onAlbumClick(albumId)
+                        }
+                    ) {
+                        state.showArtistsDialog = true
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
                     DismissIconButton(
                         onDismiss = { state.collapse() }
                     )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                NowPlayingTrackInfo(
-                    playbackState = playbackState,
-                    queueState = queueState,
-                    pagerState = state.pagerState,
-                    onAlbumClick = { albumId ->
-                        state.collapse()
-                        onAlbumClick(albumId)
-                    }
-                ) {
-                    state.showArtistsDialog = true
                 }
             }
         }
@@ -933,7 +932,7 @@ private fun NowPlayingLandscapeContent(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(leftPaneWidth)
-                    .padding(top = 48.dp)
+                    .padding(top = 16.dp)
                     .displayCutoutPadding()
                     .statusBarsPadding()
                     .alpha(expandedAlpha)

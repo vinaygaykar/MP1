@@ -1,7 +1,5 @@
 package io.github.vinaygaykar.mp1.ui.nowplaying
 
-import android.content.Context
-import android.view.View
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
@@ -60,8 +59,6 @@ internal fun NowPlayingTrackInfo(
             titleMaxLines = titleMaxLines,
             onAlbumClick = onAlbumClick,
             onArtistClick = onArtistClick,
-            context = context,
-            view = view,
             modifier = modifier.fillMaxWidth()
         )
     } else {
@@ -137,8 +134,6 @@ internal fun NowPlayingTrackInfo(
                         titleMaxLines = titleMaxLines,
                         onArtistClick = if (isCurrent) onArtistClick else null,
                         onAlbumClick = onAlbumClick,
-                        context = context,
-                        view = view,
                         modifier = Modifier
                             .fillMaxWidth()
                             .graphicsLayer {
@@ -163,8 +158,6 @@ private fun NowPlayingTrackTextContext(
     titleMaxLines: Int,
     onAlbumClick: (String) -> Unit,
     onArtistClick: (() -> Unit)?,
-    context: Context,
-    view: View,
     modifier: Modifier = Modifier
 ) {
     val displayArtist = remember(artist, title) {
@@ -177,9 +170,11 @@ private fun NowPlayingTrackTextContext(
     ) {
         AutoResizedText(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Light,
+            letterSpacing = 0.02.em,
+            lineHeight = 1.3.em,
             textAlign = TextAlign.Start,
             maxLines = titleMaxLines,
             minFontSize = 20.sp,

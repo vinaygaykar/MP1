@@ -28,9 +28,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vinaygaykar.mp1.playback.PlaybackControls
 import io.github.vinaygaykar.mp1.playback.PlaybackUiState
@@ -41,11 +43,13 @@ fun NowPlayingIconButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
+    iconSize: Dp = 24.dp
 ) {
     FilledIconButton(
         onClick = onClick,
-        modifier = modifier.size(48.dp),
+        modifier = modifier.size(size),
         shape = CircleShape,
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.05f),
@@ -55,7 +59,7 @@ fun NowPlayingIconButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(iconSize)
         )
     }
 }
@@ -64,7 +68,11 @@ fun NowPlayingIconButton(
 fun NowPlayingRepeatButton(
     repeatMode: Int,
     onRepeatToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    width: Dp = 110.dp,
+    height: Dp = 48.dp,
+    iconSize: Dp = 20.dp,
+    textStyle: TextStyle = MaterialTheme.typography.labelLarge
 ) {
     val (repeatIcon, repeatText) = when (repeatMode) {
         1 -> Icons.Rounded.RepeatOne to "Song"
@@ -75,8 +83,8 @@ fun NowPlayingRepeatButton(
     Surface(
         onClick = onRepeatToggle,
         modifier = modifier
-            .width(110.dp)
-            .height(48.dp),
+            .width(width)
+            .height(height),
         shape = CircleShape,
         color = if (repeatMode != 0) {
             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
@@ -92,19 +100,19 @@ fun NowPlayingRepeatButton(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = repeatIcon,
                 contentDescription = repeatText,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(iconSize)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = repeatText,
-                style = MaterialTheme.typography.labelLarge,
+                style = textStyle,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -119,26 +127,43 @@ fun NowPlayingActionRow(
     onLyricsClick: () -> Unit,
     onRepeatToggle: () -> Unit,
     onQueueClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isCompact: Boolean = false
 ) {
+    val buttonSize = if (isCompact) 36.dp else 48.dp
+    val iconSize = if (isCompact) 18.dp else 24.dp
+    val repeatWidth = if (isCompact) 88.dp else 110.dp
+    val repeatHeight = if (isCompact) 36.dp else 48.dp
+    val repeatIconSize = if (isCompact) 16.dp else 20.dp
+    val repeatTextStyle = if (isCompact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+    val spacing = if (isCompact) 8.dp else 12.dp
+
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically
     ) {
         NowPlayingIconButton(
             icon = Icons.Rounded.Lyrics,
             contentDescription = "Lyrics",
-            onClick = onLyricsClick
+            onClick = onLyricsClick,
+            size = buttonSize,
+            iconSize = iconSize
         )
         NowPlayingRepeatButton(
             repeatMode = repeatMode,
-            onRepeatToggle = onRepeatToggle
+            onRepeatToggle = onRepeatToggle,
+            width = repeatWidth,
+            height = repeatHeight,
+            iconSize = repeatIconSize,
+            textStyle = repeatTextStyle
         )
         NowPlayingIconButton(
             icon = Icons.AutoMirrored.Rounded.QueueMusic,
             contentDescription = "Playing Queue",
-            onClick = onQueueClick
+            onClick = onQueueClick,
+            size = buttonSize,
+            iconSize = iconSize
         )
     }
 }

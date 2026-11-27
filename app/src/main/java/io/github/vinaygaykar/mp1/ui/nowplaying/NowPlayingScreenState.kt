@@ -267,6 +267,8 @@ fun rememberNowPlayingScreenState(
 
     var stateRef by remember { mutableStateOf<NowPlayingScreenState?>(null) }
 
+    var savedPlayerDragValue by rememberSaveable { mutableStateOf(if (initialExpanded) DragValue.EXPANDED else DragValue.COLLAPSED) }
+
     val anchoredDraggableState = rememberSaveable(
         saver = AnchoredDraggableState.Saver(
             snapAnimationSpec = spring(
@@ -285,7 +287,7 @@ fun rememberNowPlayingScreenState(
         )
     ) {
         AnchoredDraggableState(
-            initialValue = if (initialExpanded) DragValue.EXPANDED else DragValue.COLLAPSED,
+            initialValue = savedPlayerDragValue,
             positionalThreshold = { distance: Float -> distance * 0.5f },
             velocityThreshold = { with(density) { 100.dp.toPx() } },
             snapAnimationSpec = spring(
@@ -303,6 +305,7 @@ fun rememberNowPlayingScreenState(
     }
 
     SideEffect {
+        savedPlayerDragValue = anchoredDraggableState.currentValue
         anchoredDraggableState.updateAnchors(anchors)
     }
 
@@ -564,7 +567,9 @@ fun rememberNowPlayingScreenState(
     val nextArtworkUri = remember(nextItem) { nextItem?.mediaMetadata?.artworkUri }
 
     var savedShowLyrics by rememberSaveable { mutableStateOf(false) }
+    var savedShowQueue by rememberSaveable { mutableStateOf(false) }
     var savedShowArtistsDialog by rememberSaveable { mutableStateOf(false) }
+    var savedLastTrackTitle by rememberSaveable { mutableStateOf("") }
 
     val state = remember(density, scope, view) {
         NowPlayingScreenState(
@@ -587,14 +592,30 @@ fun rememberNowPlayingScreenState(
             totalBottomGapPx = totalBottomGapPx
         ).apply {
             showLyrics = savedShowLyrics
+            showQueue = savedShowQueue
             showArtistsDialog = savedShowArtistsDialog
+            lastTrackTitle = savedLastTrackTitle
         }
     }
     stateRef = state
 
     SideEffect {
+        savedPlayerDragValue = anchoredDraggableState.currentValue
         savedShowLyrics = state.showLyrics
+        savedShowQueue = state.showQueue
         savedShowArtistsDialog = state.showArtistsDialog
+        savedLastTrackTitle = state.lastTrackTitle
+    }
+
+    val isExpanded = anchoredDraggableState.currentValue == DragValue.EXPANDED
+    if (!isExpanded) {
+        state.showLyrics = false
+        state.showQueue = false
+        savedShowLyrics = false
+        savedShowQueue = false
+        if (queueAnchoredDraggableState.currentValue != DragValue.COLLAPSED) {
+            scope.launch { queueAnchoredDraggableState.animateTo(DragValue.COLLAPSED) }
+        }
     }
 
     state.isScreenActive = isScreenActive
@@ -625,6 +646,7 @@ fun rememberNowPlayingScreenState(
             }
         }
         state.lastTrackTitle = playbackState.trackTitle
+        savedLastTrackTitle = playbackState.trackTitle
     }
 
     // Scroll collapse/expand animation trigger
@@ -633,7 +655,9 @@ fun rememberNowPlayingScreenState(
             if (isCollapsedOnScroll) {
                 state.moveToState(DragValue.MINI)
             } else {
-                state.moveToState(DragValue.COLLAPSED)
+                if (anchoredDraggableState.currentValue != DragValue.EXPANDED) {
+                    state.moveToState(DragValue.COLLAPSED)
+                }
             }
         }
     }
