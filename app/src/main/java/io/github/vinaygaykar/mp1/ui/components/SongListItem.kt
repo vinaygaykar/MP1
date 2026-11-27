@@ -5,6 +5,7 @@ import android.net.Uri
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -50,6 +54,13 @@ import coil.size.Precision
 import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 
+enum class SongListItemTrailingContent {
+    KEBAB_MENU,
+    DRAG_HANDLE
+}
+
+typealias TrailingContent = SongListItemTrailingContent
+
 @Composable
 fun SongListItem(
     song: Song,
@@ -60,6 +71,11 @@ fun SongListItem(
     isSelectionMode: Boolean = false,
     showTrackNumber: Boolean = false,
     containerColor: Color = Color.Transparent,
+    trailingContent: SongListItemTrailingContent = SongListItemTrailingContent.KEBAB_MENU,
+    dragModifier: Modifier = Modifier,
+    onDragStart: (() -> Unit)? = null,
+    onDrag: ((Float) -> Unit)? = null,
+    onDragEnd: (() -> Unit)? = null,
     onLongClick: () -> Unit = {},
     onMoreClick: (Offset, IntSize) -> Unit = { _, _ -> }
 ) {
@@ -156,16 +172,55 @@ fun SongListItem(
                     )
                 }
             } else {
-                IconButton(
-                    onClick = {
-                        onMoreClick(artworkOffsetInRoot, artworkSizePx)
+                when (trailingContent) {
+                    SongListItemTrailingContent.KEBAB_MENU -> {
+                        IconButton(
+                            onClick = {
+                                onMoreClick(artworkOffsetInRoot, artworkSizePx)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                    SongListItemTrailingContent.DRAG_HANDLE -> {
+                        val currentOnDragStart by rememberUpdatedState(onDragStart)
+                        val currentOnDrag by rememberUpdatedState(onDrag)
+                        val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .then(dragModifier)
+                                .then(
+                                    if (onDrag != null) {
+                                        Modifier.pointerInput(Unit) {
+                                            detectVerticalDragGestures(
+                                                onDragStart = { currentOnDragStart?.invoke() },
+                                                onDragEnd = { currentOnDragEnd?.invoke() },
+                                                onDragCancel = { currentOnDragEnd?.invoke() },
+                                                onVerticalDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    currentOnDrag?.invoke(dragAmount)
+                                                }
+                                            )
+                                        }
+                                    } else Modifier
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.DragIndicator,
+                                contentDescription = "Drag to reorder",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -290,3 +345,22 @@ private fun SongListItemTrackNumberLongPreview() {
         }
     }
 }
+
+@Preview(
+    name = "Drag Handle - Light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Composable
+private fun SongListItemDragHandlePreview() {
+    MusicPlayerTheme(dynamicColor = false) {
+        Surface {
+            SongListItem(
+                song = samplePreviewSong,
+                onClick = {},
+                trailingContent = SongListItemTrailingContent.DRAG_HANDLE
+            )
+        }
+    }
+}
+
