@@ -5,8 +5,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.EaseOutCubic
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
@@ -14,8 +12,10 @@ import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -47,10 +47,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.vinaygaykar.mp1.playback.PlayerViewModel
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
-import io.github.vinaygaykar.mp1.ui.nowplaying.rememberNowPlayingVisibilityController
 import io.github.vinaygaykar.mp1.ui.library.DragValue
 import io.github.vinaygaykar.mp1.ui.library.LibraryViewModel
 import io.github.vinaygaykar.mp1.ui.settings.SettingsViewModel
+import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -102,40 +102,51 @@ fun LibraryScreenV2(
         )
     }
 
-    LibraryContentV2(
-        uiState = uiState,
-        bottomPadding = bottomPadding,
-        isSplashActive = isSplashActive,
-        isNowPlayingExpanded = isNowPlayingExpanded,
-        miniPlayerTargetOffset = miniPlayerTargetOffset,
-        onDismissImportError = { viewModel.clearImportError() },
-        onBulgeMiniPlayer = onBulgeMiniPlayer,
-        onSearchClick = onSearchClick,
-        onSettingsClick = onSettingsClick,
-        onOpenScanLocations = onOpenScanLocations,
-        onAlbumClick = onAlbumClick,
-        onArtistClick = onArtistClick,
-        onPlaylistClick = onPlaylistClick,
-        onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
-        onNowPlayingOffsetYChange = onNowPlayingOffsetYChange,
-        onHideNowPlayingView = onHideNowPlayingView,
-        onShowNowPlayingView = onShowNowPlayingView,
-        onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
-        onPlayNext = { viewModel.playNext(it) },
-        onAddToQueue = { viewModel.addToQueue(it) },
-        onCreatePlaylist = { viewModel.createPlaylist(it) },
-        onDeletePlaylists = { viewModel.deletePlaylists(it) },
-        onImportPlaylist = { viewModel.importPlaylist(it) },
-        onAddSongsToPlaylist = { playlistId, songsToAdd ->
-            viewModel.addSongsToPlaylist(playlistId, songsToAdd)
-        },
-        onCreatePlaylistWithSongs = { name, songsToAdd ->
-            viewModel.createPlaylistAndAddSongs(name, songsToAdd)
-        },
-        onCheckHasOfflineLyrics = { song ->
-            viewModel.checkHasOfflineLyrics(song)
+    val playbackState by playerViewModel.playbackState.collectAsState()
+    val isDark = isSystemInDarkTheme()
+    val playerColorScheme: ColorScheme? = remember(playbackState.seedColor, isDark) {
+        playbackState.seedColor?.let { color ->
+            DynamicThemeHelper.createDynamicColorScheme(color, isDark = isDark)
         }
-    )
+    }
+    val currentColorScheme = playerColorScheme ?: MaterialTheme.colorScheme
+
+    MaterialTheme(colorScheme = currentColorScheme) {
+        LibraryContentV2(
+            uiState = uiState,
+            bottomPadding = bottomPadding,
+            isSplashActive = isSplashActive,
+            isNowPlayingExpanded = isNowPlayingExpanded,
+            miniPlayerTargetOffset = miniPlayerTargetOffset,
+            onDismissImportError = { viewModel.clearImportError() },
+            onBulgeMiniPlayer = onBulgeMiniPlayer,
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick,
+            onOpenScanLocations = onOpenScanLocations,
+            onAlbumClick = onAlbumClick,
+            onArtistClick = onArtistClick,
+            onPlaylistClick = onPlaylistClick,
+            onMiniPlayerCollapseChange = onMiniPlayerCollapseChange,
+            onNowPlayingOffsetYChange = onNowPlayingOffsetYChange,
+            onHideNowPlayingView = onHideNowPlayingView,
+            onShowNowPlayingView = onShowNowPlayingView,
+            onPlaySong = { song, songList -> viewModel.playSong(song, songList) },
+            onPlayNext = { viewModel.playNext(it) },
+            onAddToQueue = { viewModel.addToQueue(it) },
+            onCreatePlaylist = { viewModel.createPlaylist(it) },
+            onDeletePlaylists = { viewModel.deletePlaylists(it) },
+            onImportPlaylist = { viewModel.importPlaylist(it) },
+            onAddSongsToPlaylist = { playlistId, songsToAdd ->
+                viewModel.addSongsToPlaylist(playlistId, songsToAdd)
+            },
+            onCreatePlaylistWithSongs = { name, songsToAdd ->
+                viewModel.createPlaylistAndAddSongs(name, songsToAdd)
+            },
+            onCheckHasOfflineLyrics = { song ->
+                viewModel.checkHasOfflineLyrics(song)
+            }
+        )
+    }
 }
 
 /**
