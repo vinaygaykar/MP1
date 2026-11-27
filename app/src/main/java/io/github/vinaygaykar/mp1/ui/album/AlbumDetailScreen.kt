@@ -1,5 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.album
 
+import android.app.Activity
 import android.content.res.Configuration
 import android.net.Uri
 import android.view.HapticFeedbackConstants
@@ -19,21 +20,30 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
@@ -50,6 +60,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -72,6 +86,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -79,6 +94,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -149,6 +165,7 @@ fun AlbumDetailScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun AlbumDetailContent(
     album: Album?,
@@ -233,6 +250,26 @@ fun AlbumDetailContent(
     }
 
     val currentColorScheme = themeColorScheme ?: MaterialTheme.colorScheme
+
+    val activity = context as? Activity
+    val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
+
+    val widthClass = windowSizeClass?.widthSizeClass
+    val heightClass = windowSizeClass?.heightSizeClass
+
+    val isWideWindow = if (widthClass != null) {
+        widthClass != WindowWidthSizeClass.Compact
+    } else {
+        val configuration = LocalConfiguration.current
+        configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
+
+    val isCompactHeight = if (heightClass != null) {
+        heightClass == WindowHeightSizeClass.Compact
+    } else {
+        val configuration = LocalConfiguration.current
+        configuration.screenHeightDp < 500
+    }
 
     MaterialTheme(colorScheme = currentColorScheme) {
         val isPlayerActive = playbackState.trackTitle.isNotEmpty()
@@ -358,274 +395,95 @@ fun AlbumDetailContent(
                         .background(MaterialTheme.colorScheme.background)
                 ) {
                     key(seedColor) {
-                        LazyColumn(
-                            state = lazyListState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .hazeSource(hazeState),
-                            contentPadding = PaddingValues(
-                                top = statusBarTop + 52.dp,
-                                bottom = bottomPadding
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // 1. Album Artwork (Centered, 65% screen width up to max 260dp, sharp corners)
-                            item {
-                                val artworkUri = album?.artworkUri
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (artworkUri != null) {
-                                        val request = remember(artworkUri) {
-                                            ImageRequest.Builder(context)
-                                                .data(artworkUri)
-                                                .size(600, 600)
-                                                .crossfade(true)
-                                                .build()
-                                        }
-                                        AsyncImage(
-                                            model = request,
-                                            contentDescription = album.name,
-                                            modifier = Modifier
-                                                .fillMaxWidth(0.65f)
-                                                .widthIn(max = 260.dp)
-                                                .aspectRatio(1f),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth(0.65f)
-                                                .widthIn(max = 260.dp)
-                                                .aspectRatio(1f)
-                                                .background(MaterialTheme.colorScheme.primaryContainer),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Album,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(80.dp),
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // 2. Album Name (Changed to title typography, second)
-                            item {
-                                AutoResizedText(
-                                    text = album?.name ?: "Loading Album...",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    maxLines = 3,
-                                    minFontSize = 18.sp,
-                                    maxFontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        when {
+                            isWideWindow -> {
+                                AlbumDetailLandscapeContent(
+                                    album = album,
+                                    primaryArtist = primaryArtist,
+                                    artistName = artistName,
+                                    hasArtist = hasArtist,
+                                    songs = songs,
+                                    songsByDisc = songsByDisc,
+                                    hasMultipleDiscs = hasMultipleDiscs,
+                                    featuredArtists = featuredArtists,
+                                    playbackState = playbackState,
+                                    lazyListState = lazyListState,
+                                    hazeState = hazeState,
+                                    selectedSongIds = selectedSongIds,
+                                    isSelectionMode = isSelectionMode,
+                                    onBack = onBack,
+                                    onArtistClick = onArtistClick,
+                                    onPlaySong = onPlaySong,
+                                    toggleSongSelection = ::toggleSongSelection,
+                                    onMoreClick = { offset, size, song ->
+                                        activeOverlayData = SongOverlayData(song, offset, size)
+                                    },
+                                    bottomPadding = bottomPadding,
+                                    statusBarTop = statusBarTop
                                 )
                             }
-
-                            // 3. Album Artist (or primary artist)
-                            if (artistName != null && hasArtist) {
-                                item {
-                                    Text(
-                                        text = artistName,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp)
-                                            .clickable { primaryArtist?.let { onArtistClick(it.id) } }
-                                            .basicMarquee()
-                                    )
-                                }
+                            isCompactHeight -> {
+                                AlbumDetailCompactContent(
+                                    album = album,
+                                    primaryArtist = primaryArtist,
+                                    artistName = artistName,
+                                    hasArtist = hasArtist,
+                                    songs = songs,
+                                    songsByDisc = songsByDisc,
+                                    hasMultipleDiscs = hasMultipleDiscs,
+                                    featuredArtists = featuredArtists,
+                                    playbackState = playbackState,
+                                    lazyListState = lazyListState,
+                                    hazeState = hazeState,
+                                    selectedSongIds = selectedSongIds,
+                                    isSelectionMode = isSelectionMode,
+                                    onArtistClick = onArtistClick,
+                                    onPlaySong = onPlaySong,
+                                    toggleSongSelection = ::toggleSongSelection,
+                                    onMoreClick = { offset, size, song ->
+                                        activeOverlayData = SongOverlayData(song, offset, size)
+                                    },
+                                    bottomPadding = bottomPadding,
+                                    statusBarTop = statusBarTop
+                                )
                             }
-
-                            // 4. Release Year
-                            item {
-                                val yearText =
-                                    remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
-                                if (yearText != null) {
-                                    Text(
-                                        text = yearText,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp)
-                                    )
-                                }
-                            }
-
-                            item {
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
-
-                            // Track Count & Duration before song list
-                            item {
-                                val trackCount = songs.size
-                                val tracksText =
-                                    remember(trackCount) { if (trackCount == 1) "1 track" else "$trackCount tracks" }
-                                val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
-                                val durationText =
-                                    remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
-
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Text(
-                                        text = tracksText,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (durationText.isNotEmpty()) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = durationText,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                alpha = 0.8f
-                                            ),
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
-
-                            // 5. List of Songs (Grouped by Disc if multi-disc, else flat list)
-                            if (hasMultipleDiscs) {
-                                songsByDisc.forEach { (discNumber, discSongs) ->
-                                    item(key = "disc_header_$discNumber") {
-                                        Text(
-                                            text = "Disc $discNumber",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(
-                                                    top = 8.dp,
-                                                    bottom = 4.dp,
-                                                    start = 16.dp,
-                                                    end = 16.dp
-                                                )
-                                        )
-                                    }
-                                    itemsIndexed(discSongs, key = { _, song -> song.id }) { _, song ->
-                                        val isSelected = selectedSongIds.contains(song.id)
-                                        SongListItem(
-                                            song = song,
-                                            onClick = {
-                                                if (isSelectionMode) {
-                                                    toggleSongSelection(song)
-                                                } else {
-                                                    onPlaySong(song)
-                                                }
-                                            },
-                                            isSelected = isSelected,
-                                            isSelectionMode = isSelectionMode,
-                                            showTrackNumber = true,
-                                            onLongClick = { toggleSongSelection(song) },
-                                            onMoreClick = { offset, size ->
-                                                activeOverlayData = SongOverlayData(
-                                                    song = song,
-                                                    startOffset = offset,
-                                                    startSize = size
-                                                )
-                                            }
-                                        )
-                                    }
-                                }
-                            } else {
-                                itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
-                                    val isSelected = selectedSongIds.contains(song.id)
-                                    SongListItem(
-                                        song = song,
-                                        onClick = {
-                                            if (isSelectionMode) {
-                                                toggleSongSelection(song)
-                                            } else {
-                                                onPlaySong(song)
-                                            }
-                                        },
-                                        isSelected = isSelected,
-                                        isSelectionMode = isSelectionMode,
-                                        showTrackNumber = true,
-                                        onLongClick = { toggleSongSelection(song) },
-                                        onMoreClick = { offset, size ->
-                                            activeOverlayData = SongOverlayData(
-                                                song = song,
-                                                startOffset = offset,
-                                                startSize = size
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-
-                            // Featured Artists Horizontal List (after song list)
-                            if (featuredArtists.isNotEmpty()) {
-                                item {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 16.dp, bottom = 8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        val title =
-                                            if (featuredArtists.size == 1) "Featured Artist" else "Featured Artists"
-                                        Text(
-                                            text = title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onBackground,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp)
-                                        )
-                                        LazyRow(
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            contentPadding = PaddingValues(horizontal = 16.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            items(featuredArtists, key = { it.id }) { artist ->
-                                                CollaboratorArtistCard(
-                                                    artist = artist,
-                                                    playingArtist = playbackState.artist,
-                                                    playingAlbum = playbackState.album,
-                                                    isPlaying = playbackState.isPlaying,
-                                                    onClick = { onArtistClick(artist.id) }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                            else -> {
+                                AlbumDetailPortraitContent(
+                                    album = album,
+                                    primaryArtist = primaryArtist,
+                                    artistName = artistName,
+                                    hasArtist = hasArtist,
+                                    songs = songs,
+                                    songsByDisc = songsByDisc,
+                                    hasMultipleDiscs = hasMultipleDiscs,
+                                    featuredArtists = featuredArtists,
+                                    playbackState = playbackState,
+                                    lazyListState = lazyListState,
+                                    hazeState = hazeState,
+                                    selectedSongIds = selectedSongIds,
+                                    isSelectionMode = isSelectionMode,
+                                    onArtistClick = onArtistClick,
+                                    onPlaySong = onPlaySong,
+                                    toggleSongSelection = ::toggleSongSelection,
+                                    onMoreClick = { offset, size, song ->
+                                        activeOverlayData = SongOverlayData(song, offset, size)
+                                    },
+                                    bottomPadding = bottomPadding,
+                                    statusBarTop = statusBarTop
+                                )
                             }
                         }
                     }
 
                     // Floating Back Arrow
-                    if (!isActionPopupOpen) {
+                    if (!isActionPopupOpen && !isWideWindow) {
                         FilledTonalIconButton(
                             onClick = onBack,
                             modifier = Modifier
                                 .align(Alignment.TopStart)
-                                .padding(top = statusBarTop, start = 16.dp)
+                                .statusBarsPadding()
+                                .displayCutoutPadding()
+                                .padding(start = 16.dp, top = 8.dp)
                                 .zIndex(3f)
                         ) {
                             Icon(
@@ -686,6 +544,648 @@ fun AlbumDetailContent(
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun AlbumDetailPortraitContent(
+    album: Album?,
+    primaryArtist: Artist?,
+    artistName: String?,
+    hasArtist: Boolean,
+    songs: List<Song>,
+    songsByDisc: Map<Int, List<Song>>,
+    hasMultipleDiscs: Boolean,
+    featuredArtists: List<Artist>,
+    playbackState: PlaybackUiState,
+    lazyListState: LazyListState,
+    hazeState: HazeState,
+    selectedSongIds: Set<String>,
+    isSelectionMode: Boolean,
+    onArtistClick: (String) -> Unit,
+    onPlaySong: (Song) -> Unit,
+    toggleSongSelection: (Song) -> Unit,
+    onMoreClick: (Offset, IntSize, Song) -> Unit,
+    bottomPadding: Dp,
+    statusBarTop: Dp
+) {
+    LazyColumn(
+        state = lazyListState,
+        modifier = Modifier
+            .fillMaxSize()
+            .hazeSource(hazeState),
+        contentPadding = PaddingValues(
+            top = statusBarTop + 52.dp,
+            bottom = bottomPadding
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 1. Album Artwork
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                AlbumArtworkView(
+                    album = album,
+                    modifier = Modifier
+                        .fillMaxWidth(0.65f)
+                        .widthIn(max = 260.dp)
+                        .aspectRatio(1f)
+                )
+            }
+        }
+
+        // 2. Album Name, Artist, and Year (grouped together with tight 2.dp spacing)
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                AutoResizedText(
+                    text = album?.name ?: "Loading Album...",
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 3,
+                    minFontSize = 18.sp,
+                    maxFontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (artistName != null && hasArtist) {
+                    Text(
+                        text = artistName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { primaryArtist?.let { onArtistClick(it.id) } }
+                            .basicMarquee()
+                    )
+                }
+
+                val yearText = remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
+                if (yearText != null) {
+                    Text(
+                        text = yearText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // Track Count & Duration before song list
+        item {
+            val trackCount = songs.size
+            val tracksText = remember(trackCount) { if (trackCount == 1) "1 track" else "$trackCount tracks" }
+            val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
+            val durationText = remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
+
+            val tracksAndDurationLine = remember(tracksText, durationText) {
+                if (durationText.isNotEmpty()) "$tracksText • $durationText" else tracksText
+            }
+
+            Text(
+                text = tracksAndDurationLine,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+        }
+
+        // 3. List of Songs
+        albumSongsListItems(
+            songsByDisc = songsByDisc,
+            hasMultipleDiscs = hasMultipleDiscs,
+            songs = songs,
+            selectedSongIds = selectedSongIds,
+            isSelectionMode = isSelectionMode,
+            onPlaySong = onPlaySong,
+            toggleSongSelection = toggleSongSelection,
+            onMoreClick = onMoreClick
+        )
+
+        // Featured Artists Section
+        if (featuredArtists.isNotEmpty()) {
+            item {
+                FeaturedArtistsSection(
+                    featuredArtists = featuredArtists,
+                    playbackState = playbackState,
+                    onArtistClick = onArtistClick
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumDetailLandscapeContent(
+    album: Album?,
+    primaryArtist: Artist?,
+    artistName: String?,
+    hasArtist: Boolean,
+    songs: List<Song>,
+    songsByDisc: Map<Int, List<Song>>,
+    hasMultipleDiscs: Boolean,
+    featuredArtists: List<Artist>,
+    playbackState: PlaybackUiState,
+    lazyListState: LazyListState,
+    hazeState: HazeState,
+    selectedSongIds: Set<String>,
+    isSelectionMode: Boolean,
+    onBack: () -> Unit,
+    onArtistClick: (String) -> Unit,
+    onPlaySong: (Song) -> Unit,
+    toggleSongSelection: (Song) -> Unit,
+    onMoreClick: (Offset, IntSize, Song) -> Unit,
+    bottomPadding: Dp,
+    statusBarTop: Dp
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .displayCutoutPadding()
+            .hazeSource(hazeState)
+    ) {
+        // Pane 1 (Very Left): Dedicated non-scrollable pane with Back Button
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight()
+                .wrapContentWidth()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(start = 16.dp, end = 8.dp, top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Top
+            ) {
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+            }
+        }
+
+        // Pane 2 (Middle): Artwork & Details Summary
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(0.35f)
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    top = statusBarTop + 12.dp,
+                    bottom = bottomPadding,
+                    start = 8.dp,
+                    end = 16.dp
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Album Artwork
+            AlbumArtworkView(
+                album = album,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 240.dp)
+                    .aspectRatio(1f)
+            )
+
+            // Year & Track / Duration Summary (Single Row separated by dots)
+            AlbumDetailsSummary(
+                album = album,
+                songs = songs,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // Pane 3 (Right): Album Name, Artist Name, Songs List & Featured Artists
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(0.65f)
+        ) {
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = statusBarTop + 12.dp,
+                    bottom = bottomPadding,
+                    start = 8.dp,
+                    end = 16.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Header item: Album Name & Artist Name
+                item(key = "album_header_text") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        AutoResizedText(
+                            text = album?.name ?: "Loading Album...",
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 2,
+                            minFontSize = 18.sp,
+                            maxFontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (artistName != null && hasArtist) {
+                            Text(
+                                text = artistName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { primaryArtist?.let { onArtistClick(it.id) } }
+                                    .basicMarquee()
+                            )
+                        }
+                    }
+                }
+
+                // Songs List
+                albumSongsListItems(
+                    songsByDisc = songsByDisc,
+                    hasMultipleDiscs = hasMultipleDiscs,
+                    songs = songs,
+                    selectedSongIds = selectedSongIds,
+                    isSelectionMode = isSelectionMode,
+                    onPlaySong = onPlaySong,
+                    toggleSongSelection = toggleSongSelection,
+                    onMoreClick = onMoreClick
+                )
+
+                // Featured Artists Section all the way at the end
+                if (featuredArtists.isNotEmpty()) {
+                    item(key = "featured_artists_section_last") {
+                        FeaturedArtistsSection(
+                            featuredArtists = featuredArtists,
+                            playbackState = playbackState,
+                            onArtistClick = onArtistClick
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumDetailCompactContent(
+    album: Album?,
+    primaryArtist: Artist?,
+    artistName: String?,
+    hasArtist: Boolean,
+    songs: List<Song>,
+    songsByDisc: Map<Int, List<Song>>,
+    hasMultipleDiscs: Boolean,
+    featuredArtists: List<Artist>,
+    playbackState: PlaybackUiState,
+    lazyListState: LazyListState,
+    hazeState: HazeState,
+    selectedSongIds: Set<String>,
+    isSelectionMode: Boolean,
+    onArtistClick: (String) -> Unit,
+    onPlaySong: (Song) -> Unit,
+    toggleSongSelection: (Song) -> Unit,
+    onMoreClick: (Offset, IntSize, Song) -> Unit,
+    bottomPadding: Dp,
+    statusBarTop: Dp
+) {
+    LazyColumn(
+        state = lazyListState,
+        modifier = Modifier
+            .fillMaxSize()
+            .hazeSource(hazeState),
+        contentPadding = PaddingValues(bottom = bottomPadding),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Compact Header with Album Artwork Background + slight transparent black overlay
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+            ) {
+                if (album?.artworkUri != null) {
+                    AsyncImage(
+                        model = album.artworkUri,
+                        contentDescription = album.name,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                    )
+                }
+
+                // Transparent black overlay for text readability
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top = statusBarTop + 52.dp,
+                            bottom = 20.dp,
+                            start = 16.dp,
+                            end = 16.dp
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    AutoResizedText(
+                        text = album?.name ?: "Loading Album...",
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 2,
+                        minFontSize = 18.sp,
+                        maxFontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (artistName != null && hasArtist) {
+                        Text(
+                            text = artistName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .clickable { primaryArtist?.let { onArtistClick(it.id) } }
+                                .basicMarquee()
+                        )
+                    }
+
+                    AlbumDetailsSummary(
+                        album = album,
+                        songs = songs,
+                        textColor = Color.White.copy(alpha = 0.75f)
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // Songs List starting on actual normal background
+        albumSongsListItems(
+            songsByDisc = songsByDisc,
+            hasMultipleDiscs = hasMultipleDiscs,
+            songs = songs,
+            selectedSongIds = selectedSongIds,
+            isSelectionMode = isSelectionMode,
+            onPlaySong = onPlaySong,
+            toggleSongSelection = toggleSongSelection,
+            onMoreClick = onMoreClick
+        )
+
+        // Featured Artists
+        if (featuredArtists.isNotEmpty()) {
+            item {
+                FeaturedArtistsSection(
+                    featuredArtists = featuredArtists,
+                    playbackState = playbackState,
+                    onArtistClick = onArtistClick
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumArtworkView(
+    album: Album?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val artworkUri = album?.artworkUri
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        if (artworkUri != null) {
+            val request = remember(artworkUri) {
+                ImageRequest.Builder(context)
+                    .data(artworkUri)
+                    .size(600, 600)
+                    .crossfade(true)
+                    .build()
+            }
+            AsyncImage(
+                model = request,
+                contentDescription = album.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Album,
+                    contentDescription = null,
+                    modifier = Modifier.size(80.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumDetailsSummary(
+    album: Album?,
+    songs: List<Song>,
+    modifier: Modifier = Modifier,
+    textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+    textAlign: TextAlign = TextAlign.Start
+) {
+    val yearText = remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
+    val trackCount = songs.size
+    val tracksText = remember(trackCount) { if (trackCount == 1) "1 track" else "$trackCount tracks" }
+    val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
+    val durationText = remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
+
+    val fullSummary = remember(yearText, tracksText, durationText) {
+        listOfNotNull(yearText, tracksText, durationText.takeIf { it.isNotEmpty() })
+            .joinToString(separator = " • ")
+    }
+
+    Text(
+        text = fullSummary,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Medium,
+        color = textColor,
+        textAlign = textAlign,
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun FeaturedArtistsSection(
+    featuredArtists: List<Artist>,
+    playbackState: PlaybackUiState,
+    onArtistClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (featuredArtists.isEmpty()) return
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        val title = if (featuredArtists.size == 1) "Featured Artist" else "Featured Artists"
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(featuredArtists, key = { it.id }) { artist ->
+                CollaboratorArtistCard(
+                    artist = artist,
+                    playingArtist = playbackState.artist,
+                    playingAlbum = playbackState.album,
+                    isPlaying = playbackState.isPlaying,
+                    onClick = { onArtistClick(artist.id) }
+                )
+            }
+        }
+    }
+}
+
+private fun LazyListScope.albumSongsListItems(
+    songsByDisc: Map<Int, List<Song>>,
+    hasMultipleDiscs: Boolean,
+    songs: List<Song>,
+    selectedSongIds: Set<String>,
+    isSelectionMode: Boolean,
+    onPlaySong: (Song) -> Unit,
+    toggleSongSelection: (Song) -> Unit,
+    onMoreClick: (Offset, IntSize, Song) -> Unit
+) {
+    if (hasMultipleDiscs) {
+        songsByDisc.forEach { (discNumber, discSongs) ->
+            item(key = "disc_header_$discNumber") {
+                Text(
+                    text = "Disc $discNumber",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top = 8.dp,
+                            bottom = 4.dp,
+                            start = 16.dp,
+                            end = 16.dp
+                        )
+                )
+            }
+            itemsIndexed(discSongs, key = { _, song -> song.id }) { _, song ->
+                val isSelected = selectedSongIds.contains(song.id)
+                SongListItem(
+                    song = song,
+                    onClick = {
+                        if (isSelectionMode) {
+                            toggleSongSelection(song)
+                        } else {
+                            onPlaySong(song)
+                        }
+                    },
+                    isSelected = isSelected,
+                    isSelectionMode = isSelectionMode,
+                    showTrackNumber = true,
+                    onLongClick = { toggleSongSelection(song) },
+                    onMoreClick = { offset, size ->
+                        onMoreClick(offset, size, song)
+                    }
+                )
+            }
+        }
+    } else {
+        itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
+            val isSelected = selectedSongIds.contains(song.id)
+            SongListItem(
+                song = song,
+                onClick = {
+                    if (isSelectionMode) {
+                        toggleSongSelection(song)
+                    } else {
+                        onPlaySong(song)
+                    }
+                },
+                isSelected = isSelected,
+                isSelectionMode = isSelectionMode,
+                showTrackNumber = true,
+                onLongClick = { toggleSongSelection(song) },
+                onMoreClick = { offset, size ->
+                    onMoreClick(offset, size, song)
+                }
+            )
         }
     }
 }
@@ -1027,4 +1527,3 @@ private fun AlbumDetailScreenPreview() {
         }
     }
 }
-
