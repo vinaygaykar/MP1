@@ -50,7 +50,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -59,8 +58,8 @@ import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
-import kotlin.math.abs
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
  * AlbumGridCompact renders a vertical list of album titles with typographic focus on the centered album.
@@ -268,13 +267,9 @@ fun CompactAlbumTitleItem(
         Text(
             text = album.name,
             style = if (isSelected) {
-                MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold
-                )
+                MaterialTheme.typography.titleLarge
             } else {
-                MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.SemiBold
-                )
+                MaterialTheme.typography.titleMedium
             },
             color = if (isSelected) {
                 MaterialTheme.colorScheme.onBackground
