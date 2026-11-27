@@ -600,13 +600,13 @@ private fun AlbumDetailPortraitContent(
             }
         }
 
-        // 2. Album Name, Artist, and Year (grouped together with tight 2.dp spacing)
+        // 2. Album Name and Artist
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 AutoResizedText(
                     text = album?.name ?: "Loading Album...",
@@ -634,43 +634,20 @@ private fun AlbumDetailPortraitContent(
                             .basicMarquee()
                     )
                 }
-
-                val yearText = remember(album?.year) { album?.year?.takeIf { it > 0 }?.toString() }
-                if (yearText != null) {
-                    Text(
-                        text = yearText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
             }
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Track Count & Duration before song list
+        // Details summary (Year • Tracks • Duration) before song list
         item {
-            val trackCount = songs.size
-            val tracksText = remember(trackCount) { if (trackCount == 1) "1 track" else "$trackCount tracks" }
-            val totalDurationMs = remember(songs) { songs.sumOf { it.durationMs } }
-            val durationText = remember(totalDurationMs) { formatAlbumTotalTime(totalDurationMs) }
-
-            val tracksAndDurationLine = remember(tracksText, durationText) {
-                if (durationText.isNotEmpty()) "$tracksText • $durationText" else tracksText
-            }
-
-            Text(
-                text = tracksAndDurationLine,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp)
+            AlbumDetailsSummary(
+                album = album,
+                songs = songs,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                textAlign = TextAlign.Start
             )
         }
 
@@ -1061,7 +1038,7 @@ private fun AlbumDetailsSummary(
 
     val fullSummary = remember(yearText, tracksText, durationText) {
         listOfNotNull(yearText, tracksText, durationText.takeIf { it.isNotEmpty() })
-            .joinToString(separator = " • ")
+            .joinToString(separator = " \u2022\u00A0")
     }
 
     Text(
