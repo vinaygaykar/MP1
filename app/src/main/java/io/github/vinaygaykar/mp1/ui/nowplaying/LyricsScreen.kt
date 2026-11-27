@@ -13,8 +13,24 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -28,12 +44,31 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +81,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -791,11 +825,19 @@ fun SyncedLyrics(
 
                 Text(
                     text = line.text,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                        fontSize = if (isActive) 28.sp else 18.sp,
-                        lineHeight = if (isActive) 36.sp else 34.sp
-                    ),
+                    style = if (isActive) {
+                        MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 28.sp,
+                            lineHeight = 36.sp
+                        )
+                    } else {
+                        MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 18.sp,
+                            lineHeight = 34.sp
+                        )
+                    },
                     color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -937,9 +979,9 @@ fun LyricsEmptyState(
 }
 
 private val samplePreviewPlaybackState = PlaybackUiState(
-    trackTitle = "Midnight City",
-    artist = "M83",
-    album = "Hurry Up, We're Dreaming"
+    trackTitle = "Lorem ipsum dolor sit amet",
+    artist = "Consectetur adipiscing elit",
+    album = "Sed do eiusmod tempor"
 )
 
 private val samplePreviewProgressState = PlaybackProgressState(
@@ -953,21 +995,21 @@ private val samplePreviewLyricsControls = object : LyricsControls {
 }
 
 private val sampleSyncedLyrics = """
-    [00:10.00] You saw me standing alone
-    [00:20.00] Without a dream in my heart
-    [00:30.00] Without a love of my own
+    [00:10.00] Lorem ipsum dolor sit amet
+    [00:20.00] Consectetur adipiscing elit
+    [00:30.00] Sed do eiusmod tempor incididunt
     [00:40.00] ♪
-    [00:50.00] And then there was you
+    [00:50.00] Ut labore et dolore magna aliqua
 """.trimIndent()
 
 private val sampleStaticLyrics = """
-    You saw me standing alone
-    Without a dream in my heart
-    Without a love of my own
+    Lorem ipsum dolor sit amet
+    Consectetur adipiscing elit
+    Sed do eiusmod tempor incididunt
     
-    And then there was you
-    The moon turned to gold
-    Here in my arms
+    Ut labore et dolore magna aliqua
+    Ut enim ad minim veniam
+    Quis nostrud exercitation ullamco
 """.trimIndent()
 
 // -----------------------------------------------------------------------------
