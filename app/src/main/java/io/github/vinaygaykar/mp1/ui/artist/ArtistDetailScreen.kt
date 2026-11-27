@@ -793,20 +793,6 @@ private fun ArtistDetailPortraitContent(
                 }
             }
 
-            // Song Count
-            item {
-                val count = songs.size
-                Text(
-                    text = "$count ${if (count == 1) "song" else "songs"}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                )
-            }
-
             // Albums Horizontal List
             if (sortedAlbums.isNotEmpty()) {
                 item {
@@ -832,14 +818,8 @@ private fun ArtistDetailPortraitContent(
             // Discography (Songs grouped by Album)
             if (discographyGroups.isNotEmpty()) {
                 item(key = "discography_header") {
-                    Text(
-                        text = "Discography",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 32.dp, bottom = 8.dp, start = 16.dp, end = 16.dp)
+                    DiscographyHeaderWithSongCount(
+                        songCount = songs.size
                     )
                 }
 
@@ -1153,16 +1133,6 @@ private fun ArtistDetailLandscapeContent(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
-
-                        val count = songs.size
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "$count ${if (count == 1) "song" else "songs"}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
@@ -1218,14 +1188,8 @@ private fun ArtistDetailLandscapeContent(
 
                 // 4. Discography Header & Grouped Songs
                 item {
-                    Text(
-                        text = "Discography",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    DiscographyHeaderWithSongCount(
+                        songCount = songs.size
                     )
                 }
 
@@ -1399,10 +1363,6 @@ private fun ArtistDetailCompactContent(
                 ArtistCompactHeader(
                     artistName = displayedArtistName,
                     artistImageUrl = artistImageUrl,
-                    artistId = artist?.id ?: artistId,
-                    isPlaying = playbackState.isPlaying,
-                    playingArtist = playbackState.artist,
-                    playingAlbum = playbackState.album,
                     onImageClick = {
                         if (!artistImageUrl.isNullOrEmpty()) {
                             onPreviewImageUrlChange(artistImageUrl)
@@ -1410,20 +1370,6 @@ private fun ArtistDetailCompactContent(
                             onShowSearchImageDialogChange(true)
                         }
                     }
-                )
-            }
-
-            // Song Count
-            item {
-                val count = songs.size
-                Text(
-                    text = "$count ${if (count == 1) "song" else "songs"}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
 
@@ -1452,14 +1398,8 @@ private fun ArtistDetailCompactContent(
             // Discography (Songs grouped by Album)
             if (discographyGroups.isNotEmpty()) {
                 item(key = "discography_header") {
-                    Text(
-                        text = "Discography",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp, bottom = 8.dp, start = 16.dp, end = 16.dp)
+                    DiscographyHeaderWithSongCount(
+                        songCount = songs.size
                     )
                 }
 
@@ -1675,10 +1615,6 @@ private fun CollaboratorsSection(
 private fun ArtistCompactHeader(
     artistName: String,
     artistImageUrl: String?,
-    artistId: String,
-    isPlaying: Boolean,
-    playingArtist: String?,
-    playingAlbum: String?,
     onImageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1686,7 +1622,7 @@ private fun ArtistCompactHeader(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .aspectRatio(1f)
             .background(MaterialTheme.colorScheme.primaryContainer)
             .clickable { onImageClick() },
         contentAlignment = Alignment.BottomStart
@@ -1738,6 +1674,35 @@ private fun ArtistCompactHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp)
+        )
+    }
+}
+
+@Composable
+private fun DiscographyHeaderWithSongCount(
+    songCount: Int,
+    modifier: Modifier = Modifier
+) {
+    val countText = remember(songCount) {
+        if (songCount == 1) "1 song" else "$songCount songs"
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 28.dp, bottom = 8.dp, start = 16.dp, end = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "Discography",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = countText,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
