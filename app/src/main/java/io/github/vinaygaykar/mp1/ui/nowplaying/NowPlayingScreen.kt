@@ -378,8 +378,8 @@ private fun DismissIconButton(
         modifier = modifier.size(32.dp),
         shape = CircleShape,
         colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f),
+            contentColor = MaterialTheme.colorScheme.primary
         )
     ) {
         Icon(
