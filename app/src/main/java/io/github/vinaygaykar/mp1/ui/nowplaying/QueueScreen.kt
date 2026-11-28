@@ -6,22 +6,18 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,7 +41,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -101,7 +96,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -304,6 +298,140 @@ private fun DismissIconButton(
 }
 
 @Composable
+private fun QueueBottomBar(
+    isExpanded: Boolean,
+    isShuffleOn: Boolean,
+    isShuffleEnabled: Boolean,
+    isClearEnabled: Boolean,
+    onShuffleToggle: () -> Unit,
+    onClearQueue: () -> Unit,
+    onKebabClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(vertical = 12.dp, horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!isExpanded) {
+                    // Button 1: Shuffle Toggle (Center Aligned when collapsed)
+                    FilledTonalIconButton(
+                        onClick = onShuffleToggle,
+                        enabled = isShuffleEnabled,
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = if (isShuffleOn) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (isShuffleOn) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSecondaryFixedVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                            contentDescription = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Button 2: Kebab / Chevron Toggle (Right Aligned in same position)
+                FilledTonalIconButton(
+                    onClick = onKebabClick,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.CenterEnd),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowDown else Icons.Default.MoreHoriz,
+                        contentDescription = if (isExpanded) "Collapse Options" else "More Options",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            if (isExpanded) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                ) {
+                    FilledTonalButton(
+                        onClick = onShuffleToggle,
+                        enabled = isShuffleEnabled,
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isShuffleOn) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (isShuffleOn) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSecondaryFixedVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            onClearQueue()
+                            onKebabClick()
+                        },
+                        enabled = isClearEnabled,
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ClearAll,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Clear all",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun QueueCompactContent(
     queueState: QueueUiState,
     actions: QueueControls,
@@ -316,8 +444,8 @@ private fun QueueCompactContent(
     var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
     val isSelectionMode = selectedIndices.isNotEmpty()
     var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
-    var showKebabOptionsMenuSheet by remember { mutableStateOf(false) }
-    var isFloatingPillVisible by remember { mutableStateOf(true) }
+    var isKebabExpanded by remember { mutableStateOf(false) }
+    var isBottomBarVisible by remember { mutableStateOf(true) }
 
     fun toggleSelection(index: Int) {
         selectedIndices = if (selectedIndices.contains(index)) {
@@ -327,7 +455,11 @@ private fun QueueCompactContent(
         }
     }
 
-    BackHandler(enabled = isSelectionMode) {
+    BackHandler(enabled = isKebabExpanded) {
+        isKebabExpanded = false
+    }
+
+    BackHandler(enabled = isSelectionMode && !isKebabExpanded) {
         selectedIndices = emptySet()
     }
 
@@ -335,20 +467,24 @@ private fun QueueCompactContent(
         selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
     }
 
-    Box(
-        modifier = modifier.fillMaxSize()
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+                .weight(1f)
+                .fillMaxWidth()
         ) {
             QueueItemList(
                 queueState = queueState,
                 actions = actions,
                 selectedIndices = selectedIndices,
                 onToggleSelection = ::toggleSelection,
-                onTitleVisibilityChange = { isFloatingPillVisible = it },
+                onTitleVisibilityChange = { visible ->
+                    isBottomBarVisible = visible
+                },
                 headerContent = {
                     QueueCompactHeader(
                         count = queueState.items.size,
@@ -364,19 +500,18 @@ private fun QueueCompactContent(
         }
 
         AnimatedVisibility(
-            visible = isFloatingPillVisible && !showKebabOptionsMenuSheet && !showQueueMultiSelectionSheet,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter)
+            visible = (isBottomBarVisible && !showQueueMultiSelectionSheet) || isKebabExpanded,
+            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
         ) {
-            QueueFloatingActionsPill(
+            QueueBottomBar(
+                isExpanded = isKebabExpanded,
                 isShuffleOn = isShuffleOn,
                 isShuffleEnabled = queueState.items.size > 1,
+                isClearEnabled = queueState.items.isNotEmpty(),
                 onShuffleToggle = onShuffleToggle,
-                onKebabMenuClick = { showKebabOptionsMenuSheet = true },
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(bottom = 16.dp)
+                onClearQueue = { actions.clearQueue() },
+                onKebabClick = { isKebabExpanded = !isKebabExpanded }
             )
         }
     }
@@ -389,18 +524,6 @@ private fun QueueCompactContent(
         onDismissSheet = { showQueueMultiSelectionSheet = false },
         onClearSelection = { selectedIndices = emptySet() }
     )
-
-    QueueKebabOptionsMenuSheet(
-        visible = showKebabOptionsMenuSheet,
-        isShuffleOn = isShuffleOn,
-        isShuffleEnabled = queueState.items.size > 1,
-        isClearEnabled = queueState.items.isNotEmpty(),
-        onShuffleToggle = onShuffleToggle,
-        onClearQueue = { actions.clearQueue() },
-        onDismiss = { showKebabOptionsMenuSheet = false }
-    )
-
-    Spacer(modifier = Modifier.navigationBarsPadding())
 }
 
 @Composable
@@ -712,9 +835,9 @@ private fun QueuePortraitContent(
     var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
     val isSelectionMode = selectedIndices.isNotEmpty()
     var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
-    var showKebabOptionsMenuSheet by remember { mutableStateOf(false) }
+    var isKebabExpanded by remember { mutableStateOf(false) }
     var isTitleVisible by remember { mutableStateOf(true) }
-    var isFloatingPillVisible by remember { mutableStateOf(true) }
+    var isBottomBarVisible by remember { mutableStateOf(true) }
 
     fun toggleSelection(index: Int) {
         selectedIndices = if (selectedIndices.contains(index)) {
@@ -724,7 +847,11 @@ private fun QueuePortraitContent(
         }
     }
 
-    BackHandler(enabled = isSelectionMode) {
+    BackHandler(enabled = isKebabExpanded) {
+        isKebabExpanded = false
+    }
+
+    BackHandler(enabled = isSelectionMode && !isKebabExpanded) {
         selectedIndices = emptySet()
     }
 
@@ -732,83 +859,84 @@ private fun QueuePortraitContent(
         selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
     }
 
-    Box(
+    Column(
         modifier = modifier.fillMaxSize()
     ) {
-        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val topBarPadding = topInset + (if (isSelectionMode) 116.dp else 72.dp)
-
-        // QueueItemList fills the whole screen so scrolling content passes underneath status bar
-        QueueItemList(
-            queueState = queueState,
-            actions = actions,
-            selectedIndices = selectedIndices,
-            onToggleSelection = ::toggleSelection,
-            onTitleVisibilityChange = { visible ->
-                isTitleVisible = visible
-                isFloatingPillVisible = visible
-            },
-            modifier = Modifier.fillMaxSize(),
-            topPadding = topBarPadding
-        )
-
-        // Top Header Surface floating over QueueItemList
-        AnimatedVisibility(
-            visible = isTitleVisible || isSelectionMode,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(vertical = 6.dp)
-                ) {
-                    if (isTitleVisible) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            QueueHeaderTitle(count = queueState.items.size)
-                            DismissIconButton(onDismiss = onDismiss)
-                        }
-                    }
+            val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val topBarPadding = topInset + (if (isSelectionMode) 116.dp else 72.dp)
 
-                    // Selection Action Row (Static)
-                    if (isSelectionMode) {
-                        SelectionActionRow(
-                            selectedCount = selectedIndices.size,
-                            onSelectAll = { selectedIndices = queueState.items.indices.toSet() },
-                            onDeselect = { selectedIndices = emptySet() },
-                            onOptionsClick = { showQueueMultiSelectionSheet = true }
-                        )
+            QueueItemList(
+                queueState = queueState,
+                actions = actions,
+                selectedIndices = selectedIndices,
+                onToggleSelection = ::toggleSelection,
+                onTitleVisibilityChange = { visible ->
+                    isTitleVisible = visible
+                    isBottomBarVisible = visible
+                },
+                modifier = Modifier.fillMaxSize(),
+                topPadding = topBarPadding
+            )
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isTitleVisible || isSelectionMode,
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(vertical = 6.dp)
+                    ) {
+                        if (isTitleVisible) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                QueueHeaderTitle(count = queueState.items.size)
+                                DismissIconButton(onDismiss = onDismiss)
+                            }
+                        }
+
+                        if (isSelectionMode) {
+                            SelectionActionRow(
+                                selectedCount = selectedIndices.size,
+                                onSelectAll = { selectedIndices = queueState.items.indices.toSet() },
+                                onDeselect = { selectedIndices = emptySet() },
+                                onOptionsClick = { showQueueMultiSelectionSheet = true }
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Floating Pill with 2 circular buttons in bottom center
         AnimatedVisibility(
-            visible = isFloatingPillVisible && !showKebabOptionsMenuSheet && !showQueueMultiSelectionSheet,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter)
+            visible = (isBottomBarVisible && !showQueueMultiSelectionSheet) || isKebabExpanded,
+            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
         ) {
-            QueueFloatingActionsPill(
+            QueueBottomBar(
+                isExpanded = isKebabExpanded,
                 isShuffleOn = isShuffleOn,
                 isShuffleEnabled = queueState.items.size > 1,
+                isClearEnabled = queueState.items.isNotEmpty(),
                 onShuffleToggle = onShuffleToggle,
-                onKebabMenuClick = { showKebabOptionsMenuSheet = true },
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(bottom = 24.dp)
+                onClearQueue = { actions.clearQueue() },
+                onKebabClick = { isKebabExpanded = !isKebabExpanded }
             )
         }
     }
@@ -821,18 +949,6 @@ private fun QueuePortraitContent(
         onDismissSheet = { showQueueMultiSelectionSheet = false },
         onClearSelection = { selectedIndices = emptySet() }
     )
-
-    QueueKebabOptionsMenuSheet(
-        visible = showKebabOptionsMenuSheet,
-        isShuffleOn = isShuffleOn,
-        isShuffleEnabled = queueState.items.size > 1,
-        isClearEnabled = queueState.items.isNotEmpty(),
-        onShuffleToggle = onShuffleToggle,
-        onClearQueue = { actions.clearQueue() },
-        onDismiss = { showKebabOptionsMenuSheet = false }
-    )
-
-    Spacer(modifier = Modifier.navigationBarsPadding())
 }
 
 @Composable
@@ -848,9 +964,9 @@ private fun QueueLandscapeContent(
     var selectedIndices by remember { mutableStateOf(initialSelectedIndices) }
     val isSelectionMode = selectedIndices.isNotEmpty()
     var showQueueMultiSelectionSheet by remember { mutableStateOf(false) }
-    var showKebabOptionsMenuSheet by remember { mutableStateOf(false) }
+    var isKebabExpanded by remember { mutableStateOf(false) }
     var isTitleVisible by remember { mutableStateOf(true) }
-    var isFloatingPillVisible by remember { mutableStateOf(true) }
+    var isBottomBarVisible by remember { mutableStateOf(true) }
 
     fun toggleSelection(index: Int) {
         selectedIndices = if (selectedIndices.contains(index)) {
@@ -860,7 +976,11 @@ private fun QueueLandscapeContent(
         }
     }
 
-    BackHandler(enabled = isSelectionMode) {
+    BackHandler(enabled = isKebabExpanded) {
+        isKebabExpanded = false
+    }
+
+    BackHandler(enabled = isSelectionMode && !isKebabExpanded) {
         selectedIndices = emptySet()
     }
 
@@ -868,24 +988,26 @@ private fun QueueLandscapeContent(
         selectedIndices = selectedIndices.filter { it in queueState.items.indices }.toSet()
     }
 
-    Box(
+    Row(
         modifier = modifier.fillMaxSize()
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
         ) {
-            // Header Surface (Playing Queue Title Row)
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
+                // Header Surface (Playing Queue Title Row)
+                AnimatedVisibility(
+                    visible = isTitleVisible || isSelectionMode,
+                    enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
                 ) {
-                    AnimatedVisibility(
-                        visible = isTitleVisible || isSelectionMode,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
                             modifier = Modifier
@@ -893,9 +1015,10 @@ private fun QueueLandscapeContent(
                                 .statusBarsPadding()
                                 .windowInsetsPadding(
                                     WindowInsets.displayCutout.only(
-                                        WindowInsetsSides.Horizontal
+                                        WindowInsetsSides.Start
                                     )
                                 )
+                                .padding(bottom = 8.dp)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -905,7 +1028,6 @@ private fun QueueLandscapeContent(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 QueueHeaderTitle(count = queueState.items.size)
-                                DismissIconButton(onDismiss = onDismiss)
                             }
 
                             if (isSelectionMode) {
@@ -920,49 +1042,40 @@ private fun QueueLandscapeContent(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
-            }
 
-            QueueItemList(
-                queueState = queueState,
-                actions = actions,
-                selectedIndices = selectedIndices,
-                onToggleSelection = ::toggleSelection,
-                onTitleVisibilityChange = { visible ->
-                    isTitleVisible = visible
-                    isFloatingPillVisible = visible
-                },
-                modifier = Modifier.windowInsetsPadding(
-                    WindowInsets.displayCutout.only(
-                        WindowInsetsSides.Horizontal
-                    )
-                )
-            )
-        }
-
-        // Floating Pill with 2 circular buttons in bottom right (vertical layout with background)
-        AnimatedVisibility(
-            visible = isFloatingPillVisible && !showKebabOptionsMenuSheet && !showQueueMultiSelectionSheet,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomEnd)
-        ) {
-            QueueFloatingActionsPill(
-                isShuffleOn = isShuffleOn,
-                isShuffleEnabled = queueState.items.size > 1,
-                onShuffleToggle = onShuffleToggle,
-                onKebabMenuClick = { showKebabOptionsMenuSheet = true },
-                isVertical = true,
-                showPillBackground = true,
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .windowInsetsPadding(
+                QueueItemList(
+                    queueState = queueState,
+                    actions = actions,
+                    selectedIndices = selectedIndices,
+                    onToggleSelection = ::toggleSelection,
+                    onTitleVisibilityChange = { visible ->
+                        isTitleVisible = visible
+                        isBottomBarVisible = visible
+                    },
+                    modifier = Modifier.windowInsetsPadding(
                         WindowInsets.displayCutout.only(
-                            WindowInsetsSides.End
+                            WindowInsetsSides.Horizontal
                         )
                     )
-                    .padding(end = 16.dp, bottom = 16.dp)
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = (isBottomBarVisible && !showQueueMultiSelectionSheet) || isKebabExpanded,
+            enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
+            exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut()
+        ) {
+            QueueRightPaneBar(
+                isExpanded = isKebabExpanded,
+                isShuffleOn = isShuffleOn,
+                isShuffleEnabled = queueState.items.size > 1,
+                isClearEnabled = queueState.items.isNotEmpty(),
+                onShuffleToggle = onShuffleToggle,
+                onClearQueue = { actions.clearQueue() },
+                onKebabClick = { isKebabExpanded = !isKebabExpanded },
+                onDismiss = onDismiss
             )
         }
     }
@@ -975,18 +1088,159 @@ private fun QueueLandscapeContent(
         onDismissSheet = { showQueueMultiSelectionSheet = false },
         onClearSelection = { selectedIndices = emptySet() }
     )
+}
 
-    QueueKebabOptionsMenuSheet(
-        visible = showKebabOptionsMenuSheet,
-        isShuffleOn = isShuffleOn,
-        isShuffleEnabled = queueState.items.size > 1,
-        isClearEnabled = queueState.items.isNotEmpty(),
-        onShuffleToggle = onShuffleToggle,
-        onClearQueue = { actions.clearQueue() },
-        onDismiss = { showKebabOptionsMenuSheet = false }
-    )
+@Composable
+private fun QueueRightPaneBar(
+    isExpanded: Boolean,
+    isShuffleOn: Boolean,
+    isShuffleEnabled: Boolean,
+    isClearEnabled: Boolean,
+    onShuffleToggle: () -> Unit,
+    onClearQueue: () -> Unit,
+    onKebabClick: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier
+            .fillMaxHeight()
+            .wrapContentWidth()
+            .animateContentSize()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .wrapContentWidth()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .windowInsetsPadding(
+                    WindowInsets.displayCutout.only(WindowInsetsSides.End)
+                )
+                .padding(vertical = 12.dp, horizontal = 16.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            DismissIconButton(onDismiss = onDismiss)
 
-    Spacer(modifier = Modifier.navigationBarsPadding())
+            if (!isExpanded) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Bottom),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.wrapContentWidth()
+                ) {
+                    FilledTonalIconButton(
+                        onClick = onShuffleToggle,
+                        enabled = isShuffleEnabled,
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = if (isShuffleOn) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (isShuffleOn) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSecondaryFixedVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                            contentDescription = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    FilledTonalIconButton(
+                        onClick = onKebabClick,
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreHoriz,
+                            contentDescription = "More Options",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
+                    modifier = Modifier.wrapContentWidth()
+                ) {
+                    FilledTonalButton(
+                        onClick = onShuffleToggle,
+                        enabled = isShuffleEnabled,
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isShuffleOn) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (isShuffleOn) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSecondaryFixedVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            onClearQueue()
+                            onKebabClick()
+                        },
+                        enabled = isClearEnabled,
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ClearAll,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Clear all",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    FilledTonalIconButton(
+                        onClick = onKebabClick,
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = "Collapse Options",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -1221,380 +1475,7 @@ private fun QueueItemRow(
     )
 }
 
-@Composable
-private fun QueueFloatingActionsPill(
-    isShuffleOn: Boolean,
-    isShuffleEnabled: Boolean,
-    onShuffleToggle: () -> Unit,
-    onKebabMenuClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    isVertical: Boolean = false,
-    showPillBackground: Boolean = true
-) {
-    val shuffleContainerColor by animateColorAsState(
-        targetValue = if (isShuffleOn) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        },
-        label = "floating_shuffle_bg"
-    )
-    val shuffleContentColor by animateColorAsState(
-        targetValue = if (isShuffleOn) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        label = "floating_shuffle_content"
-    )
 
-    val buttonsContent = @Composable {
-        if (isVertical) {
-            Column(
-                modifier = Modifier.padding(
-                    vertical = if (showPillBackground) 8.dp else 0.dp,
-                    horizontal = if (showPillBackground) 6.dp else 0.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Button 1: Shuffle toggle
-                FilledTonalIconButton(
-                    onClick = onShuffleToggle,
-                    enabled = isShuffleEnabled,
-                    modifier = Modifier.size(48.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = shuffleContainerColor,
-                        contentColor = shuffleContentColor,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-                            alpha = 0.5f
-                        ),
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                            alpha = 0.38f
-                        )
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
-                        contentDescription = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // Button 2: Kebab menu
-                FilledTonalIconButton(
-                    onClick = onKebabMenuClick,
-                    modifier = Modifier.size(48.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = "More Options",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Button 1: Shuffle toggle
-                FilledTonalIconButton(
-                    onClick = onShuffleToggle,
-                    enabled = isShuffleEnabled,
-                    modifier = Modifier.size(48.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = shuffleContainerColor,
-                        contentColor = shuffleContentColor,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-                            alpha = 0.5f
-                        ),
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                            alpha = 0.38f
-                        )
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
-                        contentDescription = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // Button 2: Kebab menu
-                FilledTonalIconButton(
-                    onClick = onKebabMenuClick,
-                    modifier = Modifier.size(48.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = "More Options",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-    }
-
-    if (showPillBackground) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp,
-            modifier = modifier
-        ) {
-            buttonsContent()
-        }
-    } else {
-        Box(modifier = modifier) {
-            buttonsContent()
-        }
-    }
-}
-
-
-@Composable
-fun QueueKebabOptionsMenuSheet(
-    visible: Boolean,
-    isShuffleOn: Boolean,
-    isShuffleEnabled: Boolean,
-    isClearEnabled: Boolean,
-    onShuffleToggle: () -> Unit,
-    onClearQueue: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (visible) {
-        BackHandler(onBack = onDismiss)
-    }
-
-    // Scrim: Fades in and out without translation
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(animationSpec = tween(durationMillis = 300)),
-        exit = fadeOut(animationSpec = tween(durationMillis = 300))
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.30f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                )
-        )
-    }
-
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    // Custom Overlay: Slides in/out from bottom of screen (portrait) or right of screen (landscape)
-    AnimatedVisibility(
-        visible = visible,
-        enter = if (isLandscape) {
-            slideInHorizontally(
-                initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeIn(animationSpec = tween(durationMillis = 300))
-        } else {
-            slideInVertically(
-                initialOffsetY = { fullHeight -> fullHeight },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeIn(animationSpec = tween(durationMillis = 300))
-        },
-        exit = if (isLandscape) {
-            slideOutHorizontally(
-                targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeOut(animationSpec = tween(durationMillis = 300))
-        } else {
-            slideOutVertically(
-                targetOffsetY = { fullHeight -> fullHeight },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeOut(animationSpec = tween(durationMillis = 300))
-        },
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = if (isLandscape) Alignment.BottomEnd else Alignment.BottomCenter
-        ) {
-            QueueKebabOptionsMenuContent(
-                isShuffleOn = isShuffleOn,
-                isShuffleEnabled = isShuffleEnabled,
-                isClearEnabled = isClearEnabled,
-                onShuffleToggle = {
-                    onShuffleToggle()
-                    onDismiss()
-                },
-                onClearQueue = {
-                    onClearQueue()
-                    onDismiss()
-                },
-                modifier = modifier
-            )
-        }
-    }
-}
-
-@Composable
-fun QueueKebabOptionsMenuContent(
-    isShuffleOn: Boolean,
-    isShuffleEnabled: Boolean,
-    isClearEnabled: Boolean,
-    onShuffleToggle: () -> Unit,
-    onClearQueue: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val baseColor = MaterialTheme.colorScheme.primaryContainer
-
-    val gradientBackground = remember(baseColor, isLandscape) {
-        if (isLandscape) {
-            Brush.horizontalGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    baseColor.copy(alpha = 0.5f),
-                    baseColor
-                )
-            )
-        } else {
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    baseColor.copy(alpha = 0.5f),
-                    baseColor
-                )
-            )
-        }
-    }
-
-    Box(
-        modifier = if (isLandscape) {
-            modifier
-                .fillMaxHeight()
-                .wrapContentWidth()
-                .background(brush = gradientBackground)
-        } else {
-            modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-                .background(brush = gradientBackground)
-        },
-        contentAlignment = if (isLandscape) Alignment.BottomEnd else Alignment.Center
-    ) {
-        Column(
-            modifier = if (isLandscape) {
-                Modifier
-                    .fillMaxHeight()
-                    .wrapContentWidth()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .windowInsetsPadding(
-                        WindowInsets.displayCutout.only(WindowInsetsSides.End)
-                    )
-                    .padding(start = 64.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
-            } else {
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(start = 20.dp, top = 52.dp, end = 20.dp, bottom = 44.dp)
-            },
-            horizontalAlignment = if (isLandscape) Alignment.End else Alignment.CenterHorizontally,
-            verticalArrangement = if (isLandscape) Arrangement.spacedBy(16.dp, Alignment.Bottom) else Arrangement.spacedBy(16.dp)
-        ) {
-            // Button 1: Shuffle Toggle (icon + text, content width)
-            FilledTonalButton(
-                onClick = onShuffleToggle,
-                enabled = isShuffleEnabled,
-                modifier = Modifier
-                    .wrapContentWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = if (isShuffleOn) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHighest
-                    },
-                    contentColor = if (isShuffleOn) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(
-                        alpha = 0.5f
-                    ),
-                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(
-                        alpha = 0.38f
-                    )
-                ),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-            ) {
-                Icon(
-                    imageVector = if (isShuffleOn) Icons.Rounded.ShuffleOn else Icons.Rounded.SwapHoriz,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = if (isShuffleOn) "Shuffle On" else "Shuffle Off",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            // Button 2: Clear All (icon + text, content width, destructive styling)
-            FilledTonalButton(
-                onClick = onClearQueue,
-                enabled = isClearEnabled,
-                modifier = Modifier
-                    .wrapContentWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    disabledContainerColor = MaterialTheme.colorScheme.errorContainer.copy(
-                        alpha = 0.5f
-                    ),
-                    disabledContentColor = MaterialTheme.colorScheme.onErrorContainer.copy(
-                        alpha = 0.38f
-                    )
-                ),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.ClearAll,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Clear all",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
