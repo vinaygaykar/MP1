@@ -99,6 +99,7 @@ class MainActivity : ComponentActivity() {
 
 object Routes {
     const val ARTIST_DETAIL = "artist_detail/{artistId}?imageUrl={imageUrl}"
+    const val ALBUM_DETAIL = "album_detail/{albumId}?artworkUri={artworkUri}"
     const val PLAYLIST_DETAIL = "playlist_detail/{playlistId}?playlistName={playlistName}"
 
     fun artistDetail(id: String, imageUrl: String? = null) =
@@ -106,6 +107,12 @@ object Routes {
             "artist_detail/${Uri.encode(id)}?imageUrl=${Uri.encode(imageUrl)}"
         } else {
             "artist_detail/${Uri.encode(id)}"
+        }
+    fun albumDetail(id: String, artworkUri: String? = null) =
+        if (!artworkUri.isNullOrEmpty()) {
+            "album_detail/${Uri.encode(id)}?artworkUri=${Uri.encode(artworkUri)}"
+        } else {
+            "album_detail/${Uri.encode(id)}"
         }
     fun playlistDetail(id: Long, name: String) =
         "playlist_detail/$id?playlistName=${Uri.encode(name)}"
@@ -251,7 +258,7 @@ fun MainScreen(
                                         onSearchClick = { navController.navigate(Screen.Search.route) },
                                         onSettingsClick = { navController.navigate(Screen.Settings.route) },
                                         onOpenScanLocations = { navController.navigate("scan_locations") },
-                                        onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
+                                        onAlbumClick = { id, artworkUri -> navController.navigate(Routes.albumDetail(id, artworkUri)) },
                                         onArtistClick = { id, imageUrl -> navController.navigate(Routes.artistDetail(id, imageUrl)) },
                                         onPlaylistClick = { id, name -> navController.navigate(Routes.playlistDetail(id, name)) },
                                         onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
@@ -294,7 +301,7 @@ fun MainScreen(
                                     SearchScreen(
                                         bottomPadding = bottomPadding,
                                         onBack = { navController.popBackStack() },
-                                        onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
+                                        onAlbumClick = { navController.navigate(Routes.albumDetail(it)) },
                                         onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
                                         onHideNowPlayingView = { nowPlayingController.hide() },
                                         onShowNowPlayingView = { nowPlayingController.show() }
@@ -302,32 +309,19 @@ fun MainScreen(
                                 }
                             }
                             composable(
-                                route = "album_detail/{albumId}",
-                                arguments = listOf(navArgument("albumId") { type = NavType.StringType }),
-                                enterTransition = {
-                                    slideInHorizontally(
-                                        initialOffsetX = { it },
-                                        animationSpec = tween(350)
-                                    ) + fadeIn(tween(350))
-                                },
-                                exitTransition = {
-                                    slideOutHorizontally(
-                                        targetOffsetX = { -it / 3 },
-                                        animationSpec = tween(350)
-                                    ) + fadeOut(tween(350))
-                                },
-                                popEnterTransition = {
-                                    slideInHorizontally(
-                                        initialOffsetX = { -it / 3 },
-                                        animationSpec = tween(350)
-                                    ) + fadeIn(tween(350))
-                                },
-                                popExitTransition = {
-                                    slideOutHorizontally(
-                                        targetOffsetX = { it },
-                                        animationSpec = tween(350)
-                                    ) + fadeOut(tween(350))
-                                }
+                                route = Routes.ALBUM_DETAIL,
+                                arguments = listOf(
+                                    navArgument("albumId") { type = NavType.StringType },
+                                    navArgument("artworkUri") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    }
+                                ),
+                                enterTransition = slideEnter,
+                                exitTransition = slideExit,
+                                popEnterTransition = slidePopEnter,
+                                popExitTransition = slidePopExit
                             ) {
                                 CompositionLocalProvider(
                                     LocalAnimatedVisibilityScope provides this@composable
@@ -361,7 +355,7 @@ fun MainScreen(
                                 ) {
                                     ArtistDetailScreen(
                                         onBack = { navController.popBackStack() },
-                                        onAlbumClick = { navController.navigate("album_detail/$it") },
+                                        onAlbumClick = { id, artworkUri -> navController.navigate(Routes.albumDetail(id, artworkUri)) },
                                         onArtistClick = { id, imageUrl -> navController.navigate(Routes.artistDetail(id, imageUrl)) },
                                         onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
                                         onHideNowPlayingView = { nowPlayingController.hide() },
@@ -464,7 +458,7 @@ fun MainScreen(
             visualizerState = visualizerState,
             bulgeTrigger = miniPlayerBulgeTrigger,
             isCollapsedOnScroll = isMiniPlayerCollapsedOnScroll,
-            onAlbumClick = { albumId -> navController.navigate("album_detail/$albumId") },
+            onAlbumClick = { navController.navigate(Routes.albumDetail(it)) },
             onArtistClick = { navController.navigate(Routes.artistDetail(it)) }
         ) { offset -> miniPlayerTargetOffset = offset }
 

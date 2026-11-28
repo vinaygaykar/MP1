@@ -10,14 +10,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -144,31 +142,28 @@ fun AlbumCleanCard(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (album.artworkUri != null) {
-            val request = remember(album.artworkUri) {
-                ImageRequest.Builder(context)
-                    .data(album.artworkUri)
-                    .size(300, 300)
-                    .crossfade(true)
-                    .build()
-            }
-            val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
-            AsyncImage(
-                model = request,
-                contentDescription = album.name,
-                error = albumPlaceholder,
-                placeholder = albumPlaceholder,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Default.Album,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            )
+        val artworkUriString = album.artworkUri?.toString()
+        val request = remember(artworkUriString, album.id) {
+            ImageRequest.Builder(context)
+                .data(artworkUriString)
+                .apply {
+                    if (album.id.isNotEmpty()) {
+                        memoryCacheKey("album_art_${album.id}")
+                        placeholderMemoryCacheKey("album_art_${album.id}")
+                    }
+                }
+                .size(300, 300)
+                .crossfade(false)
+                .build()
         }
+        val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+        AsyncImage(
+            model = request,
+            contentDescription = album.name,
+            error = albumPlaceholder,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
     }
 }
 

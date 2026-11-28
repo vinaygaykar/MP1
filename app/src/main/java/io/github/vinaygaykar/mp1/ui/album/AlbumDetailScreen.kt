@@ -80,6 +80,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -140,6 +141,7 @@ fun AlbumDetailScreen(
     playerViewModel: PlayerViewModel = hiltViewModel()
 ) {
     val album by viewModel.album.collectAsState()
+    val artworkUri by viewModel.albumArtworkUri.collectAsState()
     val primaryArtist by viewModel.primaryArtist.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val featuredArtists by viewModel.featuredArtists.collectAsState()
@@ -154,6 +156,7 @@ fun AlbumDetailScreen(
         playbackState = playbackState,
         playlists = playlists,
         albumId = viewModel.albumId,
+        artworkUri = artworkUri,
         onBack = onBack,
         onArtistClick = onArtistClick,
         onHideNowPlayingView = onHideNowPlayingView,
@@ -178,6 +181,7 @@ fun AlbumDetailContent(
     playbackState: PlaybackUiState,
     playlists: List<Playlist>,
     albumId: String = "",
+    artworkUri: String? = album?.artworkUri?.toString(),
     onBack: () -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
@@ -412,6 +416,7 @@ fun AlbumDetailContent(
                                     featuredArtists = featuredArtists,
                                     playbackState = playbackState,
                                     albumId = albumId,
+                                    artworkUri = artworkUri,
                                     lazyListState = lazyListState,
                                     hazeState = hazeState,
                                     selectedSongIds = selectedSongIds,
@@ -439,6 +444,7 @@ fun AlbumDetailContent(
                                     featuredArtists = featuredArtists,
                                     playbackState = playbackState,
                                     albumId = albumId,
+                                    artworkUri = artworkUri,
                                     lazyListState = lazyListState,
                                     hazeState = hazeState,
                                     selectedSongIds = selectedSongIds,
@@ -465,6 +471,7 @@ fun AlbumDetailContent(
                                     featuredArtists = featuredArtists,
                                     playbackState = playbackState,
                                     albumId = albumId,
+                                    artworkUri = artworkUri,
                                     lazyListState = lazyListState,
                                     hazeState = hazeState,
                                     selectedSongIds = selectedSongIds,
@@ -567,6 +574,7 @@ private fun AlbumDetailPortraitContent(
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
     albumId: String,
+    artworkUri: String?,
     lazyListState: LazyListState,
     hazeState: HazeState,
     selectedSongIds: Set<String>,
@@ -601,6 +609,7 @@ private fun AlbumDetailPortraitContent(
                 AlbumArtworkView(
                     album = album,
                     albumId = albumId,
+                    artworkUri = artworkUri,
                     modifier = Modifier
                         .fillMaxWidth(0.65f)
                         .widthIn(max = 260.dp)
@@ -697,6 +706,7 @@ private fun AlbumDetailLandscapeContent(
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
     albumId: String,
+    artworkUri: String?,
     lazyListState: LazyListState,
     hazeState: HazeState,
     selectedSongIds: Set<String>,
@@ -762,6 +772,7 @@ private fun AlbumDetailLandscapeContent(
             AlbumArtworkView(
                 album = album,
                 albumId = albumId,
+                artworkUri = artworkUri,
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 240.dp)
@@ -870,6 +881,7 @@ private fun AlbumDetailCompactContent(
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
     albumId: String,
+    artworkUri: String?,
     lazyListState: LazyListState,
     hazeState: HazeState,
     selectedSongIds: Set<String>,
@@ -892,26 +904,37 @@ private fun AlbumDetailCompactContent(
         // Compact Header with Album Artwork Background + slight transparent black overlay (Square Shaped)
         item {
             val keyId = album?.id ?: albumId
+            val effectiveArtworkUri = album?.artworkUri?.toString() ?: artworkUri
+            val context = LocalContext.current
+            val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .albumSharedElement(key = "album_image_$keyId")
             ) {
-                if (album?.artworkUri != null) {
-                    AsyncImage(
-                        model = album.artworkUri,
-                        contentDescription = album.name,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                    )
+                val request = remember(effectiveArtworkUri, keyId) {
+                    ImageRequest.Builder(context)
+                        .data(effectiveArtworkUri)
+                        .apply {
+                            if (keyId.isNotEmpty()) {
+                                memoryCacheKey("album_art_$keyId")
+                                placeholderMemoryCacheKey("album_art_$keyId")
+                            }
+                        }
+                        .size(600, 600)
+                        .crossfade(false)
+                        .build()
                 }
+
+                AsyncImage(
+                    model = request,
+                    contentDescription = album?.name ?: "Album Artwork",
+                    error = albumPlaceholder,
+                    modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Crop
+                )
 
                 // Transparent black overlay for text readability
                 Box(
@@ -1000,44 +1023,39 @@ private fun AlbumDetailCompactContent(
 private fun AlbumArtworkView(
     album: Album?,
     modifier: Modifier = Modifier,
-    albumId: String = ""
+    albumId: String = "",
+    artworkUri: String? = album?.artworkUri?.toString()
 ) {
     val context = LocalContext.current
-    val artworkUri = album?.artworkUri
+    val effectiveArtworkUri = album?.artworkUri?.toString() ?: artworkUri
     val keyId = album?.id ?: albumId
+    val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+
     Box(
         modifier = modifier.albumSharedElement(key = "album_image_$keyId"),
         contentAlignment = Alignment.Center
     ) {
-        if (artworkUri != null) {
-            val request = remember(artworkUri) {
-                ImageRequest.Builder(context)
-                    .data(artworkUri)
-                    .size(600, 600)
-                    .crossfade(true)
-                    .build()
-            }
-            AsyncImage(
-                model = request,
-                contentDescription = album.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Album,
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
+        val request = remember(effectiveArtworkUri, keyId) {
+            ImageRequest.Builder(context)
+                .data(effectiveArtworkUri)
+                .apply {
+                    if (keyId.isNotEmpty()) {
+                        memoryCacheKey("album_art_$keyId")
+                        placeholderMemoryCacheKey("album_art_$keyId")
+                    }
+                }
+                .size(600, 600)
+                .crossfade(false)
+                .build()
         }
+
+        AsyncImage(
+            model = request,
+            contentDescription = album?.name ?: "Album Artwork",
+            error = albumPlaceholder,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
     }
 }
 

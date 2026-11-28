@@ -95,7 +95,7 @@ internal fun CategoryDetailScreen(
     onImportPlaylistLauncher: () -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
-    onAlbumClick: (String) -> Unit = {},
+    onAlbumClick: (String, String?) -> Unit = { _, _ -> },
     onArtistClick: (String, String?) -> Unit = { _, _ -> },
     onPlaylistClick: (Long, String) -> Unit = { _, _ -> },
     onCheckHasOfflineLyrics: suspend (Song) -> Boolean = { false },
@@ -202,7 +202,7 @@ internal fun CategoryDetailScreen(
         onDismiss = { activeOverlayData = null },
         onPlayNext = { song -> onPlayNext(listOf(song)) },
         onAddToQueue = { song -> onAddToQueue(listOf(song)) },
-        onAlbumClick = onAlbumClick
+        onAlbumClick = { id -> onAlbumClick(id, null) }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -331,7 +331,7 @@ internal fun CategoryDetailScreen(
                         LibraryCategory.ALBUMS -> {
                             AlbumsTab(
                                 albums = uiState.albums,
-                                onAlbumClick = { album -> onAlbumClick(album.id) },
+                                onAlbumClick = { album -> onAlbumClick(album.id, album.artworkUri?.toString()) },
                                 detailProgress = detailProgress,
                                 categoryKey = libraryState.lastOpenedCategory,
                                 isSplashActive = isSplashActive,

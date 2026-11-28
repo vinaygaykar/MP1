@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -34,7 +33,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +56,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -70,6 +69,7 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
@@ -534,24 +534,28 @@ fun MessyAlbumCardItem(
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
             ) {
-                if (album.artworkUri != null) {
-                    val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
-                    AsyncImage(
-                        model = album.artworkUri,
-                        contentDescription = album.name,
-                        error = albumPlaceholder,
-                        placeholder = albumPlaceholder,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Album,
-                        contentDescription = null,
-                        modifier = Modifier.size(56.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
+                val context = LocalContext.current
+                val artworkUriString = album.artworkUri?.toString()
+                val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+                val request = remember(artworkUriString, album.id) {
+                    ImageRequest.Builder(context)
+                        .data(artworkUriString)
+                        .apply {
+                            if (album.id.isNotEmpty()) {
+                                memoryCacheKey("album_art_${album.id}")
+                                placeholderMemoryCacheKey("album_art_${album.id}")
+                            }
+                        }
+                        .crossfade(false)
+                        .build()
                 }
+                AsyncImage(
+                    model = request,
+                    contentDescription = album.name,
+                    error = albumPlaceholder,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
 
                 // Album title overlay on top left corner with black background
                 Box(
@@ -626,24 +630,28 @@ fun FastGridAlbumItem(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (album.artworkUri != null) {
-                    val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
-                    AsyncImage(
-                        model = album.artworkUri,
-                        contentDescription = album.name,
-                        error = albumPlaceholder,
-                        placeholder = albumPlaceholder,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Album,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
+                val context = LocalContext.current
+                val artworkUriString = album.artworkUri?.toString()
+                val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+                val request = remember(artworkUriString, album.id) {
+                    ImageRequest.Builder(context)
+                        .data(artworkUriString)
+                        .apply {
+                            if (album.id.isNotEmpty()) {
+                                memoryCacheKey("album_art_${album.id}")
+                                placeholderMemoryCacheKey("album_art_${album.id}")
+                            }
+                        }
+                        .crossfade(false)
+                        .build()
                 }
+                AsyncImage(
+                    model = request,
+                    contentDescription = album.name,
+                    error = albumPlaceholder,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
             }
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -743,24 +751,28 @@ fun AlbumRowItem(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (album.artworkUri != null) {
-                    val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
-                    AsyncImage(
-                        model = album.artworkUri,
-                        contentDescription = album.name,
-                        error = albumPlaceholder,
-                        placeholder = albumPlaceholder,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Album,
-                        contentDescription = null,
-                        modifier = Modifier.size(if (isTargeted) 56.dp else 28.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
+                val context = LocalContext.current
+                val artworkUriString = album.artworkUri?.toString()
+                val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+                val request = remember(artworkUriString, album.id) {
+                    ImageRequest.Builder(context)
+                        .data(artworkUriString)
+                        .apply {
+                            if (album.id.isNotEmpty()) {
+                                memoryCacheKey("album_art_${album.id}")
+                                placeholderMemoryCacheKey("album_art_${album.id}")
+                            }
+                        }
+                        .crossfade(false)
+                        .build()
                 }
+                AsyncImage(
+                    model = request,
+                    contentDescription = album.name,
+                    error = albumPlaceholder,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
 
                 // Normal Mode Overlays
                 if (phase2Progress < 0.99f) {

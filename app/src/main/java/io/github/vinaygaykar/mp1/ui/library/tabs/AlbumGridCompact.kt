@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -27,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,6 +45,7 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -56,6 +55,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
@@ -114,6 +114,7 @@ fun AlbumGridCompact(
     BoxWithConstraints(
         modifier = modifier.fillMaxSize()
     ) {
+        val context = LocalContext.current
         val halfHeight = this@BoxWithConstraints.maxHeight / 2
         val topPadding = (halfHeight - 40.dp).coerceAtLeast(0.dp)
         val bottomPadding = (halfHeight - 40.dp + contentPadding.calculateBottomPadding()).coerceAtLeast(0.dp)
@@ -205,24 +206,27 @@ fun AlbumGridCompact(
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (targetAlbum.artworkUri != null) {
-                            val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
-                            AsyncImage(
-                                model = targetAlbum.artworkUri,
-                                contentDescription = targetAlbum.name,
-                                error = albumPlaceholder,
-                                placeholder = albumPlaceholder,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Album,
-                                contentDescription = null,
-                                modifier = Modifier.size(56.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
+                        val artworkUriString = targetAlbum.artworkUri?.toString()
+                        val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+                        val request = remember(artworkUriString, targetAlbum.id) {
+                            ImageRequest.Builder(context)
+                                .data(artworkUriString)
+                                .apply {
+                                    if (targetAlbum.id.isNotEmpty()) {
+                                        memoryCacheKey("album_art_${targetAlbum.id}")
+                                        placeholderMemoryCacheKey("album_art_${targetAlbum.id}")
+                                    }
+                                }
+                                .crossfade(false)
+                                .build()
                         }
+                        AsyncImage(
+                            model = request,
+                            contentDescription = targetAlbum.name,
+                            error = albumPlaceholder,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
                     }
                 }
             }

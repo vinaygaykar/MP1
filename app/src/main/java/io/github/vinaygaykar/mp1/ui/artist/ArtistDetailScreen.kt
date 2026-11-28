@@ -147,7 +147,7 @@ import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
 @Composable
 fun ArtistDetailScreen(
     onBack: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (String, String?) -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
@@ -210,7 +210,7 @@ fun ArtistDetailContent(
     isSearchingImages: Boolean = false,
     artistId: String = "",
     onBack: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (String, String?) -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
@@ -373,7 +373,7 @@ fun ArtistDetailContent(
                     selectedSongIds = setOf(song.id)
                     showPlaylistSelectionSheet = true
                 },
-                onAlbumClick = onAlbumClick
+                onAlbumClick = { onAlbumClick(it, null) }
             ) {
                 Box(
                     modifier = Modifier
@@ -624,7 +624,7 @@ private fun ArtistDetailPortraitContent(
     onPreviewImageUrlChange: (String?) -> Unit,
     onShowSearchImageDialogChange: (Boolean) -> Unit,
     onBack: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (String, String?) -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     onMiniPlayerCollapseChange: (Boolean) -> Unit,
@@ -972,7 +972,7 @@ private fun ArtistDetailLandscapeContent(
     onPreviewImageUrlChange: (String?) -> Unit,
     onShowSearchImageDialogChange: (Boolean) -> Unit,
     onBack: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (String, String?) -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     onMiniPlayerCollapseChange: (Boolean) -> Unit,
@@ -1314,7 +1314,7 @@ private fun ArtistDetailCompactContent(
     onPreviewImageUrlChange: (String?) -> Unit,
     onShowSearchImageDialogChange: (Boolean) -> Unit,
     onBack: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (String, String?) -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     onMiniPlayerCollapseChange: (Boolean) -> Unit,
@@ -1537,7 +1537,7 @@ private fun ArtistDetailCompactContent(
 private fun AlbumsSection(
     title: String,
     albums: List<Album>,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (albums.isEmpty()) return
@@ -1564,7 +1564,7 @@ private fun AlbumsSection(
             items(albums, key = { it.id }) { album ->
                 ArtistAlbumCard(
                     album = album,
-                    onClick = { onAlbumClick(album.id) }
+                    onClick = { onAlbumClick(album.id, album.artworkUri?.toString()) }
                 )
             }
         }
@@ -1872,7 +1872,7 @@ private fun ArtistDetailScreenPreview() {
                 playbackState = samplePreviewPlaybackState,
                 playlists = samplePreviewPlaylists,
                 onBack = {},
-                onAlbumClick = {},
+                onAlbumClick = { _, _ -> },
                 onArtistClick = { _, _ -> }
             )
         }
@@ -1900,29 +1900,28 @@ fun ArtistAlbumCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            val artworkUri = album.artworkUri
-            if (artworkUri != null) {
-                val request = remember(artworkUri) {
-                    ImageRequest.Builder(context)
-                        .data(artworkUri)
-                        .size(250, 250)
-                        .crossfade(true)
-                        .build()
-                }
-                AsyncImage(
-                    model = request,
-                    contentDescription = album.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Album,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
+            val artworkUriString = album.artworkUri?.toString()
+            val albumPlaceholder = rememberVectorPainter(Icons.Default.Album)
+            val request = remember(artworkUriString, album.id) {
+                ImageRequest.Builder(context)
+                    .data(artworkUriString)
+                    .apply {
+                        if (album.id.isNotEmpty()) {
+                            memoryCacheKey("album_art_${album.id}")
+                            placeholderMemoryCacheKey("album_art_${album.id}")
+                        }
+                    }
+                    .size(250, 250)
+                    .crossfade(false)
+                    .build()
             }
+            AsyncImage(
+                model = request,
+                contentDescription = album.name,
+                error = albumPlaceholder,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
 
         val yearString = album.year?.takeIf { it > 0 }?.toString() ?: ""

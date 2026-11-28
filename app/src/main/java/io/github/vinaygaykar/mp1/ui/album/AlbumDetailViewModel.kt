@@ -17,22 +17,28 @@ import io.github.vinaygaykar.mp1.utils.toArtistId
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class AlbumDetailViewModel @Inject constructor(
-    private val musicRepository: MusicRepository,
+    musicRepository: MusicRepository,
     private val playlistRepository: PlaylistRepository,
     savedStateHandle: SavedStateHandle,
     private val playback: PlaybackClient
 ) : ViewModel() {
 
     val albumId: String = savedStateHandle.get<String>("albumId") ?: ""
+    val initialArtworkUri: String? = savedStateHandle.get<String>("artworkUri")
 
     val album: StateFlow<Album?> = musicRepository.getAlbumByIdFlow(albumId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val albumArtworkUri: StateFlow<String?> = album
+        .map { it?.artworkUri?.toString() ?: initialArtworkUri }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialArtworkUri)
 
     val primaryArtist: StateFlow<Artist?> = combine(
         album,
