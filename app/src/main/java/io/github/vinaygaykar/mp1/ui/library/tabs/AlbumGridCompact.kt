@@ -1,6 +1,7 @@
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -58,6 +59,7 @@ import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
+import io.github.vinaygaykar.mp1.ui.components.albumSharedElement
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -70,6 +72,7 @@ import kotlin.math.abs
  * 4. Selected album artwork floats on the center-right, occupying 40% of parent width, overlapping non-selected titles.
  * 5. Artwork maintains a 1:1 aspect ratio.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AlbumGridCompact(
     albums: List<Album>,
@@ -198,6 +201,7 @@ fun AlbumGridCompact(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .albumSharedElement(key = "album_image_${targetAlbum.id}")
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {

@@ -134,6 +134,7 @@ import io.github.vinaygaykar.mp1.ui.components.LocalAnimatedVisibilityScope
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
+import io.github.vinaygaykar.mp1.ui.components.albumSharedElement
 import io.github.vinaygaykar.mp1.ui.components.artistSharedElement
 import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
@@ -1895,6 +1896,7 @@ fun ArtistAlbumCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
+                .albumSharedElement(key = "album_image_${album.id}")
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {

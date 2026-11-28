@@ -30,3 +30,22 @@ fun Modifier.artistSharedElement(
         this
     }
 }
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.albumSharedElement(
+    key: String,
+    sharedTransitionScope: SharedTransitionScope? = LocalSharedTransitionScope.current,
+    animatedVisibilityScope: AnimatedVisibilityScope? = LocalAnimatedVisibilityScope.current
+): Modifier {
+    return if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            this@albumSharedElement.sharedElement(
+                sharedContentState = rememberSharedContentState(key = key),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+        }
+    } else {
+        this
+    }
+}

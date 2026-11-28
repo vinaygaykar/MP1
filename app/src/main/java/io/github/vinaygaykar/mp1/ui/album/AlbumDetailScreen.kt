@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -117,6 +118,7 @@ import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
+import io.github.vinaygaykar.mp1.ui.components.albumSharedElement
 import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
 import io.github.vinaygaykar.mp1.ui.library.tabs.PlaylistPickerBottomSheet
@@ -151,6 +153,7 @@ fun AlbumDetailScreen(
         featuredArtists = featuredArtists,
         playbackState = playbackState,
         playlists = playlists,
+        albumId = viewModel.albumId,
         onBack = onBack,
         onArtistClick = onArtistClick,
         onHideNowPlayingView = onHideNowPlayingView,
@@ -174,6 +177,7 @@ fun AlbumDetailContent(
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
     playlists: List<Playlist>,
+    albumId: String = "",
     onBack: () -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
@@ -407,6 +411,7 @@ fun AlbumDetailContent(
                                     hasMultipleDiscs = hasMultipleDiscs,
                                     featuredArtists = featuredArtists,
                                     playbackState = playbackState,
+                                    albumId = albumId,
                                     lazyListState = lazyListState,
                                     hazeState = hazeState,
                                     selectedSongIds = selectedSongIds,
@@ -433,6 +438,7 @@ fun AlbumDetailContent(
                                     hasMultipleDiscs = hasMultipleDiscs,
                                     featuredArtists = featuredArtists,
                                     playbackState = playbackState,
+                                    albumId = albumId,
                                     lazyListState = lazyListState,
                                     hazeState = hazeState,
                                     selectedSongIds = selectedSongIds,
@@ -458,6 +464,7 @@ fun AlbumDetailContent(
                                     hasMultipleDiscs = hasMultipleDiscs,
                                     featuredArtists = featuredArtists,
                                     playbackState = playbackState,
+                                    albumId = albumId,
                                     lazyListState = lazyListState,
                                     hazeState = hazeState,
                                     selectedSongIds = selectedSongIds,
@@ -559,6 +566,7 @@ private fun AlbumDetailPortraitContent(
     hasMultipleDiscs: Boolean,
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
+    albumId: String,
     lazyListState: LazyListState,
     hazeState: HazeState,
     selectedSongIds: Set<String>,
@@ -592,6 +600,7 @@ private fun AlbumDetailPortraitContent(
             ) {
                 AlbumArtworkView(
                     album = album,
+                    albumId = albumId,
                     modifier = Modifier
                         .fillMaxWidth(0.65f)
                         .widthIn(max = 260.dp)
@@ -687,6 +696,7 @@ private fun AlbumDetailLandscapeContent(
     hasMultipleDiscs: Boolean,
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
+    albumId: String,
     lazyListState: LazyListState,
     hazeState: HazeState,
     selectedSongIds: Set<String>,
@@ -751,6 +761,7 @@ private fun AlbumDetailLandscapeContent(
             // Album Artwork
             AlbumArtworkView(
                 album = album,
+                albumId = albumId,
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 240.dp)
@@ -846,6 +857,7 @@ private fun AlbumDetailLandscapeContent(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun AlbumDetailCompactContent(
     album: Album?,
@@ -857,6 +869,7 @@ private fun AlbumDetailCompactContent(
     hasMultipleDiscs: Boolean,
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
+    albumId: String,
     lazyListState: LazyListState,
     hazeState: HazeState,
     selectedSongIds: Set<String>,
@@ -878,10 +891,12 @@ private fun AlbumDetailCompactContent(
     ) {
         // Compact Header with Album Artwork Background + slight transparent black overlay (Square Shaped)
         item {
+            val keyId = album?.id ?: albumId
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
+                    .albumSharedElement(key = "album_image_$keyId")
             ) {
                 if (album?.artworkUri != null) {
                     AsyncImage(
@@ -980,15 +995,18 @@ private fun AlbumDetailCompactContent(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun AlbumArtworkView(
     album: Album?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    albumId: String = ""
 ) {
     val context = LocalContext.current
     val artworkUri = album?.artworkUri
+    val keyId = album?.id ?: albumId
     Box(
-        modifier = modifier,
+        modifier = modifier.albumSharedElement(key = "album_image_$keyId"),
         contentAlignment = Alignment.Center
     ) {
         if (artworkUri != null) {

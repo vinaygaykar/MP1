@@ -1,9 +1,9 @@
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -51,8 +51,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -73,6 +73,7 @@ import coil.compose.AsyncImage
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
+import io.github.vinaygaykar.mp1.ui.components.albumSharedElement
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
 import kotlinx.coroutines.delay
@@ -452,6 +453,7 @@ fun MessyFastScrollGrid(
  * Displays album art ONLY (no text labels by design) with staggered alignment, inner border frame,
  * dynamic shadows, and center-focused Z-index layering.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MessyAlbumCardItem(
     album: Album,
@@ -527,6 +529,7 @@ fun MessyAlbumCardItem(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(2.dp)
+                    .albumSharedElement(key = "album_image_${album.id}")
                     .clip(RectangleShape)
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
@@ -574,6 +577,7 @@ fun MessyAlbumCardItem(
 }
 
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun FastGridAlbumItem(
     album: Album,
@@ -617,6 +621,7 @@ fun FastGridAlbumItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
+                    .albumSharedElement(key = "album_image_${album.id}")
                     .clip(RectangleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
@@ -665,6 +670,7 @@ fun FastGridAlbumItem(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AlbumRowItem(
     album: Album,
@@ -732,6 +738,7 @@ fun AlbumRowItem(
                             Modifier.fillMaxWidth()
                         }
                     )
+                    .albumSharedElement(key = "album_image_${album.id}")
                     .clip(RectangleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center

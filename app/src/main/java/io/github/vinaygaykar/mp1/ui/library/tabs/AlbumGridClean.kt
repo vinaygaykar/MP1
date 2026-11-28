@@ -1,5 +1,6 @@
 package io.github.vinaygaykar.mp1.ui.library.tabs
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +43,7 @@ import coil.request.ImageRequest
 import io.github.vinaygaykar.mp1.domain.models.Album
 import io.github.vinaygaykar.mp1.ui.components.SimpleScrollBar
 import io.github.vinaygaykar.mp1.ui.components.StaggeredItemWrapper
+import io.github.vinaygaykar.mp1.ui.components.albumSharedElement
 
 /**
  * AlbumGridClean renders a 2-column grid layout of square album art with sharp corners.
@@ -108,6 +109,7 @@ fun AlbumGridClean(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 /**
  * Square album art item with sharp corners (no text, no card container).
  */
@@ -130,6 +132,7 @@ fun AlbumCleanCard(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
+            .albumSharedElement(key = "album_image_${album.id}")
             .background(backgroundColor)
             .onGloballyPositioned { coords ->
                 itemCoordinates = coords
