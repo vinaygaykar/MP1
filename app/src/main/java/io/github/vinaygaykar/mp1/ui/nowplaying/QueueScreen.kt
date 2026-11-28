@@ -11,7 +11,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -939,12 +941,12 @@ private fun QueueLandscapeContent(
             )
         }
 
-        // Floating Pill with 2 circular buttons in bottom left (vertical layout with background)
+        // Floating Pill with 2 circular buttons in bottom right (vertical layout with background)
         AnimatedVisibility(
             visible = isFloatingPillVisible && !showKebabOptionsMenuSheet && !showQueueMultiSelectionSheet,
             enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomStart)
+            modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             QueueFloatingActionsPill(
                 isShuffleOn = isShuffleOn,
@@ -957,10 +959,10 @@ private fun QueueLandscapeContent(
                     .navigationBarsPadding()
                     .windowInsetsPadding(
                         WindowInsets.displayCutout.only(
-                            WindowInsetsSides.Start
+                            WindowInsetsSides.End
                         )
                     )
-                    .padding(start = 16.dp, bottom = 16.dp)
+                    .padding(end = 16.dp, bottom = 16.dp)
             )
         }
     }
@@ -1398,22 +1400,39 @@ fun QueueKebabOptionsMenuSheet(
         )
     }
 
-    // Custom Overlay: Slides in/out from bottom of screen
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // Custom Overlay: Slides in/out from bottom of screen (portrait) or right of screen (landscape)
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(
-            initialOffsetY = { fullHeight -> fullHeight },
-            animationSpec = tween(durationMillis = 300)
-        ) + fadeIn(animationSpec = tween(durationMillis = 300)),
-        exit = slideOutVertically(
-            targetOffsetY = { fullHeight -> fullHeight },
-            animationSpec = tween(durationMillis = 300)
-        ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+        enter = if (isLandscape) {
+            slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeIn(animationSpec = tween(durationMillis = 300))
+        } else {
+            slideInVertically(
+                initialOffsetY = { fullHeight -> fullHeight },
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeIn(animationSpec = tween(durationMillis = 300))
+        },
+        exit = if (isLandscape) {
+            slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeOut(animationSpec = tween(durationMillis = 300))
+        } else {
+            slideOutVertically(
+                targetOffsetY = { fullHeight -> fullHeight },
+                animationSpec = tween(durationMillis = 300)
+            ) + fadeOut(animationSpec = tween(durationMillis = 300))
+        },
         modifier = Modifier.fillMaxSize()
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomCenter
+            contentAlignment = if (isLandscape) Alignment.BottomEnd else Alignment.BottomCenter
         ) {
             QueueKebabOptionsMenuContent(
                 isShuffleOn = isShuffleOn,
@@ -1442,31 +1461,63 @@ fun QueueKebabOptionsMenuContent(
     onClearQueue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val baseColor = MaterialTheme.colorScheme.primaryContainer
-    val gradientBackground = remember(baseColor) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.Transparent,
-                baseColor.copy(alpha = 0.5f),
-                baseColor
+
+    val gradientBackground = remember(baseColor, isLandscape) {
+        if (isLandscape) {
+            Brush.horizontalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    baseColor.copy(alpha = 0.5f),
+                    baseColor
+                )
             )
-        )
+        } else {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    baseColor.copy(alpha = 0.5f),
+                    baseColor
+                )
+            )
+        }
     }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .wrapContentHeight()
-            .background(brush = gradientBackground),
-        contentAlignment = Alignment.Center
+        modifier = if (isLandscape) {
+            modifier
+                .fillMaxHeight()
+                .wrapContentWidth()
+                .background(brush = gradientBackground)
+        } else {
+            modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .background(brush = gradientBackground)
+        },
+        contentAlignment = if (isLandscape) Alignment.BottomEnd else Alignment.Center
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(start = 20.dp, top = 52.dp, end = 20.dp, bottom = 44.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = if (isLandscape) {
+                Modifier
+                    .fillMaxHeight()
+                    .wrapContentWidth()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .windowInsetsPadding(
+                        WindowInsets.displayCutout.only(WindowInsetsSides.End)
+                    )
+                    .padding(start = 64.dp, top = 24.dp, end = 24.dp, bottom = 24.dp)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 20.dp, top = 52.dp, end = 20.dp, bottom = 44.dp)
+            },
+            horizontalAlignment = if (isLandscape) Alignment.End else Alignment.CenterHorizontally,
+            verticalArrangement = if (isLandscape) Arrangement.spacedBy(16.dp, Alignment.Bottom) else Arrangement.spacedBy(16.dp)
         ) {
             // Button 1: Shuffle Toggle (icon + text, content width)
             FilledTonalButton(
