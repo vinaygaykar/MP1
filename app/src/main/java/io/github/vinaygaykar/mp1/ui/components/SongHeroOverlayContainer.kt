@@ -92,9 +92,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -168,22 +165,6 @@ fun SongHeroOverlayContainer(
         modifier = modifier
             .fillMaxSize()
             .zIndex(if (overlayData != null) 100f else 0f)
-            .then(
-                if (overlayData != null) {
-                    Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Main)
-                                event.changes.forEach { change ->
-                                    if (change.positionChange() != Offset.Zero) {
-                                        change.consume()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else Modifier
-            )
     ) {
         // Parent Screen Content (Haze blur source)
         Box(
