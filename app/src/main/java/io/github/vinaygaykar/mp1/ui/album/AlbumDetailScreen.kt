@@ -130,7 +130,7 @@ import kotlin.math.ceil
 @Composable
 fun AlbumDetailScreen(
     onBack: () -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
@@ -175,7 +175,7 @@ fun AlbumDetailContent(
     playbackState: PlaybackUiState,
     playlists: List<Playlist>,
     onBack: () -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
@@ -563,7 +563,7 @@ private fun AlbumDetailPortraitContent(
     hazeState: HazeState,
     selectedSongIds: Set<String>,
     isSelectionMode: Boolean,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     toggleSongSelection: (Song) -> Unit,
     onMoreClick: (Offset, IntSize, Song) -> Unit,
@@ -630,7 +630,7 @@ private fun AlbumDetailPortraitContent(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { primaryArtist?.let { onArtistClick(it.id) } }
+                            .clickable { primaryArtist?.let { onArtistClick(it.id, it.imageUrl) } }
                             .basicMarquee()
                     )
                 }
@@ -692,7 +692,7 @@ private fun AlbumDetailLandscapeContent(
     selectedSongIds: Set<String>,
     isSelectionMode: Boolean,
     onBack: () -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     toggleSongSelection: (Song) -> Unit,
     onMoreClick: (Offset, IntSize, Song) -> Unit,
@@ -812,7 +812,7 @@ private fun AlbumDetailLandscapeContent(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { primaryArtist?.let { onArtistClick(it.id) } }
+                                    .clickable { primaryArtist?.let { onArtistClick(it.id, it.imageUrl) } }
                                     .basicMarquee()
                             )
                         }
@@ -861,7 +861,7 @@ private fun AlbumDetailCompactContent(
     hazeState: HazeState,
     selectedSongIds: Set<String>,
     isSelectionMode: Boolean,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     toggleSongSelection: (Song) -> Unit,
     onMoreClick: (Offset, IntSize, Song) -> Unit,
@@ -937,7 +937,7 @@ private fun AlbumDetailCompactContent(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
-                                .clickable { primaryArtist?.let { onArtistClick(it.id) } }
+                                .clickable { primaryArtist?.let { onArtistClick(it.id, it.imageUrl) } }
                                 .basicMarquee()
                         )
                     }
@@ -1056,7 +1056,7 @@ private fun AlbumDetailsSummary(
 private fun FeaturedArtistsSection(
     featuredArtists: List<Artist>,
     playbackState: PlaybackUiState,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (featuredArtists.isEmpty()) return
@@ -1088,7 +1088,7 @@ private fun FeaturedArtistsSection(
                     playingArtist = playbackState.artist,
                     playingAlbum = playbackState.album,
                     isPlaying = playbackState.isPlaying,
-                    onClick = { onArtistClick(artist.id) }
+                    onClick = { onArtistClick(artist.id, artist.imageUrl) }
                 )
             }
         }
@@ -1500,7 +1500,7 @@ private fun AlbumDetailScreenPreview() {
                 playbackState = samplePreviewPlaybackState,
                 playlists = samplePreviewPlaylists,
                 onBack = {},
-                onArtistClick = {}
+                onArtistClick = { _, _ -> }
             )
         }
     }

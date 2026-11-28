@@ -1,7 +1,6 @@
 package io.github.vinaygaykar.mp1
 
 import android.app.Activity
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -330,13 +329,17 @@ fun MainScreen(
                                     ) + fadeOut(tween(350))
                                 }
                             ) {
-                                AlbumDetailScreen(
-                                    onBack = { navController.popBackStack() },
-                                    onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
-                                    onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
-                                    onHideNowPlayingView = { nowPlayingController.hide() },
-                                    onShowNowPlayingView = { nowPlayingController.show() }
-                                )
+                                CompositionLocalProvider(
+                                    LocalAnimatedVisibilityScope provides this@composable
+                                ) {
+                                    AlbumDetailScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onArtistClick = { id, imageUrl -> navController.navigate(Routes.artistDetail(id, imageUrl)) },
+                                        onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
+                                        onHideNowPlayingView = { nowPlayingController.hide() },
+                                        onShowNowPlayingView = { nowPlayingController.show() }
+                                    )
+                                }
                             }
                             composable(
                                 route = Routes.ARTIST_DETAIL,
@@ -359,7 +362,7 @@ fun MainScreen(
                                     ArtistDetailScreen(
                                         onBack = { navController.popBackStack() },
                                         onAlbumClick = { navController.navigate("album_detail/$it") },
-                                        onArtistClick = { navController.navigate(Routes.artistDetail(it)) },
+                                        onArtistClick = { id, imageUrl -> navController.navigate(Routes.artistDetail(id, imageUrl)) },
                                         onMiniPlayerCollapseChange = { isMiniPlayerCollapsedOnScroll = it },
                                         onHideNowPlayingView = { nowPlayingController.hide() },
                                         onShowNowPlayingView = { nowPlayingController.show() }

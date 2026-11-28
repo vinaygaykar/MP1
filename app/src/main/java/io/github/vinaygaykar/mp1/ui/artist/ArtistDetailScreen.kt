@@ -147,7 +147,7 @@ import io.github.vinaygaykar.mp1.ui.theme.rememberMorphingArtistShape
 fun ArtistDetailScreen(
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
@@ -210,7 +210,7 @@ fun ArtistDetailContent(
     artistId: String = "",
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onHideNowPlayingView: () -> Unit = {},
     onShowNowPlayingView: () -> Unit = {},
     onMiniPlayerCollapseChange: (Boolean) -> Unit = {},
@@ -624,7 +624,7 @@ private fun ArtistDetailPortraitContent(
     onShowSearchImageDialogChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     onMiniPlayerCollapseChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -972,7 +972,7 @@ private fun ArtistDetailLandscapeContent(
     onShowSearchImageDialogChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     onMiniPlayerCollapseChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -1314,7 +1314,7 @@ private fun ArtistDetailCompactContent(
     onShowSearchImageDialogChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     onMiniPlayerCollapseChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -1363,6 +1363,7 @@ private fun ArtistDetailCompactContent(
                 ArtistCompactHeader(
                     artistName = displayedArtistName,
                     artistImageUrl = artistImageUrl,
+                    artistId = artistId,
                     onImageClick = {
                         if (!artistImageUrl.isNullOrEmpty()) {
                             onPreviewImageUrlChange(artistImageUrl)
@@ -1574,7 +1575,7 @@ private fun CollaboratorsSection(
     title: String,
     collaborators: List<Artist>,
     playbackState: PlaybackUiState,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (collaborators.isEmpty()) return
@@ -1604,7 +1605,7 @@ private fun CollaboratorsSection(
                     playingArtist = playbackState.artist,
                     playingAlbum = playbackState.album,
                     isPlaying = playbackState.isPlaying,
-                    onClick = { onArtistClick(collaborator.id) }
+                    onClick = { onArtistClick(collaborator.id, collaborator.imageUrl) }
                 )
             }
         }
@@ -1615,6 +1616,7 @@ private fun CollaboratorsSection(
 private fun ArtistCompactHeader(
     artistName: String,
     artistImageUrl: String?,
+    artistId: String = "",
     onImageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1623,6 +1625,7 @@ private fun ArtistCompactHeader(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
+            .artistSharedElement(key = "artist_image_${artistId}")
             .background(MaterialTheme.colorScheme.primaryContainer)
             .clickable { onImageClick() },
         contentAlignment = Alignment.BottomStart
@@ -1869,7 +1872,7 @@ private fun ArtistDetailScreenPreview() {
                 playlists = samplePreviewPlaylists,
                 onBack = {},
                 onAlbumClick = {},
-                onArtistClick = {}
+                onArtistClick = { _, _ -> }
             )
         }
     }
@@ -1971,6 +1974,7 @@ fun CollaboratorArtistCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
+                .artistSharedElement(key = "artist_image_${artist.id}")
                 .clip(collaboratorShape)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
