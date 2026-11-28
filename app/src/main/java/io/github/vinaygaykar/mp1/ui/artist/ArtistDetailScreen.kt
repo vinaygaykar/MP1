@@ -61,7 +61,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -134,7 +133,6 @@ import io.github.vinaygaykar.mp1.ui.components.LocalAnimatedVisibilityScope
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
-import io.github.vinaygaykar.mp1.ui.components.albumSharedElement
 import io.github.vinaygaykar.mp1.ui.components.artistSharedElement
 import io.github.vinaygaykar.mp1.ui.library.SongsMultiSelectOverlay
 import io.github.vinaygaykar.mp1.ui.library.tabs.CreatePlaylistDialog
@@ -195,7 +193,7 @@ fun ArtistDetailScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3WindowSizeClassApi::class)
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun ArtistDetailContent(
     artist: Artist?,
@@ -1896,7 +1894,6 @@ fun ArtistAlbumCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .albumSharedElement(key = "album_image_${album.id}")
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
@@ -1975,7 +1972,6 @@ fun CollaboratorArtistCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .artistSharedElement(key = "artist_image_${artist.id}")
                 .clip(collaboratorShape)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
