@@ -5,7 +5,12 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -68,6 +73,7 @@ import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
@@ -80,6 +86,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -116,6 +123,7 @@ import io.github.vinaygaykar.mp1.ui.artist.CollaboratorArtistCard
 import io.github.vinaygaykar.mp1.ui.components.AutoResizedText
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkItem
 import io.github.vinaygaykar.mp1.ui.components.FlyingArtworkOverlay
+import io.github.vinaygaykar.mp1.ui.components.LocalAnimatedVisibilityScope
 import io.github.vinaygaykar.mp1.ui.components.SongHeroOverlayContainer
 import io.github.vinaygaykar.mp1.ui.components.SongListItem
 import io.github.vinaygaykar.mp1.ui.components.SongOverlayData
@@ -127,6 +135,7 @@ import io.github.vinaygaykar.mp1.ui.theme.DynamicThemeHelper
 import io.github.vinaygaykar.mp1.ui.theme.MusicPlayerTheme
 import io.github.vinaygaykar.mp1.utils.joinArtistsForDisplay
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
+import kotlinx.coroutines.delay
 import kotlin.math.ceil
 
 
@@ -247,6 +256,37 @@ fun AlbumDetailContent(
     val isDark = isSystemInDarkTheme()
     var seedColor by remember { mutableStateOf<Color?>(null) }
 
+    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+    val isContentVisible by remember(animatedVisibilityScope) {
+        derivedStateOf {
+            if (animatedVisibilityScope == null) true
+            else animatedVisibilityScope.transition.targetState == EnterExitState.Visible
+        }
+    }
+
+    var isTransitionCompleted by remember(animatedVisibilityScope) {
+        mutableStateOf(animatedVisibilityScope == null)
+    }
+
+    var hasPlayedEntryAnimation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(animatedVisibilityScope) {
+        if (animatedVisibilityScope != null) {
+            val transition = animatedVisibilityScope.transition
+            while (transition.currentState != EnterExitState.Visible || transition.targetState != EnterExitState.Visible) {
+                delay(16)
+            }
+        }
+        isTransitionCompleted = true
+    }
+
+    LaunchedEffect(isTransitionCompleted) {
+        if (isTransitionCompleted) {
+            delay(650)
+            hasPlayedEntryAnimation = true
+        }
+    }
+
     LaunchedEffect(album?.artworkUri) {
         seedColor = DynamicThemeHelper.extractSeedColor(context, album?.artworkUri)
     }
@@ -257,7 +297,25 @@ fun AlbumDetailContent(
         }
     }
 
-    val currentColorScheme = themeColorScheme ?: MaterialTheme.colorScheme
+    val baseColorScheme = themeColorScheme ?: MaterialTheme.colorScheme
+
+    val animatedBackground by animateColorAsState(baseColorScheme.background, tween(350), label = "bg")
+    val animatedOnBackground by animateColorAsState(baseColorScheme.onBackground, tween(350), label = "onBg")
+    val animatedSurface by animateColorAsState(baseColorScheme.surface, tween(350), label = "surf")
+    val animatedOnSurface by animateColorAsState(baseColorScheme.onSurface, tween(350), label = "onSurf")
+    val animatedOnSurfaceVariant by animateColorAsState(baseColorScheme.onSurfaceVariant, tween(350), label = "onSurfVar")
+    val animatedPrimary by animateColorAsState(baseColorScheme.primary, tween(350), label = "pri")
+    val animatedSecondary by animateColorAsState(baseColorScheme.secondary, tween(350), label = "sec")
+
+    val currentColorScheme = baseColorScheme.copy(
+        background = animatedBackground,
+        onBackground = animatedOnBackground,
+        surface = animatedSurface,
+        onSurface = animatedOnSurface,
+        onSurfaceVariant = animatedOnSurfaceVariant,
+        primary = animatedPrimary,
+        secondary = animatedSecondary
+    )
 
     val activity = context as? Activity
     val windowSizeClass = activity?.let { calculateWindowSizeClass(it) }
@@ -402,90 +460,97 @@ fun AlbumDetailContent(
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    key(seedColor) {
-                        when {
-                            isWideWindow -> {
-                                AlbumDetailLandscapeContent(
-                                    album = album,
-                                    primaryArtist = primaryArtist,
-                                    artistName = artistName,
-                                    hasArtist = hasArtist,
-                                    songs = songs,
-                                    songsByDisc = songsByDisc,
-                                    hasMultipleDiscs = hasMultipleDiscs,
-                                    featuredArtists = featuredArtists,
-                                    playbackState = playbackState,
-                                    albumId = albumId,
-                                    artworkUri = artworkUri,
-                                    lazyListState = lazyListState,
-                                    hazeState = hazeState,
-                                    selectedSongIds = selectedSongIds,
-                                    isSelectionMode = isSelectionMode,
-                                    onBack = onBack,
-                                    onArtistClick = onArtistClick,
-                                    onPlaySong = onPlaySong,
-                                    toggleSongSelection = ::toggleSongSelection,
-                                    onMoreClick = { offset, size, song ->
-                                        activeOverlayData = SongOverlayData(song, offset, size)
-                                    },
-                                    bottomPadding = bottomPadding,
-                                    statusBarTop = statusBarTop
-                                )
-                            }
-                            isCompactHeight -> {
-                                AlbumDetailCompactContent(
-                                    album = album,
-                                    primaryArtist = primaryArtist,
-                                    artistName = artistName,
-                                    hasArtist = hasArtist,
-                                    songs = songs,
-                                    songsByDisc = songsByDisc,
-                                    hasMultipleDiscs = hasMultipleDiscs,
-                                    featuredArtists = featuredArtists,
-                                    playbackState = playbackState,
-                                    albumId = albumId,
-                                    artworkUri = artworkUri,
-                                    lazyListState = lazyListState,
-                                    hazeState = hazeState,
-                                    selectedSongIds = selectedSongIds,
-                                    isSelectionMode = isSelectionMode,
-                                    onArtistClick = onArtistClick,
-                                    onPlaySong = onPlaySong,
-                                    toggleSongSelection = ::toggleSongSelection,
-                                    onMoreClick = { offset, size, song ->
-                                        activeOverlayData = SongOverlayData(song, offset, size)
-                                    },
-                                    bottomPadding = bottomPadding,
-                                    statusBarTop = statusBarTop
-                                )
-                            }
-                            else -> {
-                                AlbumDetailPortraitContent(
-                                    album = album,
-                                    primaryArtist = primaryArtist,
-                                    artistName = artistName,
-                                    hasArtist = hasArtist,
-                                    songs = songs,
-                                    songsByDisc = songsByDisc,
-                                    hasMultipleDiscs = hasMultipleDiscs,
-                                    featuredArtists = featuredArtists,
-                                    playbackState = playbackState,
-                                    albumId = albumId,
-                                    artworkUri = artworkUri,
-                                    lazyListState = lazyListState,
-                                    hazeState = hazeState,
-                                    selectedSongIds = selectedSongIds,
-                                    isSelectionMode = isSelectionMode,
-                                    onArtistClick = onArtistClick,
-                                    onPlaySong = onPlaySong,
-                                    toggleSongSelection = ::toggleSongSelection,
-                                    onMoreClick = { offset, size, song ->
-                                        activeOverlayData = SongOverlayData(song, offset, size)
-                                    },
-                                    bottomPadding = bottomPadding,
-                                    statusBarTop = statusBarTop
-                                )
-                            }
+                    when {
+                        isWideWindow -> {
+                            AlbumDetailLandscapeContent(
+                                album = album,
+                                primaryArtist = primaryArtist,
+                                artistName = artistName,
+                                hasArtist = hasArtist,
+                                songs = songs,
+                                songsByDisc = songsByDisc,
+                                hasMultipleDiscs = hasMultipleDiscs,
+                                featuredArtists = featuredArtists,
+                                playbackState = playbackState,
+                                albumId = albumId,
+                                artworkUri = artworkUri,
+                                lazyListState = lazyListState,
+                                hazeState = hazeState,
+                                selectedSongIds = selectedSongIds,
+                                isSelectionMode = isSelectionMode,
+                                isContentVisible = isContentVisible,
+                                isTransitionCompleted = isTransitionCompleted,
+                                hasPlayedEntryAnimation = hasPlayedEntryAnimation,
+                                onBack = onBack,
+                                onArtistClick = onArtistClick,
+                                onPlaySong = onPlaySong,
+                                toggleSongSelection = ::toggleSongSelection,
+                                onMoreClick = { offset, size, song ->
+                                    activeOverlayData = SongOverlayData(song, offset, size)
+                                },
+                                bottomPadding = bottomPadding,
+                                statusBarTop = statusBarTop
+                            )
+                        }
+                        isCompactHeight -> {
+                            AlbumDetailCompactContent(
+                                album = album,
+                                primaryArtist = primaryArtist,
+                                artistName = artistName,
+                                hasArtist = hasArtist,
+                                songs = songs,
+                                songsByDisc = songsByDisc,
+                                hasMultipleDiscs = hasMultipleDiscs,
+                                featuredArtists = featuredArtists,
+                                playbackState = playbackState,
+                                albumId = albumId,
+                                artworkUri = artworkUri,
+                                lazyListState = lazyListState,
+                                hazeState = hazeState,
+                                selectedSongIds = selectedSongIds,
+                                isSelectionMode = isSelectionMode,
+                                isContentVisible = isContentVisible,
+                                isTransitionCompleted = isTransitionCompleted,
+                                hasPlayedEntryAnimation = hasPlayedEntryAnimation,
+                                onArtistClick = onArtistClick,
+                                onPlaySong = onPlaySong,
+                                toggleSongSelection = ::toggleSongSelection,
+                                onMoreClick = { offset, size, song ->
+                                    activeOverlayData = SongOverlayData(song, offset, size)
+                                },
+                                bottomPadding = bottomPadding,
+                                statusBarTop = statusBarTop
+                            )
+                        }
+                        else -> {
+                            AlbumDetailPortraitContent(
+                                album = album,
+                                primaryArtist = primaryArtist,
+                                artistName = artistName,
+                                hasArtist = hasArtist,
+                                songs = songs,
+                                songsByDisc = songsByDisc,
+                                hasMultipleDiscs = hasMultipleDiscs,
+                                featuredArtists = featuredArtists,
+                                playbackState = playbackState,
+                                albumId = albumId,
+                                artworkUri = artworkUri,
+                                lazyListState = lazyListState,
+                                hazeState = hazeState,
+                                selectedSongIds = selectedSongIds,
+                                isSelectionMode = isSelectionMode,
+                                isContentVisible = isContentVisible,
+                                isTransitionCompleted = isTransitionCompleted,
+                                hasPlayedEntryAnimation = hasPlayedEntryAnimation,
+                                onArtistClick = onArtistClick,
+                                onPlaySong = onPlaySong,
+                                toggleSongSelection = ::toggleSongSelection,
+                                onMoreClick = { offset, size, song ->
+                                    activeOverlayData = SongOverlayData(song, offset, size)
+                                },
+                                bottomPadding = bottomPadding,
+                                statusBarTop = statusBarTop
+                            )
                         }
                     }
 
@@ -499,6 +564,12 @@ fun AlbumDetailContent(
                                 .displayCutoutPadding()
                                 .padding(start = 16.dp, top = 8.dp)
                                 .zIndex(3f)
+                                .staggeredSlideIn(
+                                    visible = if (hasPlayedEntryAnimation) true else isContentVisible,
+                                    delayMs = if (hasPlayedEntryAnimation) 0 else 40,
+                                    initialOffsetYPx = -40f,
+                                    skipAnimation = hasPlayedEntryAnimation
+                                )
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -579,6 +650,9 @@ private fun AlbumDetailPortraitContent(
     hazeState: HazeState,
     selectedSongIds: Set<String>,
     isSelectionMode: Boolean,
+    isContentVisible: Boolean = true,
+    isTransitionCompleted: Boolean = true,
+    hasPlayedEntryAnimation: Boolean = false,
     onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     toggleSongSelection: (Song) -> Unit,
@@ -623,7 +697,12 @@ private fun AlbumDetailPortraitContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                    .staggeredSlideIn(
+                        visible = if (hasPlayedEntryAnimation) true else isContentVisible,
+                        delayMs = if (hasPlayedEntryAnimation) 0 else 60,
+                        skipAnimation = hasPlayedEntryAnimation
+                    ),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 AutoResizedText(
@@ -664,31 +743,46 @@ private fun AlbumDetailPortraitContent(
             AlbumDetailsSummary(
                 album = album,
                 songs = songs,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                    .staggeredSlideIn(
+                        visible = if (hasPlayedEntryAnimation) true else isContentVisible,
+                        delayMs = if (hasPlayedEntryAnimation) 0 else 120,
+                        skipAnimation = hasPlayedEntryAnimation
+                    ),
                 textAlign = TextAlign.Start
             )
         }
 
         // 3. List of Songs
-        albumSongsListItems(
-            songsByDisc = songsByDisc,
-            hasMultipleDiscs = hasMultipleDiscs,
-            songs = songs,
-            selectedSongIds = selectedSongIds,
-            isSelectionMode = isSelectionMode,
-            onPlaySong = onPlaySong,
-            toggleSongSelection = toggleSongSelection,
-            onMoreClick = onMoreClick
-        )
+        if (isTransitionCompleted) {
+            albumSongsListItems(
+                songsByDisc = songsByDisc,
+                hasMultipleDiscs = hasMultipleDiscs,
+                songs = songs,
+                selectedSongIds = selectedSongIds,
+                isSelectionMode = isSelectionMode,
+                onPlaySong = onPlaySong,
+                toggleSongSelection = toggleSongSelection,
+                onMoreClick = onMoreClick,
+                isTransitionCompleted = isTransitionCompleted,
+                hasPlayedEntryAnimation = hasPlayedEntryAnimation
+            )
 
-        // Featured Artists Section
-        if (featuredArtists.isNotEmpty()) {
-            item {
-                FeaturedArtistsSection(
-                    featuredArtists = featuredArtists,
-                    playbackState = playbackState,
-                    onArtistClick = onArtistClick
-                )
+            // Featured Artists Section
+            if (featuredArtists.isNotEmpty()) {
+                item {
+                    FeaturedArtistsSection(
+                        featuredArtists = featuredArtists,
+                        playbackState = playbackState,
+                        onArtistClick = onArtistClick,
+                        modifier = Modifier.staggeredSlideIn(
+                            visible = if (hasPlayedEntryAnimation) true else isTransitionCompleted,
+                            delayMs = if (hasPlayedEntryAnimation) 0 else 240,
+                            skipAnimation = hasPlayedEntryAnimation
+                        )
+                    )
+                }
             }
         }
     }
@@ -711,6 +805,9 @@ private fun AlbumDetailLandscapeContent(
     hazeState: HazeState,
     selectedSongIds: Set<String>,
     isSelectionMode: Boolean,
+    isContentVisible: Boolean = true,
+    isTransitionCompleted: Boolean = true,
+    hasPlayedEntryAnimation: Boolean = false,
     onBack: () -> Unit,
     onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
@@ -809,7 +906,12 @@ private fun AlbumDetailLandscapeContent(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp),
+                            .padding(bottom = 8.dp)
+                            .staggeredSlideIn(
+                                visible = if (hasPlayedEntryAnimation) true else isContentVisible,
+                                delayMs = if (hasPlayedEntryAnimation) 0 else 60,
+                                skipAnimation = hasPlayedEntryAnimation
+                            ),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         AutoResizedText(
@@ -842,25 +944,27 @@ private fun AlbumDetailLandscapeContent(
                 }
 
                 // Songs List
-                albumSongsListItems(
-                    songsByDisc = songsByDisc,
-                    hasMultipleDiscs = hasMultipleDiscs,
-                    songs = songs,
-                    selectedSongIds = selectedSongIds,
-                    isSelectionMode = isSelectionMode,
-                    onPlaySong = onPlaySong,
-                    toggleSongSelection = toggleSongSelection,
-                    onMoreClick = onMoreClick
-                )
+                if (isTransitionCompleted) {
+                    albumSongsListItems(
+                        songsByDisc = songsByDisc,
+                        hasMultipleDiscs = hasMultipleDiscs,
+                        songs = songs,
+                        selectedSongIds = selectedSongIds,
+                        isSelectionMode = isSelectionMode,
+                        onPlaySong = onPlaySong,
+                        toggleSongSelection = toggleSongSelection,
+                        onMoreClick = onMoreClick
+                    )
 
-                // Featured Artists Section all the way at the end
-                if (featuredArtists.isNotEmpty()) {
-                    item(key = "featured_artists_section_last") {
-                        FeaturedArtistsSection(
-                            featuredArtists = featuredArtists,
-                            playbackState = playbackState,
-                            onArtistClick = onArtistClick
-                        )
+                    // Featured Artists Section all the way at the end
+                    if (featuredArtists.isNotEmpty()) {
+                        item(key = "featured_artists_section_last") {
+                            FeaturedArtistsSection(
+                                featuredArtists = featuredArtists,
+                                playbackState = playbackState,
+                                onArtistClick = onArtistClick
+                            )
+                        }
                     }
                 }
             }
@@ -886,6 +990,9 @@ private fun AlbumDetailCompactContent(
     hazeState: HazeState,
     selectedSongIds: Set<String>,
     isSelectionMode: Boolean,
+    isContentVisible: Boolean = true,
+    isTransitionCompleted: Boolean = true,
+    hasPlayedEntryAnimation: Boolean = false,
     onArtistClick: (String, String?) -> Unit,
     onPlaySong: (Song) -> Unit,
     toggleSongSelection: (Song) -> Unit,
@@ -988,31 +1095,39 @@ private fun AlbumDetailCompactContent(
             AlbumDetailsSummary(
                 album = album,
                 songs = songs,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .staggeredSlideIn(
+                        visible = if (hasPlayedEntryAnimation) true else isContentVisible,
+                        delayMs = if (hasPlayedEntryAnimation) 0 else 120,
+                        skipAnimation = hasPlayedEntryAnimation
+                    ),
                 textAlign = TextAlign.Start
             )
         }
 
         // Songs List starting on actual normal background
-        albumSongsListItems(
-            songsByDisc = songsByDisc,
-            hasMultipleDiscs = hasMultipleDiscs,
-            songs = songs,
-            selectedSongIds = selectedSongIds,
-            isSelectionMode = isSelectionMode,
-            onPlaySong = onPlaySong,
-            toggleSongSelection = toggleSongSelection,
-            onMoreClick = onMoreClick
-        )
+        if (isTransitionCompleted) {
+            albumSongsListItems(
+                songsByDisc = songsByDisc,
+                hasMultipleDiscs = hasMultipleDiscs,
+                songs = songs,
+                selectedSongIds = selectedSongIds,
+                isSelectionMode = isSelectionMode,
+                onPlaySong = onPlaySong,
+                toggleSongSelection = toggleSongSelection,
+                onMoreClick = onMoreClick
+            )
 
-        // Featured Artists
-        if (featuredArtists.isNotEmpty()) {
-            item {
-                FeaturedArtistsSection(
-                    featuredArtists = featuredArtists,
-                    playbackState = playbackState,
-                    onArtistClick = onArtistClick
-                )
+            // Featured Artists
+            if (featuredArtists.isNotEmpty()) {
+                item {
+                    FeaturedArtistsSection(
+                        featuredArtists = featuredArtists,
+                        playbackState = playbackState,
+                        onArtistClick = onArtistClick
+                    )
+                }
             }
         }
     }
@@ -1139,9 +1254,12 @@ private fun LazyListScope.albumSongsListItems(
     isSelectionMode: Boolean,
     onPlaySong: (Song) -> Unit,
     toggleSongSelection: (Song) -> Unit,
-    onMoreClick: (Offset, IntSize, Song) -> Unit
+    onMoreClick: (Offset, IntSize, Song) -> Unit,
+    isTransitionCompleted: Boolean = true,
+    hasPlayedEntryAnimation: Boolean = false
 ) {
     if (hasMultipleDiscs) {
+        var overallIndex = 0
         songsByDisc.forEach { (discNumber, discSongs) ->
             item(key = "disc_header_$discNumber") {
                 Text(
@@ -1159,8 +1277,10 @@ private fun LazyListScope.albumSongsListItems(
                         )
                 )
             }
-            itemsIndexed(discSongs, key = { _, song -> song.id }) { _, song ->
+            itemsIndexed(discSongs, key = { _, song -> song.id }) { indexInDisc, song ->
                 val isSelected = selectedSongIds.contains(song.id)
+                val delayMs = if (hasPlayedEntryAnimation) 0 else minOf(overallIndex * 35, 300)
+                overallIndex++
                 SongListItem(
                     song = song,
                     onClick = {
@@ -1176,13 +1296,19 @@ private fun LazyListScope.albumSongsListItems(
                     onLongClick = { toggleSongSelection(song) },
                     onMoreClick = { offset, size ->
                         onMoreClick(offset, size, song)
-                    }
+                    },
+                    modifier = Modifier.staggeredSlideIn(
+                        visible = if (hasPlayedEntryAnimation) true else isTransitionCompleted,
+                        delayMs = delayMs,
+                        skipAnimation = hasPlayedEntryAnimation
+                    )
                 )
             }
         }
     } else {
-        itemsIndexed(songs, key = { _, song -> song.id }) { _, song ->
+        itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
             val isSelected = selectedSongIds.contains(song.id)
+            val delayMs = if (hasPlayedEntryAnimation) 0 else minOf(index * 35, 300)
             SongListItem(
                 song = song,
                 onClick = {
@@ -1198,7 +1324,12 @@ private fun LazyListScope.albumSongsListItems(
                 onLongClick = { toggleSongSelection(song) },
                 onMoreClick = { offset, size ->
                     onMoreClick(offset, size, song)
-                }
+                },
+                modifier = Modifier.staggeredSlideIn(
+                    visible = if (hasPlayedEntryAnimation) true else isTransitionCompleted,
+                    delayMs = delayMs,
+                    skipAnimation = hasPlayedEntryAnimation
+                )
             )
         }
     }
@@ -1539,5 +1670,39 @@ private fun AlbumDetailScreenPreview() {
                 onArtistClick = { _, _ -> }
             )
         }
+    }
+}
+
+@Composable
+private fun Modifier.staggeredSlideIn(
+    visible: Boolean,
+    delayMs: Int = 0,
+    durationMs: Int = 400,
+    initialOffsetYPx: Float = 120f,
+    skipAnimation: Boolean = false
+): Modifier {
+    if (skipAnimation) {
+        return this
+    }
+
+    val progress = remember { Animatable(0f) }
+
+    LaunchedEffect(visible) {
+        if (visible) {
+            if (delayMs > 0) {
+                delay(delayMs.toLong())
+            }
+            progress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = durationMs, easing = EaseOutCubic)
+            )
+        } else {
+            progress.snapTo(0f)
+        }
+    }
+
+    return this.graphicsLayer {
+        this.alpha = progress.value
+        this.translationY = (1f - progress.value) * initialOffsetYPx
     }
 }

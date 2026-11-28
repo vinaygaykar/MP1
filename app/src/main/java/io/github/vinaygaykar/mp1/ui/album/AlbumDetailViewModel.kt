@@ -14,9 +14,11 @@ import io.github.vinaygaykar.mp1.domain.repository.PlaylistRepository
 import io.github.vinaygaykar.mp1.playback.client.PlaybackClient
 import io.github.vinaygaykar.mp1.utils.splitArtistsByDelimiters
 import io.github.vinaygaykar.mp1.utils.toArtistId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -32,6 +34,13 @@ class AlbumDetailViewModel @Inject constructor(
 
     val albumId: String = savedStateHandle.get<String>("albumId") ?: ""
     val initialArtworkUri: String? = savedStateHandle.get<String>("artworkUri")
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            musicRepository.getAlbumByIdFlow(albumId).firstOrNull()
+            musicRepository.getSongsByAlbum(albumId).firstOrNull()
+        }
+    }
 
     val album: StateFlow<Album?> = musicRepository.getAlbumByIdFlow(albumId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

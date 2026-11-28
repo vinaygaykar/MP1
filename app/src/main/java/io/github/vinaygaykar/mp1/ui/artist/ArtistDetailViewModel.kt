@@ -13,11 +13,13 @@ import io.github.vinaygaykar.mp1.domain.models.Song
 import io.github.vinaygaykar.mp1.domain.repository.MusicRepository
 import io.github.vinaygaykar.mp1.domain.repository.PlaylistRepository
 import io.github.vinaygaykar.mp1.playback.client.PlaybackClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -37,6 +39,13 @@ class ArtistDetailViewModel @Inject constructor(
 
     val artistId: String = savedStateHandle.get<String>("artistId") ?: ""
     val initialImageUrl: String? = savedStateHandle.get<String>("imageUrl")
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            musicRepository.getArtistByIdFlow(artistId).firstOrNull()
+            musicRepository.getSongsByArtist(artistId).firstOrNull()
+        }
+    }
 
     private val _candidateImages = MutableStateFlow<List<DeezerArtist>>(emptyList())
     val candidateImages: StateFlow<List<DeezerArtist>> = _candidateImages.asStateFlow()
